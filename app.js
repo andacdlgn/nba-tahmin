@@ -35,6 +35,22 @@ const shiftDay = (s, n) => { const d = parseYmd(s); d.setUTCDate(d.getUTCDate()+
 const espnToday = () => new Date(Date.now()-6*36e5).toLocaleDateString("sv-SE",{timeZone:"America/New_York"}).replaceAll("-","");
 const timeTR = d => d.toLocaleTimeString("tr-TR",{timeZone:TZ,hour:"2-digit",minute:"2-digit"});
 const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s).toLocaleDateString("tr-TR",{timeZone:"UTC",...o});
+// Takım logoları: ESPN'in küçültülmüş (hızlı) adresi; yüklenemezse tam boy, o da olmazsa kısaltma.
+const LOGO_SMALL = a => `https://a.espncdn.com/combiner/i?img=/i/teamlogos/nba/500/${String(a).toLowerCase()}.png&h=96&w=96`;
+const LOGO_FULL  = a => `https://a.espncdn.com/i/teamlogos/nba/500/${String(a).toLowerCase()}.png`;
+document.addEventListener("error", e => {
+  const img = e.target;
+  if(!(img instanceof HTMLImageElement)) return;
+  const m = /teamlogos\/nba\/500\/([a-z]+)\.png/i.exec(img.src);
+  if(!m) return;
+  const abbr = m[1];
+  if(img.src.includes("combiner")){ img.src = LOGO_FULL(abbr); return; }
+  // son çare: logonun yerine kısaltma
+  const b = document.createElement("span");
+  b.className = "logo-fb"; b.textContent = abbr.toUpperCase();
+  b.style.width = (img.width||28)+"px"; b.style.height = (img.height||28)+"px";
+  img.replaceWith(b);
+}, true);
 const esc = s => String(s??"").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const bucket = m => m<=5?"1-5":m<=10?"6-10":m<=15?"11-15":"16+";
 const slug = s => s.toLocaleLowerCase("tr").replace(/[çğıöşü]/g, c => ({ç:"c",ğ:"g",ı:"i",ö:"o",ş:"s",ü:"u"}[c])).replace(/[^a-z0-9]/g, "");
@@ -67,7 +83,7 @@ function parseGames(raw){
     const c = ev.competitions[0], st = ev.status||c.status||{}, ty = st.type||{};
     const side = k => {
       const x = c.competitors.find(p => p.homeAway===k) || {};
-      return { abbr:x.team?.abbreviation, id:x.team?.id, name:x.team?.shortDisplayName, logo:x.team?.logo,
+      return { abbr:x.team?.abbreviation, id:x.team?.id, name:x.team?.shortDisplayName, logo:LOGO_SMALL(x.team?.abbreviation||""),
                score: x.score!=null && x.score!=="" ? +x.score : null, winner:!!x.winner,
                rec:(x.records||[])[0]?.summary||"" };
     };
@@ -788,7 +804,7 @@ function renderStats(){
   for(const {g,r} of recs) for(const t of [g.home,g.away]){ const k=t.abbr; tm[k]=tm[k]||{n:0,ok:0,logo:null}; tm[k].n++; if(r.w>0) tm[k].ok++; }
   const tl=Object.entries(tm).filter(([,v])=>v.n>=3).map(([k,v])=>({k,...v,p:v.ok/v.n}));
   const best=[...tl].sort((a,b)=>b.p-a.p||b.n-a.n).slice(0,4), worst=[...tl].sort((a,b)=>a.p-b.p||b.n-a.n).slice(0,4);
-  const logo = abbr => `https://a.espncdn.com/i/teamlogos/nba/500/${abbr.toLowerCase()}.png`;
+  const logo = abbr => LOGO_SMALL(abbr);
   const kpi=(v,l,c)=>`<div class="kpi"><b>${v}</b><small>${l}</small>${c!=null?`<div class="bar2"><i style="width:${c}%;background:${col(u)}"></i></div>`:""}</div>`;
   let html = `<div class="chips" id="statSel" style="margin-top:4px">${S.order.map(x=>`<button class="chip" data-v="${x}" aria-pressed="${x===u}">${esc(pname(x))}</button>`).join("")}</div>`;
   if(!n){ $("#istatistik").innerHTML = html+`<div class="note">İlk maçlar bitince istatistikler burada görünecek.</div>`; bindStatSel(); return; }

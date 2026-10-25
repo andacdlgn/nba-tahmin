@@ -111,6 +111,8 @@ button,input,select{font:inherit;color:inherit}
 .rules .pt{display:grid;grid-template-columns:1fr auto;gap:4px 12px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:15px}
 .rules .pt b{font-family:"Barlow Condensed";font-size:18px;text-align:right}
 
+.logo-fb{display:inline-grid;place-items:center;flex:none;border-radius:50%;background:var(--panel-2);color:var(--muted);font-family:"Barlow Condensed";font-weight:800;font-size:11px;min-width:24px;min-height:24px}
+
 /* ---------- Ortak ---------- */
 main{padding-top:14px}
 .chips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding:2px 0 4px}
