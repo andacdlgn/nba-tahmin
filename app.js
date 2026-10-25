@@ -35,21 +35,25 @@ const shiftDay = (s, n) => { const d = parseYmd(s); d.setUTCDate(d.getUTCDate()+
 const espnToday = () => new Date(Date.now()-6*36e5).toLocaleDateString("sv-SE",{timeZone:"America/New_York"}).replaceAll("-","");
 const timeTR = d => d.toLocaleTimeString("tr-TR",{timeZone:TZ,hour:"2-digit",minute:"2-digit"});
 const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s).toLocaleDateString("tr-TR",{timeZone:"UTC",...o});
-// Takım logoları: ESPN'in küçültülmüş (hızlı) adresi; yüklenemezse tam boy, o da olmazsa kısaltma.
-const LOGO_SMALL = a => `https://a.espncdn.com/combiner/i?img=/i/teamlogos/nba/500/${String(a).toLowerCase()}.png&h=96&w=96`;
+// Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
+// Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
+const LOGO_SMALL = a => `logos/${String(a).toLowerCase()}.png`;
 const LOGO_FULL  = a => `https://a.espncdn.com/i/teamlogos/nba/500/${String(a).toLowerCase()}.png`;
 document.addEventListener("error", e => {
   const img = e.target;
   if(!(img instanceof HTMLImageElement)) return;
-  const m = /teamlogos\/nba\/500\/([a-z]+)\.png/i.exec(img.src);
-  if(!m) return;
-  const abbr = m[1];
-  if(img.src.includes("combiner")){ img.src = LOGO_FULL(abbr); return; }
-  // son çare: logonun yerine kısaltma
-  const b = document.createElement("span");
-  b.className = "logo-fb"; b.textContent = abbr.toUpperCase();
-  b.style.width = (img.width||28)+"px"; b.style.height = (img.height||28)+"px";
-  img.replaceWith(b);
+  const src = img.getAttribute("src") || "";
+  const local = /^logos\/([a-z]+)\.png$/i.exec(src);
+  if(local){ img.src = LOGO_FULL(local[1]); return; }
+  const espn = /teamlogos\/nba\/500\/([a-z]+)\.png/i.exec(src);
+  if(espn){
+    const b = document.createElement("span");
+    b.className = "logo-fb"; b.textContent = espn[1].toUpperCase();
+    b.style.width = (img.width||28)+"px"; b.style.height = (img.height||28)+"px";
+    img.replaceWith(b); return;
+  }
+  // oyuncu fotoğrafı vb. yüklenemezse boş gri kutu kalsın
+  img.removeAttribute("src"); img.style.visibility = "hidden";
 }, true);
 const esc = s => String(s??"").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const bucket = m => m<=5?"1-5":m<=10?"6-10":m<=15?"11-15":"16+";
