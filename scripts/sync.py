@@ -130,12 +130,30 @@ def finished_game(ev):
         }
     h, a = side["home"], side["away"]
     winner = h["abbr"] if h["score"] > a["score"] else a["abbr"]
-    return {
+    g = {
         "id": ev["id"], "start": ev["date"], "seasonType": ev.get("season", {}).get("type", 2),
         "home": h, "away": a, "winner": winner,
         "margin": abs(h["score"] - a["score"]),
         "bucket": margin_bucket(abs(h["score"] - a["score"])),
+        "ot": int(c["status"].get("period") or 4) > 4,
     }
+    sr = series_info(ev)
+    if sr:
+        g["series"] = sr
+    return g
+
+
+def series_info(ev):
+    """Playoff serisi: anahtar (sezon + iki takım), kazanılan maçlar, bitti mi."""
+    c = ev["competitions"][0]
+    s = c.get("series")
+    if not s or ev.get("season", {}).get("type") != 3:
+        return None
+    by_id = {t["team"]["id"]: t["team"]["abbreviation"] for t in c["competitors"]}
+    wins = {by_id.get(str(x.get("id")), str(x.get("id"))): int(x.get("wins") or 0) for x in s.get("competitors", [])}
+    abbrs = sorted(by_id.values())
+    return {"key": f"{ev.get('season', {}).get('year', '')}{'-'.join(abbrs)}", "wins": wins,
+            "done": bool(s.get("completed")), "need": (int(s.get("totalCompetitions") or 7) // 2) + 1}
 
 
 # ---------------------------------------------------------------- Firestore
@@ -220,9 +238,26 @@ def score_game(g, pick, conf, top_ids):
 
 LOCK = timedelta(0)  # gecenin bütün tahminleri ilk maç başlayınca kilitlenir
 
+# Gecenin sorusu: gün numarasına göre sırayla seçilir. app.js'teki QUESTIONS ile birebir aynı sıra.
+QUESTIONS = [
+    lambda gs: max(max((t["pts"] for t in g["top"]), default=0) for g in gs) >= 40,   # en skorer 40+
+    lambda gs: max(g["margin"] for g in gs) >= 20,                                    # 20+ farklı maç
+    lambda gs: any(g.get("ot") for g in gs),                                          # uzatma
+    lambda gs: max(max(g["home"]["score"], g["away"]["score"]) for g in gs) >= 130,   # 130+ atan takım
+    lambda gs: sum(g["winner"] == g["away"]["abbr"] for g in gs) > sum(g["winner"] == g["home"]["abbr"] for g in gs),
+    lambda gs: min(g["margin"] for g in gs) <= 3,                                     # 3 ve daha az farklı maç
+]
+
+
+def question_answer(day, dgames):
+    return "y" if QUESTIONS[int(day) % len(QUESTIONS)](dgames) else "n"
+
+
+SERIES_WIN, SERIES_GAMES = 3, 2  # seri kazananı +3, maç sayısı da doğruysa +2
+
 
 def valid_before(doc, start_iso):
-    """Tahmin kilitten (maçtan 10 dk önce) önce mi kaydedildi? (sunucu saatiyle)"""
+    """Tahmin kilitten (gecenin ilk maçı) önce mi kaydedildi? (sunucu saatiyle)"""
     if not doc or not doc.get("updatedAt"):
         return False
     return ts(doc["updatedAt"]) < ts(start_iso) - LOCK
@@ -257,11 +292,16 @@ def main(full=False):
     today = espn_today()
     first = start if (full or not games) else max(start, today - timedelta(days=3))
 
+    nights = load("nights.json", {})
     # 1) biten maçlar ve kutu skorları
     d = first
     while d <= today:
         day = d.strftime("%Y%m%d")
-        for ev in scoreboard(day):
+        evs = [e for e in scoreboard(day) if e.get("season", {}).get("type") != 1]
+        if evs:
+            nights[day] = {"n": len(evs), "done": all(e["competitions"][0]["status"]["type"].get("state") == "post" for e in evs),
+                           "first": min(e["date"] for e in evs)}
+        for ev in evs:
             g = finished_game(ev)
             if not g or g["seasonType"] == 1:
                 continue
@@ -322,7 +362,13 @@ def main(full=False):
                 dp_name = daily.get("dayPlayerName")
                 if daily["dayPlayerId"] in night_ids:
                     dp = 2
-            total = dp
+            # gecenin sorusu: gece tamamen bittiyse
+            q, qp = None, 0
+            if daily and daily.get("q") in ("y", "n") and daily.get("qAt") and ts(daily["qAt"]) < ts(first_start) - LOCK:
+                q = daily["q"]
+                if nights.get(day, {}).get("done") and nights[day]["n"] == len(dgames):
+                    qp = 1 if q == question_answer(day, dgames) else 0
+            total = dp + qp
             n = 0
             for g in dgames:
                 pick = fs_doc(f"picks/{g['id']}_{uid}")
@@ -334,26 +380,59 @@ def main(full=False):
                 n += 1 if pick else 0
                 sc["games"].setdefault(g["id"], {})[uid] = r
                 total += r["pts"]
-            sc["days"][day][uid] = {"pts": total, "n": n, "dp": dp, "dpName": dp_name, "conf": conf_game,
-                                    "week": week_key(day)}
+            sc["days"][day][uid] = {"pts": total, "n": n + (1 if q else 0), "dp": dp, "dpName": dp_name, "conf": conf_game,
+                                    "q": q, "qp": qp, "week": week_key(day)}
 
-    # toplamlar
+    # playoff serileri: biten her seri, son maçının gecesine puan olarak eklenir (gün satırında "sr")
+    series = {}
+    for g in games.values():
+        sr = g.get("series")
+        if sr:
+            series.setdefault(sr["key"], []).append(g)
+    sc["series"] = {}
+    for key, sg in series.items():
+        sg.sort(key=lambda g: g["start"])
+        last = sg[-1]["series"]
+        need = last.get("need", 4)
+        winner = next((t for t, w in last["wins"].items() if w >= need), None)
+        if not winner:
+            continue
+        total_games = sum(last["wins"].values())
+        first_start, final_day = sg[0]["start"], sg[-1]["day"]
+        row = {}
+        for uid in players:
+            sp = fs_doc(f"series/{key}_{uid}")
+            if not valid_before(sp, first_start):
+                continue
+            pts = 0
+            if sp.get("winner") == winner:
+                pts = SERIES_WIN + (SERIES_GAMES if int(sp.get("games") or 0) == total_games else 0)
+            row[uid] = {"pts": pts, "pick": {"w": sp.get("winner"), "g": sp.get("games")}}
+        sc["series"][key] = {"winner": winner, "games": total_games, "day": final_day, "row": row}
+    for day, row in sc["days"].items():
+        for uid, v in row.items():
+            v["sr"] = sum(x["row"].get(uid, {}).get("pts", 0) for x in sc["series"].values() if x["day"] == day)
+
+    # toplamlar (gün puanı + o gece biten serilerin puanı)
+    for row in sc["days"].values():
+        for v in row.values():
+            v["tot"] = v["pts"] + v.get("sr", 0)
     tot = {uid: {"pts": 0, "days": 0, "dayWins": 0, "weekWins": 0} for uid in players}
     weeks = {}
     for day, row in sc["days"].items():
         if not any(v.get("n") or v.get("dpName") for v in row.values()):
             continue  # kimsenin oynamadığı gece sayılmaz
-        best = max((v["pts"] for v in row.values()), default=None)
+        best = max((v["tot"] for v in row.values()), default=None)
         for uid, v in row.items():
             if uid not in tot:
                 continue
-            tot[uid]["pts"] += v["pts"]
+            tot[uid]["pts"] += v["tot"]
             tot[uid]["days"] += 1
-            sole_best = sum(1 for x in row.values() if x["pts"] == best) == 1
-            if v["pts"] == best and sole_best:
+            sole_best = sum(1 for x in row.values() if x["tot"] == best) == 1
+            if v["tot"] == best and sole_best:
                 tot[uid]["dayWins"] += 1
             weeks.setdefault(v["week"], {}).setdefault(uid, 0)
-            weeks[v["week"]][uid] += v["pts"]
+            weeks[v["week"]][uid] += v["tot"]
     cur_week = week_key(today.strftime("%Y%m%d"))
     for wk, row in weeks.items():
         if wk == cur_week:
@@ -365,7 +444,7 @@ def main(full=False):
     sc["totals"] = tot
     sc["weeks"] = weeks
 
-    changed = [save("games.json", games), save("players.json", pstats), save("scores.json", sc)]
+    changed = [save("games.json", games), save("players.json", pstats), save("scores.json", sc), save("nights.json", nights)]
     try:
         changed.append(save_all_players())
     except Exception as e:  # kadro listesi olmasa da puanlar yazılsın

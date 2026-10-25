@@ -8,7 +8,10 @@ Her gecenin NBA maçlarına tahmin oyunu: kazanan, fark ve maçın en skoreri.
 - **Günün bankosu:** her gece bir maç seçilir; o maçta kazanan doğruysa 2 puan, yanlışsa **-1**.
 - **Günün oyuncusu:** gecenin en çok sayı atanı bilinirse **+2**.
 - Gecenin bütün tahminleri (maçlar, banko, günün oyuncusu) **gecenin ilk maçı başladığı anda** kilitlenir; o ana kadar değiştirilebilir ve "Tahmini kaydet" ile kaydedilir. Kilitlenince rakiplerin seçimleri açılır; kimin hangi maçları girdiği ise "Günün tahminleri"nde hemen görünür.
-- **Playoff:** tüm puanlar 2 katı.
+- **Gecenin sorusu:** her gece evet/hayır sorusu (ör. "Bir maç uzatmaya gider mi?"), doğru cevap **+1**.
+- **Playoff:** tüm puanlar 2 katı. Her seri başlamadan seriyi kim, kaç maçta alır tahmini: kazanan **+3**, maç sayısı da doğruysa **+2**.
+- **Laf atma:** kilit sonrası maçlara emoji ve kısa yorum (küfür filtreli).
+- Rozetler, ayın şampiyonları, takım karnesi, rakip analizi ve sezon ödülleri siteden hesaplanır.
 - Haftalar pazartesi–pazar; tek başına en çok puanı alan haftayı kazanır.
 
 ## Nasıl çalışır
@@ -20,7 +23,8 @@ Her gecenin NBA maçlarına tahmin oyunu: kazanan, fark ve maçın en skoreri.
 - `scripts/reset.py` + `.github/workflows/reset.yml`: "Şifremi unuttum" isteklerini 5 dakikada bir işler.
 
 ## Hatırlatma maili
-- Oyuncu profilinden e-posta adresini yazıp "Hatırlat"ı açarsa, gecenin ilk maçına 2 saat kala eksik tahmini varsa bir kez mail gelir.
+- Oyuncu profilinden e-posta adresini yazıp "Hatırlat"ı açarsa, gecenin ilk maçına 2 saat kala eksik tahmini varsa bir kez mail gelir; seçtiği skorer ya da günün oyuncusu ESPN'de "Out" görünürse kilitten önce uyarı maili gelir.
+- "Pazartesi haftalık özet" açıksa her pazartesi 10:00'dan sonra geçen haftanın özeti gelir.
 - Adres `contacts/{uid}` belgesinde durur; yalnızca sahibi okuyabilir. Gönderilenler `reminders/` koleksiyonunda tutulur (aynı gece ikinci mail gitmez).
 - `scripts/remind.py` + `.github/workflows/remind.yml` 10 dakikada bir çalışır. Gerekli gizli değişkenler: `FIREBASE_SA`, `GMAIL_USER` (gönderen Gmail adresi), `GMAIL_APP_PASSWORD` (Google hesabında oluşturulan uygulama şifresi).
 

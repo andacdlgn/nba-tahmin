@@ -93,7 +93,7 @@ service cloud.firestore {
 
       function baseOk() {
         let d = request.resource.data;
-        return d.keys().hasOnly(['uid', 'day', 'firstStart', 'confGame', 'confStart', 'confAt', 'dayPlayerId', 'dayPlayerName', 'dayAt'])
+        return d.keys().hasOnly(['uid', 'day', 'firstStart', 'confGame', 'confStart', 'confAt', 'dayPlayerId', 'dayPlayerName', 'dayAt', 'q', 'qAt'])
           && d.uid == request.auth.uid
           && did == d.day + '_' + request.auth.uid
           && d.firstStart is timestamp;
@@ -115,11 +115,19 @@ service cloud.firestore {
               && d.dayAt == request.time && request.time < lockAt(d.firstStart))
         );
       }
-      allow create: if isPlayer() && baseOk() && confOk(null) && dayOk(null);
+      // gecenin sorusu: evet (y) / hayır (n), ilk maça kadar değiştirilebilir
+      function qOk(old) {
+        let d = request.resource.data;
+        return !('q' in d) || (
+          (old != null && 'q' in old && d.q == old.q && d.qAt == old.qAt)
+          || (d.q in ['y', 'n'] && d.qAt == request.time && request.time < lockAt(d.firstStart))
+        );
+      }
+      allow create: if isPlayer() && baseOk() && confOk(null) && dayOk(null) && qOk(null);
       allow update: if isPlayer() && baseOk()
         && resource.data.uid == request.auth.uid
         && request.resource.data.firstStart == resource.data.firstStart
-        && confOk(resource.data) && dayOk(resource.data);
+        && confOk(resource.data) && dayOk(resource.data) && qOk(resource.data);
       allow delete: if false;
     }
 
@@ -171,12 +179,52 @@ service cloud.firestore {
     match /contacts/{uid} {
       allow read: if signedIn() && request.auth.uid == uid;
       allow create, update: if isPlayer() && request.auth.uid == uid
-        && request.resource.data.keys().hasOnly(['email', 'remind', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['email', 'remind', 'weekly', 'updatedAt'])
+        && (!('weekly' in request.resource.data) || request.resource.data.weekly is bool)
         && request.resource.data.email is string && request.resource.data.email.size() <= 120
         && (request.resource.data.email == '' || request.resource.data.email.matches('^[^@ ]+@[^@ ]+[.][^@ ]+$'))
         && request.resource.data.remind is bool
         && request.resource.data.updatedAt == request.time;
       allow delete: if signedIn() && request.auth.uid == uid;
+    }
+
+    // series/{seriKey}_{uid}: playoff seri tahmini (kazanan + kaç maçta). Serinin ilk maçında kilitlenir.
+    match /series/{sid} {
+      allow read: if resource == null
+        || (signedIn() && resource.data.uid == request.auth.uid)
+        || request.time >= resource.data.start;
+      function validSeries() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['uid', 'key', 'winner', 'games', 'start', 'updatedAt'])
+          && d.uid == request.auth.uid
+          && sid == d.key + '_' + request.auth.uid
+          && str(d.key, 40) && str(d.winner, 6)
+          && d.games in [4, 5, 6, 7]
+          && d.start is timestamp
+          && d.updatedAt == request.time
+          && request.time < d.start;
+      }
+      allow create: if isPlayer() && validSeries();
+      allow update: if isPlayer() && validSeries()
+        && resource.data.uid == request.auth.uid
+        && request.resource.data.start == resource.data.start
+        && request.time < resource.data.start;
+      allow delete: if false;
+    }
+
+    // talk/{maçId}_{uid}: maç kartına emoji tepki ve kısa yorum (laf atma). Herkes görür, sahibi yazar.
+    match /talk/{tid} {
+      allow read: if signedIn();
+      allow create, update: if isPlayer()
+        && request.resource.data.keys().hasOnly(['uid', 'gid', 'day', 'e', 't', 'at'])
+        && request.resource.data.uid == request.auth.uid
+        && tid == request.resource.data.gid + '_' + request.auth.uid
+        && str(request.resource.data.gid, 20) && str(request.resource.data.day, 8)
+        && request.resource.data.e in ['', '😂', '🔥', '🤡', '😱', '👏', '💀', '🎯', '🙏']
+        && request.resource.data.t is string && request.resource.data.t.size() <= 80
+        && !request.resource.data.t.lower().matches('.*(orospu|siktir|sikerim|yarrak|am[iı]nak|amc[iı]k|ibne|pezevenk|fuck|nigg|faggot).*')
+        && request.resource.data.at == request.time;
+      allow delete: if signedIn() && resource.data.uid == request.auth.uid;
     }
   }
 }
