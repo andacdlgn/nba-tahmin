@@ -861,7 +861,7 @@ footer .ver{display:inline-block;margin-top:6px;opacity:.7;font-variant-numeric:
 
 /* ---------- Açılış ekranı ---------- */
 #splash{position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
-  background:radial-gradient(120% 80% at 50% 0%, color-mix(in srgb,var(--amber) 14%,var(--bg)) 0%, var(--bg) 60%);transition:opacity .55s ease, visibility .55s}
+  background:radial-gradient(120% 80% at 50% 0%, color-mix(in srgb,var(--amber) 14%,var(--bg)) 0%, var(--bg) 60%);transition:opacity .35s ease, visibility .35s}
 #splash.out{opacity:0;visibility:hidden}
 .sp-court{position:absolute;left:50%;top:50%;width:min(86vw,420px);aspect-ratio:1;transform:translate(-50%,-52%);border:2px solid color-mix(in srgb,var(--muted) 22%,transparent);border-radius:50%;pointer-events:none}
 .sp-court::before{content:"";position:absolute;left:50%;top:-30vh;bottom:-30vh;border-left:2px solid color-mix(in srgb,var(--muted) 18%,transparent)}
