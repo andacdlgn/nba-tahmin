@@ -1,9 +1,7 @@
 name: Şifre sıfırlama ve e-posta onayı
 
+# Artık worker.yml çalıştırıyor; bu dosya yalnızca elle çalıştırmak için duruyor.
 on:
-  schedule:
-    # 5 dakikada bir (GitHub'ın zamanlaması bazen birkaç dakika gecikir).
-    - cron: "*/5 * * * *"
   workflow_dispatch: {}
 
 permissions:

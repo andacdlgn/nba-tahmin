@@ -20,14 +20,14 @@ Her gecenin NBA maçlarına tahmin oyunu: kazanan, fark ve maçın en skoreri.
 - `firestore.rules`: Veritabanı güvenlik kuralları (kilit, gizlilik, davet kodu). Firebase konsoluna yapıştırılır.
 - `scripts/sync.py`: Biten maçları ESPN'den, tahminleri Firestore'dan okuyup puanları hesaplar → `data/`.
 - `.github/workflows/sync.yml`: Bu betiği saatte bir çalıştırır. Ayrıca `data/allplayers.json` (güvenlik sorusu için oyuncu listesi) güncellenir.
-- `scripts/reset.py` + `.github/workflows/reset.yml`: "Şifremi unuttum" isteklerini 5 dakikada bir işler.
+- `.github/workflows/worker.yml`: arka plan görevi. ~5,5 saat açık kalır, 20 saniyede bir onay kodlarını (`verify.py`) ve "Şifremi unuttum" isteklerini (`reset.py`), 10 dakikada bir hatırlatma maillerini (`remind.py`) işler; süresi dolunca kendini yeniden başlatır. Durursa Actions → "Arka plan görevleri" → Run workflow ile elle başlatılır. `reset.yml` ve `remind.yml` artık yalnızca elle çalıştırmak için.
 
 ## Hatırlatma maili
 - Oyuncu profilinden e-posta adresini yazıp "Hatırlat"ı açarsa, gecenin ilk maçına 2 saat kala eksik tahmini varsa bir kez mail gelir; seçtiği skorer ya da günün oyuncusu ESPN'de "Out" görünürse kilitten önce uyarı maili gelir.
 - "Pazartesi haftalık özet" açıksa her pazartesi 10:00'dan sonra geçen haftanın özeti gelir.
-- Mailler yalnızca **onaylanmış** adreslere gider. Profilde "Onay kodu gönder" → `verifyReq/{uid}`; `scripts/verify.py` (şifre sıfırlama göreviyle 5 dakikada bir) 6 haneli kodu mailler ve özetini `otp/{uid}`'ye yazar. Kod 30 dakika geçerli; doğruluğunu Firebase kuralı kontrol eder (`contacts.verified`).
+- Mailler yalnızca **onaylanmış** adreslere gider. Profilde "Onay kodu gönder" → `verifyReq/{uid}`; `scripts/verify.py` (arka plan göreviyle, genelde 1 dakika içinde) 6 haneli kodu mailler ve özetini `otp/{uid}`'ye yazar. Kod 30 dakika geçerli; doğruluğunu Firebase kuralı kontrol eder (`contacts.verified`).
 - Adres `contacts/{uid}` belgesinde durur; yalnızca sahibi okuyabilir. Gönderilenler `reminders/` koleksiyonunda tutulur (aynı gece ikinci mail gitmez).
-- `scripts/remind.py` + `.github/workflows/remind.yml` 10 dakikada bir çalışır. Gerekli gizli değişkenler: `FIREBASE_SA`, `GMAIL_USER` (gönderen Gmail adresi), `GMAIL_APP_PASSWORD` (Google hesabında oluşturulan uygulama şifresi).
+- `scripts/remind.py` arka plan görevinde 10 dakikada bir çalışır. Gerekli gizli değişkenler: `FIREBASE_SA`, `GMAIL_USER` (gönderen Gmail adresi), `GMAIL_APP_PASSWORD` (Google hesabında oluşturulan uygulama şifresi).
 
 ## Şifre sıfırlama
 - Kayıtta herkes bir **takım** ve bir **basketbolcu** seçer (güvenlik sorusu). Cevap tuzlu SHA-256 olarak `recovery/{uid}` belgesinde durur; yalnızca sahibi okuyabilir.

@@ -1,9 +1,7 @@
 name: Tahmin hatırlatma maili
 
+# Artık worker.yml çalıştırıyor; bu dosya yalnızca elle çalıştırmak için duruyor.
 on:
-  schedule:
-    # 10 dakikada bir bakar; gecenin ilk maçına 2 saat kala, eksik tahmini olanlara bir kez mail atar.
-    - cron: "*/10 * * * *"
   workflow_dispatch: {}
 
 permissions:

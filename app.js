@@ -1869,7 +1869,7 @@ function showResetWait(){
     const m = st && RESET_MSG[st];
     box.innerHTML = m
       ? `<div class="reset-box ${m[0]}"><b>${m[0]==="ok"?"✓ Tamam":"Olmadı"}</b><p>${m[1]}</p></div><button class="btn-primary" id="rwBack" type="button">${m[0]==="ok"?"Giriş yap":"Geri dön"}</button>`
-      : `<div class="reset-box"><div class="spin"></div><b>İsteğin alındı</b><p>Yeni şifren genelde 5–15 dakika içinde geçerli olur. Bu sayfayı açık bırakabilir ya da sonra dönebilirsin, sonuç burada görünür.</p></div><button class="linkish" id="rwBack" type="button">Girişe dön</button>`;
+      : `<div class="reset-box"><div class="spin"></div><b>İsteğin alındı</b><p>Yeni şifren genelde 1-2 dakika içinde geçerli olur. Bu sayfayı açık bırakabilir ya da sonra dönebilirsin, sonuç burada görünür.</p></div><button class="linkish" id="rwBack" type="button">Girişe dön</button>`;
     $("#rwBack").onclick = () => m ? (back(false), m[0]!=="ok" && st!=="locked" && setAuthMode("reset")) : back(true);
     if(m) done();
   };
@@ -1962,7 +1962,7 @@ function paintProfile(){
       const d=contactData(); await setDoc(doc(S.db,"contacts",S.uid), d); S.contact={...d};
       await setDoc(doc(S.db,"verifyReq",S.uid), {email, at:serverTimestamp()});
       S.otpSentTo=email; paintMail();
-      msg.textContent=`Kod ${email} adresine gönderilecek. Genelde 5–15 dakika sürer, gelince buraya yaz. Gereksiz klasörüne de bak.`;
+      msg.textContent=`Kod ${email} adresine gönderilecek. Genelde 1-2 dakika içinde gelir, gelince buraya yaz. Gereksiz klasörüne de bak.`;
     }catch(e){ $("#pfMailMsg").textContent="İstek gönderilemedi, tekrar dene."; }
     $("#pfSendCode").disabled=false;
   };
