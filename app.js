@@ -143,30 +143,40 @@ function liveTops(g){
   const m=Math.max(...bp.map(p=>p.pts));
   return bp.filter(p=>p.pts===m).map(p=>({id:p.id,name:p.name,pts:p.pts}));
 }
+// Bir günün puanları, kırılımıyla: w = taraf (banko dahil), m = fark, s = en skorer, dp = günün oyuncusu
 function dayPoints(day){
-  // arşivde varsa onu, yoksa canlı hesap
   const arch = S.arch.scores.days?.[day];
   const out = {};
   const D = S.days[day];
-  for(const uid of S.order){
-    if(arch?.[uid] && (!D || D.games.every(g=>g.state==="post") && !D.games.some(g=>!S.arch.games[g.id]))){
-      out[uid] = {pts:arch[uid].pts, n:arch[uid].n??1, final:true, src:"arch"}; continue;
+  const archParts = uid => {
+    const p = {pts:arch[uid].pts, n:arch[uid].n??1, final:true, src:"arch", w:0, m:0, s:0, dp:arch[uid].dp||0};
+    for(const [gid,row] of Object.entries(S.arch.scores.games||{})){
+      const g = S.arch.games[gid]; const r = row[uid];
+      if(!g || g.day!==day || !r) continue;
+      const k = g.seasonType===3 ? 2 : 1;
+      p.w += r.w*k; p.m += r.m*k; p.s += r.s*k;
     }
-    if(!D){ out[uid] = arch?.[uid] ? {pts:arch[uid].pts, n:arch[uid].n??1, final:true, src:"arch"} : null; continue; }
-    let pts=0, n=0, final=D.games.length>0;
+    return p;
+  };
+  for(const uid of S.order){
+    if(arch?.[uid] && (!D || D.games.every(g=>g.state==="post") && !D.games.some(g=>!S.arch.games[g.id]))){ out[uid] = archParts(uid); continue; }
+    if(!D){ out[uid] = arch?.[uid] ? archParts(uid) : null; continue; }
+    const p = {pts:0, n:0, final:D.games.length>0, src:"live", w:0, m:0, s:0, dp:0};
     const daily=D.daily[uid];
     for(const g of D.games){
-      if(!started(g)) { final=false; continue; }
-      if(g.state!=="post") final=false;
+      if(!started(g)) { p.final=false; continue; }
+      if(g.state!=="post") p.final=false;
       const pick = D.picks[g.id]?.[uid];
-      if(pick) n++;
+      if(pick) p.n++;
+      if(g.state!=="post" && g.state!=="in") continue;
       const r = scorePick(g, pick, daily?.confGame===g.id);
-      if(g.state==="post" || g.state==="in") pts += r.pts;
+      const k = g.seasonType===3 ? 2 : 1;
+      p.w += r.w*k; p.m += r.m*k; p.s += r.s*k; p.pts += r.pts;
     }
-    const dp = dayPlayerResult(day, uid);
-    if(dp?.hit) pts += 2;
-    if(daily?.dayPlayerId) n++;
-    out[uid] = {pts, n, final, src:"live"};
+    const dpr = dayPlayerResult(day, uid);
+    if(dpr?.hit){ p.pts += 2; p.dp = 2; }
+    if(daily?.dayPlayerId) p.n++;
+    out[uid] = p;
   }
   return out;
 }
@@ -273,34 +283,37 @@ async function saveDaily(patch){
     await setDoc(dailyRef(S.day, S.uid), data);
     // sunucunun yazdığı saatleri geri oku; sonraki kayıt bunları aynen göndermeli
     D.daily[S.uid] = await readDaily(S.day, S.uid) || D.daily[S.uid];
-    toast(patch.confGame ? "Günün güveni seçildi." : "Günün oyuncusu seçildi.");
+    toast(patch.confGame ? "Günün bankosu seçildi." : "Günün oyuncusu seçildi.");
   }catch(e){ toast("Kaydedilemedi: süre dolmuş olabilir."); }
   render();
 }
 
 /* ====================================================== skorbord */
-function seasonTotals(){
-  const t = {}; for(const u of S.order) t[u] = S.arch.scores.totals?.[u]?.pts || 0;
-  // arşive henüz girmemiş günler (bugün, dün): canlı hesap
-  for(const day of [S.today, shiftDay(S.today,-1)]){
-    if(!S.days[day]) continue;
-    const archDay = S.arch.scores.days?.[day];
-    const dp = dayPoints(day);
-    for(const u of S.order){ if(dp[u]?.src==="live"){ t[u] += dp[u].pts - (archDay?.[u]?.pts||0); } }
+// Sezon toplamı ve kırılımı: arşivdeki günler + henüz arşive girmemiş günler (canlı)
+function seasonBreakdown(){
+  const days = new Set(Object.keys(S.arch.scores.days||{}));
+  for(const d of [S.today, shiftDay(S.today,-1)]) if(S.days[d]) days.add(d);
+  const b = {}; for(const u of S.order) b[u] = {pts:0, w:0, m:0, s:0, dp:0};
+  for(const d of days){
+    const dp = dayPoints(d);
+    for(const u of S.order){ const p=dp[u]; if(!p) continue; b[u].pts+=p.pts; b[u].w+=p.w; b[u].m+=p.m; b[u].s+=p.s; b[u].dp+=p.dp; }
   }
-  return t;
+  return b;
 }
+function seasonTotals(){ const b=seasonBreakdown(); const t={}; for(const u of S.order) t[u]=b[u].pts; return t; }
+const brkHTML = p => `<div class="brk"><span>Maç <b>${p.w}</b></span><span>Fark <b>${p.m}</b></span><span>Oyuncu <b>${p.s+p.dp}</b></span></div>`;
 function renderBoard(){
-  const tot = seasonTotals();
+  const brk = seasonBreakdown();
+  const tot = {}; for(const u of S.order) tot[u]=brk[u].pts;
   const tonight = S.days[S.today] ? dayPoints(S.today) : {};
   const ranked = [...S.order].sort((a,b)=>tot[b]-tot[a]);
   let html;
   if(S.order.length<=2){
     const [a,b] = S.order;
-    const cell = u => u ? `<div class="pl"><div class="nm" style="color:${col(u)}">${esc(pname(u))}</div><div class="digits tnum">${tot[u]}</div></div>` : `<div class="pl"><div class="nm">Rakip bekleniyor</div><div class="digits">–</div></div>`;
+    const cell = u => u ? `<div class="pl"><div class="nm" style="color:${col(u)}">${esc(pname(u))}</div><div class="digits tnum">${tot[u]}</div>${brkHTML(brk[u])}</div>` : `<div class="pl"><div class="nm">Rakip bekleniyor</div><div class="digits">–</div><div class="brk">&nbsp;</div></div>`;
     html = `<div class="duel">${cell(a)}<div class="vs">VS</div>${cell(b)}</div>`;
   } else {
-    html = `<div class="lb">${ranked.map((u,i)=>`<div class="lb-row"><span class="rk">${i+1}</span><span class="nm" style="color:${col(u)}">${esc(pname(u))}</span><span class="td">bu gece ${tonight[u]?.pts??0}</span><span class="tn tnum">${tot[u]}</span></div>`).join("")}</div>`;
+    html = `<div class="lb">${ranked.map((u,i)=>`<div class="lb-row"><span class="rk">${i+1}</span><span class="nmw"><span class="nm" style="color:${col(u)};display:block">${esc(pname(u))}</span>${brkHTML(brk[u])}</span><span class="td">bu gece ${tonight[u]?.pts??0}</span><span class="tn tnum">${tot[u]}</span></div>`).join("")}</div>`;
   }
   let lead = `<i></i>Henüz puan yok`;
   if(ranked.length>1){
@@ -343,7 +356,7 @@ function renderStatus(){
   if(open.length){
     const missing = open.filter(g=>!D.picks[g.id]?.[S.uid]).length;
     if(missing) parts.push(`<span class="warn">${missing} maç eksik</span>`);
-    if(!daily.confGame) parts.push(`<span class="warn">Güven seçilmedi</span>`);
+    if(!daily.confGame) parts.push(`<span class="warn">Banko seçilmedi</span>`);
     if(!daily.dayPlayerId && !D.games.some(started)) parts.push(`<span class="warn">Günün oyuncusu seçilmedi</span>`);
   }
   if(D.games.some(g=>g.seasonType===3)) parts.push(`<span class="playoff">Playoff: puanlar 2 katı</span>`);
@@ -384,7 +397,7 @@ function pickCell(g, pick, uid, conf){
   const homeLead=(g.home.score??0)-(g.away.score??0);
   const winNow = homeLead!==0 && (homeLead>0?g.home.abbr:g.away.abbr)===pick.winner;
   return `<div class="prow ${!S.seen.has(g.id) && uid!==S.uid ? "reveal":""}" style="--pc:${col(uid)}">
-    <span class="who">${esc(pname(uid))}${conf?' <span class="star" title="Günün güveni">★</span>':""}</span>
+    <span class="who">${esc(pname(uid))}${conf?' <span class="star" title="Günün bankosu">★</span>':""}</span>
     <span class="pk"><span>${esc(team.name)} ${mark(winNow)}</span><span>${pick.margin} ${mark(r.m)}</span><span>${esc(pick.scorerName)} ${tops?mark(r.s):""}</span></span>
     <span class="pts tnum">${(g.state==="post"||live)?(r.pts>0?"+":"")+r.pts:""}<small>${g.state==="post"?"puan":live?"şu an":""}</small></span>
   </div>`;
@@ -426,8 +439,8 @@ function gameCard(g){
     const tops = g.state==="post" ? topsOf(g) : liveTops(g);
     body += `<div class="g-foot"><span class="leaders">${tops?`En skorer: <b>${tops.map(x=>esc(x.name)).join(", ")}</b> ${tops[0].pts} sayı`:""}</span><button class="linkish" data-act="box" data-g="${g.id}">İstatistikler</button></div>`;
   }
-  const conf = !lock ? `<button class="conf-btn" data-act="conf" data-g="${g.id}" aria-pressed="${confHere}" ${confLocked&&!confHere?"disabled":""} title="Günün güveni: kazanan doğruysa 2 puan, yanlışsa -1">★ ${confHere?"Güven":"Güven ver"}</button>`
-    : confHere ? `<span class="conf-btn" aria-pressed="true">★ Güven</span>` : "";
+  const conf = !lock ? `<button class="conf-btn" data-act="conf" data-g="${g.id}" aria-pressed="${confHere}" ${confLocked&&!confHere?"disabled":""} title="Günün bankosu: kazanan doğruysa 2 puan, yanlışsa -1">★ ${confHere?"Banko":"Banko yap"}</button>`
+    : confHere ? `<span class="conf-btn" aria-pressed="true">★ Banko</span>` : "";
   const dd = S.draft[g.id], sv = D.picks[g.id]?.[S.uid];
   const dirty = !lock && sv && dd && (dd.winner!==sv.winner || dd.margin!==sv.margin || dd.scorerId!==sv.scorerId);
   const missingCls = !lock && (!sv || dirty) ? " missing" : "";
@@ -457,7 +470,7 @@ $("#games").addEventListener("click", e => {
   if(act==="scorer") return openPlayerPicker({mode:"game", g});
   if(act==="conf"){
     const cur = D.daily[S.uid]?.confGame;
-    if(cur===g.id) return toast("Güveni başka maça taşıyabilirsin; kaldırılamaz.");
+    if(cur===g.id) return toast("Bankoyu başka maça taşıyabilirsin; kaldırılamaz.");
     return saveDaily({confGame:g.id, confStart:g.start});
   }
   d.err=null; renderGames();
@@ -596,6 +609,67 @@ $("#shClose").onclick = closeSheet;
 $("#sheet").addEventListener("click", e => { if(e.target.id==="sheet") closeSheet(); });
 document.addEventListener("keydown", e => { if(e.key==="Escape") closeSheet(); });
 
+
+/* ====================================================== Kurallar */
+function openRules(){
+  openSheet(`<div class="rules"><h3 id="shTitle">Kurallar</h3>
+    <p>Her gece, o günün tüm NBA maçları için üç tahmin yapılır: <b>kazanan taraf</b>, <b>fark aralığı</b> ve <b>maçın en skoreri</b>. Üçü de zorunlu; doldurup "Tahmini kaydet"e basınca kaydedilir.</p>
+    <h4>Puanlar</h4>
+    <div class="pt"><span>Kazananı bilmek</span><b>1</b><span>Kazananla birlikte farkı da bilmek</span><b>+1</b><span>Maçın en skorerini bilmek</span><b>+1</b><span>Bir maçtan en fazla</span><b>3</b></div>
+    <h4>Günün bankosu</h4>
+    <p>Her gece bir maçı banko yaparsın. O maçta kazananı bilirsen 1 yerine <b>2 puan</b>, bilemezsen <b>-1</b>. Fark ve en skorer puanları normal sayılır. Banko başka bir maça taşınabilir ama kaldırılamaz.</p>
+    <h4>Günün oyuncusu</h4>
+    <p>Gecenin tüm maçlarından bir oyuncu seçersin. O gece en çok sayıyı o atarsa <b>+2</b>.</p>
+    <h4>Fark aralıkları</h4>
+    <p>1-5 · 6-10 · 11-15 · 16+. Uzatmaya giden maçta da son skordaki fark sayılır. Fark puanı yalnızca kazanan doğruysa geçerli.</p>
+    <h4>Kilit ve gizlilik</h4>
+    <p>Tahminler maç saatinden <b>10 dakika öncesine</b> kadar değiştirilebilir. Günün bankosu kendi maçından, günün oyuncusu ilk maçtan 10 dakika önce kilitlenir. Kilitlenene kadar rakiplerin seçimleri gizli; kimin hangi maçları girdiği ise "Günün tahminleri"nde görünür.</p>
+    <h4>Eşitlikler</h4>
+    <p>Birden fazla oyuncu aynı en yüksek sayıyı atarsa, bunlardan herhangi birini seçen bilmiş sayılır.</p>
+    <h4>Gece, hafta, sezon</h4>
+    <p>Gece: o gecenin en çok puanını tek başına alan kazanır. Hafta pazartesi–pazar. Sezon puanı tüm gecelerin toplamı. <b>Playoffta tüm puanlar 2 katı.</b></p>
+    <h4>Yeni oyuncu</h4>
+    <p>Siteye girip "Yeni oyuncu" sekmesinden ad, 6 haneli şifre ve davet koduyla katılınır.</p></div>`);
+}
+$("#rulesBtn").onclick = openRules;
+
+/* ====================================================== SONUÇLAR */
+async function renderResults(){
+  const day = S.rday || S.day;
+  const rel = day===S.today ? "Bugün" : day===shiftDay(S.today,-1) ? "Dün" : day===shiftDay(S.today,1) ? "Yarın" : "";
+  $("#rdLabel").innerHTML = rel ? `${rel}<small>${dayNice(day)} (ABD)</small>` : `${dayNice(day)}<small>ABD tarihi</small>`;
+  const D = S.days[day];
+  if(!D){ $("#results").innerHTML=`<div class="note">Maçlar yükleniyor.</div>`; loadDay(day).then(()=>{ if(S.tab==="sonuclar") renderResults(); }).catch(()=>{ $("#results").innerHTML=`<div class="note">Maçlara şu an ulaşılamıyor.</div>`; }); return; }
+  if(!D.games.length){ $("#results").innerHTML=`<div class="note">Bu gün maç yok.</div>`; return; }
+  const order={in:0,post:1,pre:2};
+  const games=[...D.games].sort((a,b)=>(order[a.state]-order[b.state])||(a.start-b.start));
+  $("#results").innerHTML = `<div class="res">${games.map(g=>{
+    const tm = side => { const t=g[side], o=side==="home"?g.away:g.home; const lose=g.state==="post" && (t.score??0)<(o.score??0);
+      return `<div class="rg-t ${lose?"lose":""}"><img src="${t.logo||""}" alt=""><span class="n">${esc(t.name)}<small>${t.rec}</small></span><span class="sc">${g.state==="pre"?"":t.score??""}</span></div>`; };
+    const tops = g.state==="post" ? topsOf(g) : g.state==="in" ? liveTops(g) : null;
+    const s = S.sums[g.id]?.data;
+    let lead = "";
+    if(s && g.state!=="pre"){
+      const bp = boxPlayers(s);
+      const best = side => { const arr=bp.filter(p=>p.team===g[side].abbr).sort((a,b)=>b.pts-a.pts)[0]; return arr?`${esc(g[side].name)}: <b>${esc(arr.name)}</b> ${arr.pts} sayı, ${arr.reb} rib, ${arr.ast} ast`:""; };
+      lead = [best("away"),best("home")].filter(Boolean).join("<br>");
+    } else if(tops){ lead = `En skorer: <b>${tops.map(t=>esc(t.name)).join(", ")}</b> ${tops[0].pts} sayı`; }
+    return `<button class="rg ${g.state==="in"?"is-live":""}" data-g="${g.id}"><div class="rg-h"><span class="s">${g.state==="in"?'<span class="badge-live">Canlı</span> ':""}${gameStatusTR(g)}</span><span>${g.state==="pre"?"Türkiye saati":"İstatistikler ›"}</span></div>
+      ${tm("away")}${tm("home")}${lead?`<div class="rg-l">${lead}</div>`:""}</button>`;
+  }).join("")}</div>`;
+  // biten maçların oyuncu istatistiklerini arka planda getir
+  const need = games.filter(g=>g.state==="post" && !S.sums[g.id]);
+  if(need.length) Promise.all(need.slice(0,15).map(g=>loadSummary(g).catch(()=>null))).then(()=>{ if(S.tab==="sonuclar" && (S.rday||S.day)===day) renderResults(); });
+}
+$("#results").addEventListener("click", e => {
+  const b=e.target.closest(".rg"); if(!b) return;
+  const D=S.days[S.rday||S.day]; const g=D?.games.find(x=>x.id===b.dataset.g); if(!g) return;
+  if(g.state==="pre") return openInfo(g);
+  openBox(g);
+});
+$("#rdPrev").onclick=()=>{ S.rday=shiftDay(S.rday||S.day,-1); renderResults(); };
+$("#rdNext").onclick=()=>{ S.rday=shiftDay(S.rday||S.day,1); renderResults(); };
+
 /* ====================================================== AYRIŞMA */
 function renderAyrisma(){
   const D = S.days[S.day];
@@ -722,11 +796,11 @@ function renderStats(){
     ${kpi("%"+pct(wOk,n),`Kazanan (${wOk}/${n})`,pct(wOk,n))}
     ${kpi("%"+pct(mOk,wOk),`Fark, kazananı bildiğinde (${mOk}/${wOk})`,pct(mOk,wOk))}
     ${kpi("%"+pct(sOk,n),`En skorer (${sOk}/${n})`,pct(sOk,n))}
-    ${kpi(`${cOk}–${conf.length-cOk}`,`Güven (net ${cOk*2-(conf.length-cOk)>0?"+":""}${cOk*2-(conf.length-cOk)})`,null)}
+    ${kpi(`${cOk}–${conf.length-cOk}`,`Banko (net ${cOk*2-(conf.length-cOk)>0?"+":""}${cOk*2-(conf.length-cOk)})`,null)}
     ${kpi(`${dpHit}/${dps.length}`,"Günün oyuncusu",null)}
     ${(()=>{ const ds=allDays().filter(d=>dayPoints(d)[u]?.n); const t=ds.reduce((s,d)=>s+(dayPoints(d)[u]?.pts||0),0); return kpi(ds.length?(t/ds.length).toFixed(1):"–",`Gece başına ortalama puan (${ds.length} gece)`,null); })()}</div>`;
   const tmax=Math.max(1,...Object.values(totals));
-  html += `<div class="sec-title"><h2>Puanlar nereden geliyor</h2></div><div class="box">${[["Taraf (güven dahil)",totals.taraf],["Fark",totals.fark],["En skorer",totals.skorer],["Günün oyuncusu",totals.oyuncu]].map(([l,v])=>`<div style="margin:6px 0"><div style="display:flex;justify-content:space-between;font-size:14px"><span>${l}</span><b>${v}</b></div><div class="bar2"><i style="width:${Math.max(0,v)/tmax*100}%;background:${col(u)}"></i></div></div>`).join("")}</div>`;
+  html += `<div class="sec-title"><h2>Puanlar nereden geliyor</h2></div><div class="box">${[["Taraf (banko dahil)",totals.taraf],["Fark",totals.fark],["En skorer",totals.skorer],["Günün oyuncusu",totals.oyuncu]].map(([l,v])=>`<div style="margin:6px 0"><div style="display:flex;justify-content:space-between;font-size:14px"><span>${l}</span><b>${v}</b></div><div class="bar2"><i style="width:${Math.max(0,v)/tmax*100}%;background:${col(u)}"></i></div></div>`).join("")}</div>`;
   if(tl.length){
     const tbl=(t,arr)=>`<div class="box"><h4 style="margin:0 0 4px">${t}</h4>${arr.map(x=>`<div class="trow3"><img src="${logo(x.k)}" alt=""><span>${x.k} <small class="muted">${x.ok}/${x.n}</small></span><b style="text-align:right">%${Math.round(x.p*100)}</b></div>`).join("")}</div>`;
     html += `<div class="sec-title"><h2>Takımlar</h2><span class="aside">en az 3 maç</span></div><div class="split" style="grid-template-columns:1fr 1fr;display:grid;gap:8px">${tbl("En iyi okuduğun",best)}${tbl("En çok yanıldığın",worst)}</div>`;
@@ -783,13 +857,14 @@ function render(){
   renderBoard();
   $("#navLive").classList.toggle("hide", !(S.days[S.today]?.games.some(g=>g.state==="in")));
   if(S.tab==="tahmin"){ renderDayLabel(); renderStatus(); if(S.sub==="maclar"){ renderDayPlayer(); renderGames(); } else renderDayView(); }
+  if(S.tab==="sonuclar") renderResults();
   if(S.tab==="ayrisma") renderAyrisma();
   if(S.tab==="puan") renderPuan();
   if(S.tab==="istatistik") renderStats();
 }
 function route(){
   const t=(location.hash||"#tahmin").slice(1);
-  S.tab=["tahmin","ayrisma","puan","istatistik"].includes(t)?t:"tahmin";
+  S.tab=["tahmin","sonuclar","ayrisma","puan","istatistik"].includes(t)?t:"tahmin";
   $$("[data-view]").forEach(v=>v.classList.toggle("hide", v.id!=="view-"+S.tab));
   $$(".nav a").forEach(a=>a.dataset.tab===S.tab?a.setAttribute("aria-current","page"):a.removeAttribute("aria-current"));
   render();
@@ -813,8 +888,11 @@ async function loadArchive(){
 }
 async function refresh(){
   const jobs=[loadDay(S.today,{force:true})];
+  if(S.tab==="sonuclar" && S.rday && S.rday!==S.today) jobs.push(loadDay(S.rday,{force:true}));
   if(S.day!==S.today) jobs.push(loadDay(S.day,{force:true}));
-  const yd=shiftDay(S.today,-1); if(!S.arch.scores.days?.[yd]) jobs.push(loadDay(yd).catch(()=>null));
+  // dün henüz arşive (tüm oyuncular için) girmediyse canlı hesap için yükle
+  const yd=shiftDay(S.today,-1), archYd=S.arch.scores.days?.[yd];
+  if(!archYd || S.order.some(u=>!archYd[u])) jobs.push(loadDay(yd).catch(()=>null));
   await Promise.allSettled(jobs);
   render(); schedule();
 }
@@ -824,7 +902,7 @@ function schedule(){
   S.timer=setTimeout(refresh, document.hidden?10*60e3: live?30e3: 3*60e3);
 }
 document.addEventListener("visibilitychange", ()=>{ if(!document.hidden && S.uid) refresh(); });
-new IntersectionObserver(([e])=>$("#mini").classList.toggle("show",!e.isIntersecting),{rootMargin:"-52px 0px 0px 0px"}).observe($("#board"));
+new IntersectionObserver(([e])=>{ const on=!e.isIntersecting && !!$("#mini").innerHTML; $("#mini").classList.toggle("show",on); $(".topbar").classList.toggle("scrolled",on); },{rootMargin:"-52px 0px 0px 0px"}).observe($("#board"));
 
 /* ====================================================== giriş */
 let authMode="login";
@@ -866,7 +944,6 @@ $("#authForm").addEventListener("submit", async e=>{
 });
 $("#me").onclick=()=>{
   openSheet(`<h3 id="shTitle">${esc(pname(S.uid))}</h3><p class="muted">Bu cihazda girişli kalırsın. Başka cihazda adın ve şifrenle girebilirsin.</p>
-    <div class="box"><b>Kurallar</b><p style="margin:6px 0 0;font-size:14px;line-height:1.55">Her maç için kazanan, fark ve en skorer zorunlu. Kazanan doğruysa 1 puan; kazananla birlikte fark da doğruysa +1; en skorer doğruysa +1.<br>Günün güveni: seçtiğin maçta kazanan doğruysa 2 puan, yanlışsa -1.<br>Günün oyuncusu: gecenin en çok sayı atanını bilirsen +2.<br>Tahmin maçtan 10 dakika önce kilitlenir; rakiplerin seçimleri o an açılır. Playoffta tüm puanlar 2 katı.</p></div>
     <button class="btn" id="logout" style="margin-top:12px">Çıkış yap</button>`);
   $("#logout").onclick=async()=>{ closeSheet(); await signOut(S.auth); };
 };
@@ -889,7 +966,7 @@ $("#me").onclick=()=>{
     $("#auth").classList.add("hide"); $("#app").classList.remove("hide");
     $("#me").classList.remove("hide"); $("#me").textContent=pname(S.uid).slice(0,1).toLocaleUpperCase("tr");
     S.statFor=S.uid;
-    $("#foot").innerHTML="Kazanan 1 · fark +1 · en skorer +1 · güven ×2 / -1 · günün oyuncusu +2<br>Veriler ESPN'den alınır. Maç varken 30 saniyede bir yenilenir.";
+    $("#foot").innerHTML="Kazanan 1 · fark +1 · en skorer +1 · banko 2 / -1 · günün oyuncusu +2<br>Veriler ESPN'den alınır. Maç varken 30 saniyede bir yenilenir.";
     route(); showDay(); refresh();
   });
 })();

@@ -22,6 +22,7 @@
     <div class="brand cond">NBA Tahmin</div>
     <div class="mini" id="mini" aria-hidden="true"></div>
     <div class="tb-right">
+      <button class="rules-btn" id="rulesBtn" type="button">Kurallar</button>
       <button class="icon-btn" id="theme" type="button"></button>
       <button class="icon-btn hide" id="me" type="button" aria-label="Hesap"></button>
     </div>
@@ -79,6 +80,16 @@
         <div id="subTahminler" class="hide"><div id="dayView"></div></div>
       </section>
 
+      <!-- SONUÇLAR -->
+      <section id="view-sonuclar" data-view class="hide">
+        <div class="daynav">
+          <button id="rdPrev" aria-label="Önceki gün">‹</button>
+          <div class="dl" id="rdLabel"></div>
+          <button id="rdNext" aria-label="Sonraki gün">›</button>
+        </div>
+        <div id="results"></div>
+      </section>
+
       <!-- AYRIŞMA -->
       <section id="view-ayrisma" data-view class="hide">
         <div class="sec-title"><h2>Ayrıştığınız maçlar</h2><span class="aside" id="ayrDay"></span></div>
@@ -102,6 +113,7 @@
   <nav class="nav" aria-label="Sekmeler">
     <div class="in">
       <a href="#tahmin" data-tab="tahmin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3.5 9.5c4 1 13 1 17 0M3.5 14.5c4-1 13-1 17 0M12 3c-2.5 3-2.5 15 0 18M12 3c2.5 3 2.5 15 0 18"/></svg><span class="live-dot hide" id="navLive"></span>Tahmin</a>
+      <a href="#sonuclar" data-tab="sonuclar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M12 5v14M7 10v4M17 10v4"/></svg>Sonuçlar</a>
       <a href="#ayrisma" data-tab="ayrisma"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v6M12 9l-6 6v6M12 9l6 6v6"/></svg>Ayrışma</a>
       <a href="#puan" data-tab="puan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v4a5 5 0 0 1-10 0z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/></svg>Puan</a>
       <a href="#istatistik" data-tab="istatistik"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>İstatistik</a>
