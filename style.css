@@ -79,7 +79,7 @@ button,input,select{font:inherit;color:inherit}
 .bf-meta{color:var(--board-muted);font-size:13px}
 .bf-meta b{color:var(--board-ink);font-weight:600}
 .lb{display:grid;gap:6px;padding-top:8px}
-.lb-row{display:grid;grid-template-columns:22px 1fr auto auto;align-items:center;gap:10px;background:var(--board-2);border-radius:10px;padding:7px 10px}
+.lb-row{display:grid;grid-template-columns:18px auto 1fr auto auto;align-items:center;gap:10px;background:var(--board-2);border-radius:10px;padding:7px 10px}
 .lb-row .rk{font-family:"Barlow Condensed";font-weight:700;color:var(--board-muted)}
 .lb-row .nm{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .lb-row .tn{font-family:"Barlow Condensed";font-weight:800;font-size:24px}
@@ -373,3 +373,141 @@ footer{color:var(--muted);font-size:12px;text-align:center;margin:28px 0 8px}
 #resetWait .linkish{display:block;margin:0 auto}
 .spin{width:28px;height:28px;margin:0 auto 10px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--ink);animation:spin 1s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
+
+/* ================= Grup A: skor alanı */
+/* saha çizgileri: çok silik orta saha, orta yuvarlak ve iki üç sayı yayı */
+.board{position:relative;overflow:hidden;isolation:isolate}
+.board::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;opacity:.07;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 940 500' fill='none' stroke='%23fff' stroke-width='3'%3E%3Crect x='10' y='10' width='920' height='480' rx='4'/%3E%3Cpath d='M470 10v480'/%3E%3Ccircle cx='470' cy='250' r='60'/%3E%3Ccircle cx='470' cy='250' r='20'/%3E%3Crect x='10' y='170' width='190' height='160'/%3E%3Crect x='740' y='170' width='190' height='160'/%3E%3Cpath d='M10 30h140a220 220 0 0 1 0 440H10M930 30H790a220 220 0 0 0 0 440h140'/%3E%3Ccircle cx='200' cy='250' r='60'/%3E%3Ccircle cx='740' cy='250' r='60'/%3E%3C/svg%3E") center/cover no-repeat}
+.av{--pc:var(--board-muted);display:inline-grid;place-items:center;width:46px;height:46px;border-radius:50%;flex:none;
+  font-family:"Barlow Condensed";font-weight:800;font-size:20px;color:#fff;letter-spacing:.02em;
+  background:radial-gradient(circle at 30% 25%,color-mix(in srgb,var(--pc) 70%,#fff),var(--pc) 60%,color-mix(in srgb,var(--pc) 70%,#000));
+  box-shadow:0 0 0 3px var(--board),0 0 0 5px color-mix(in srgb,var(--pc) 55%,transparent)}
+.av.sm{width:32px;height:32px;font-size:14px;box-shadow:0 0 0 2px color-mix(in srgb,var(--pc) 45%,transparent)}
+.av.empty{background:var(--board-2);color:var(--board-muted)}
+.pl .av{margin:12px auto 6px}
+/* skorbord rakamları: sönük 88 arka planı + oyuncu renginde ışık */
+.digits{position:relative;overflow:hidden}
+.digits span{position:relative;text-shadow:0 0 18px color-mix(in srgb,var(--pc,#fff) 55%,transparent)}
+.digits::before{content:attr(data-g);position:absolute;inset:6px 0 4px;color:var(--board-ink);opacity:.06}
+.digits::after{content:"";position:absolute;inset:0;pointer-events:none;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.16) 0 1px,transparent 1px 3px)}
+.digits.bump span{animation:bump .5s ease}
+@keyframes bump{30%{transform:scale(1.12);color:#fff}}
+/* form noktaları */
+.form{display:inline-flex;gap:4px;justify-content:center;margin-top:7px}
+.form i{width:8px;height:8px;border-radius:50%;background:var(--board-line)}
+.form i.W{background:var(--win)}.form i.L{background:var(--lose)}.form i.T{background:var(--amber)}
+.pl .form{display:flex}
+.lb-row .td .form{margin:0 0 2px}
+/* halat çekme */
+.tug{margin:14px 4px 0}
+.tug-bar{position:relative;height:8px;border-radius:99px;background:var(--board-2);display:flex}
+.tug-bar .ta{width:var(--pos);background:linear-gradient(90deg,color-mix(in srgb,var(--a) 35%,transparent),var(--a));border-radius:99px 0 0 99px;transition:width .8s cubic-bezier(.2,.8,.2,1)}
+.tug-bar .tb{flex:1;background:linear-gradient(90deg,var(--b),color-mix(in srgb,var(--b) 35%,transparent));border-radius:0 99px 99px 0}
+.tug-bar .knot{position:absolute;top:50%;left:var(--pos);width:18px;height:18px;transform:translate(-50%,-50%);border-radius:50%;
+  background:var(--board-ink);box-shadow:0 0 0 3px var(--board),0 2px 8px rgba(0,0,0,.5);transition:left .8s cubic-bezier(.2,.8,.2,1)}
+.tug-lbl{text-align:center;font-family:"Barlow Condensed";font-weight:700;font-size:15px;margin-top:6px;color:var(--board-muted);letter-spacing:.03em}
+.lb-row{position:relative;overflow:hidden}
+.lb-row::before{content:"";position:absolute;left:0;bottom:0;height:2px;width:var(--w);background:var(--pc);opacity:.8}
+
+/* ================= Grup B: maç kartları */
+/* takım renkleri: kartın üstünde iki renkli şerit, takım düğmelerinde hafif renk */
+.game{overflow:hidden}
+.game::before{content:"";position:absolute;left:0;right:0;top:0;height:4px;
+  background:linear-gradient(90deg,var(--ca,var(--line)) 0 46%,var(--ch,var(--line)) 54% 100%)}
+.tbtn{--tc:var(--line);background:linear-gradient(100deg,color-mix(in srgb,var(--tc) 16%,var(--panel-2)) 0,var(--panel-2) 55%)}
+.tbtn[aria-pressed="true"]{border-color:var(--tc);background:linear-gradient(100deg,color-mix(in srgb,var(--tc) 26%,var(--panel)) 0,var(--panel) 60%);
+  box-shadow:0 0 0 1px var(--tc) inset}
+:root[data-theme="dark"] .tbtn[aria-pressed="true"]{border-color:color-mix(in srgb,var(--tc) 70%,#fff)}
+.g-hr{display:inline-flex;align-items:center;gap:6px}
+/* canlı kart */
+.game.is-live{animation:livePulse 2.2s ease-in-out infinite}
+@keyframes livePulse{0%,100%{box-shadow:0 0 0 0 color-mix(in srgb,var(--live) 0%,transparent)}50%{box-shadow:0 0 0 4px color-mix(in srgb,var(--live) 28%,transparent)}}
+.live-clock{font-family:"Barlow Condensed";font-weight:700;font-size:19px;color:var(--live);margin-left:6px;letter-spacing:.02em}
+.live-clock b{font-weight:800;font-size:22px;font-variant-numeric:tabular-nums}
+.tbtn .sc.flash{animation:scFlash 1.4s ease}
+@keyframes scFlash{0%{color:var(--live);transform:scale(1.25);text-shadow:0 0 14px var(--live)}100%{transform:none}}
+.prow.winning{background:color-mix(in srgb,var(--win) 14%,var(--panel-2))}
+.prow.losing{background:color-mix(in srgb,var(--lose) 12%,var(--panel-2))}
+.prow.winning .pts small{color:var(--win)} .prow.losing .pts small{color:var(--lose)}
+/* sonuç çipleri */
+.prow .pk{gap:4px}
+.rc{display:inline-flex;align-items:center;gap:3px;border-radius:7px;padding:2px 7px;font-size:12.5px;font-weight:600;background:var(--panel);border:1px solid var(--line);
+  white-space:nowrap;max-width:150px;overflow:hidden;text-overflow:ellipsis}
+.rc i{font-style:normal;font-weight:800}
+.rc.ok{background:var(--win-soft);border-color:transparent;color:var(--win)}
+.rc.no{background:var(--lose-soft);border-color:transparent;color:var(--lose);text-decoration:line-through;text-decoration-thickness:1px}
+.rc.no i{text-decoration:none}
+.rc.nok{border-color:var(--win);color:var(--win)}
+.rc.nno{border-style:dashed;color:var(--muted)}
+/* kazanılan puan rozeti */
+.pt-badge{font-family:"Barlow Condensed";font-weight:800;font-size:18px;line-height:1;border-radius:9px;padding:4px 9px;font-variant-numeric:tabular-nums}
+.pt-badge.pos{background:var(--win);color:#fff}
+.pt-badge.neg{background:var(--lose);color:#fff}
+.pt-badge.zero{background:var(--panel-2);color:var(--muted);border:1px solid var(--line)}
+/* kilit halkası */
+.ring{display:inline-flex;align-items:center;gap:5px;margin-left:8px;font-weight:600;color:var(--muted);font-size:12.5px;vertical-align:middle}
+.ring svg{width:20px;height:20px;transform:rotate(-90deg)}
+.ring .rt{fill:none;stroke:var(--track,var(--line));stroke-width:4}
+.ring .rf{fill:none;stroke:var(--win);stroke-width:4;stroke-linecap:round;stroke-dasharray:94.25;transition:stroke-dashoffset .6s}
+.ring.warn{color:var(--amber-ink)} .ring.warn .rf{stroke:var(--amber)}
+.ring.urgent{color:var(--lose)} .ring.urgent .rf{stroke:var(--lose)} .ring.urgent svg{animation:pulse 1.2s infinite}
+
+/* ================= Grup C: sezon grafiği ve gece takvimi */
+.chart svg{width:100%;height:auto;display:block;overflow:visible}
+.chart .gl{stroke:var(--line);stroke-width:1}
+.chart .gt{fill:var(--muted);font:600 12px Barlow}
+.chart .el{font:800 17px "Barlow Condensed"}
+.chart .ln{stroke-dasharray:2000;stroke-dashoffset:2000;animation:draw 1.4s .1s ease forwards}
+@keyframes draw{to{stroke-dashoffset:0}}
+@media (prefers-reduced-motion:reduce){.chart .ln{animation:none;stroke-dashoffset:0}}
+.chart-leg{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:8px;font-size:13px}
+.chart-leg .pn i.none{background:var(--track);border:1px solid var(--line)}
+.cal-wrap{overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+.cal{display:grid;grid-template-columns:26px repeat(var(--wk),18px);grid-auto-rows:18px;gap:4px;font-size:10.5px;color:var(--muted);width:max-content}
+.cal>span:not(.cc):not(.cl){white-space:nowrap;font-weight:600}
+.cl{display:flex;align-items:center;font-weight:600}
+.cc{width:18px;height:18px;border-radius:5px;border:0;padding:0;background:var(--track);display:block}
+button.cc{cursor:pointer;transition:transform .15s}
+button.cc:hover{transform:scale(1.2)}
+.cc.out{background:transparent}
+.cc.none{background:var(--track);opacity:.6}
+.cc.tie{background:var(--amber)}
+.cc.live{background:repeating-linear-gradient(45deg,var(--live) 0 3px,transparent 3px 6px);box-shadow:inset 0 0 0 1px var(--live)}
+
+/* ================= Grup D: his ve akış */
+/* kaydet tiki */
+.save-btn .tick{display:inline-grid;place-items:center;width:20px;height:20px;margin-right:6px;vertical-align:-4px}
+.save-btn .tick svg{width:20px;height:20px;fill:none;stroke:var(--win);stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+.save-btn.done{animation:savedPop .5s ease}
+.save-btn.done .tick svg path{stroke-dasharray:24;stroke-dashoffset:24;animation:tickDraw .45s .1s ease forwards}
+@keyframes savedPop{40%{transform:scale(1.03);background:var(--win-soft)}}
+@keyframes tickDraw{to{stroke-dashoffset:0}}
+/* konfeti */
+.confetti{position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:100}
+/* yükleme iskeleti */
+.game.skel{border-color:var(--line)}
+.game.skel::before{display:none}
+.sk{border-radius:10px;background:linear-gradient(90deg,var(--panel-2) 0,color-mix(in srgb,var(--panel-2) 60%,var(--line)) 40%,var(--panel-2) 80%);background-size:300% 100%;animation:shimmer 1.4s linear infinite}
+.sk-h{height:14px;width:38%;margin-bottom:12px}
+.sk-teams{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.sk-t{height:54px;border-radius:14px}
+.sk-l{height:12px;width:22%;margin:14px 0 8px}
+.sk-m{height:38px}
+@keyframes shimmer{from{background-position:100% 0}to{background-position:-200% 0}}
+@media (prefers-reduced-motion:reduce){.sk{animation:none}}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+/* maçsız gece */
+.empty{display:flex;flex-direction:column;align-items:center;text-align:center;padding:26px 16px 30px;margin:12px 0;border:1px dashed var(--line);border-radius:18px;background:var(--panel)}
+.empty svg{width:150px;height:auto;margin-bottom:10px;overflow:visible}
+.empty b{font-family:"Barlow Condensed";font-weight:800;font-size:24px}
+.empty span{color:var(--muted);font-size:14.5px}
+.e-board{fill:var(--panel-2);stroke:var(--muted);stroke-width:2.5}
+.e-sq{fill:none;stroke:var(--muted);stroke-width:2.5}
+.e-rim{fill:var(--amber)}
+.e-net{fill:none;stroke:var(--muted);stroke-width:1.5;stroke-linejoin:round}
+.e-ball{fill:#e8792b}
+.e-ln{fill:none;stroke:#7a3610;stroke-width:1.8}
+.empty svg circle.e-ball,.empty svg .e-ln{animation:roll 3s ease-in-out infinite;transform-origin:128px 100px}
+@keyframes roll{0%,100%{transform:translateX(0) rotate(0)}50%{transform:translateX(-8px) rotate(-40deg)}}
