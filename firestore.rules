@@ -13,6 +13,13 @@ service cloud.firestore {
     function str(v, maxLen) { return v is string && v.size() > 0 && v.size() <= maxLen; }
     // Tahminler maç saatinden 10 dakika önce kilitlenir (ve o an herkese açılır).
     function lockAt(t) { return t - duration.value(10, 'm'); }
+    // Oyuncu adı: büyük harfle başlar; harf, rakam, boşluk ve . - ' içerebilir; küfür/hakaret içermez.
+    // (Ayrıntılı kontrol sitede yapılır; burada en bariz kelimeler engellenir.)
+    function validName(n) {
+      return n is string && n.size() > 0 && n.size() <= 40
+        && n.matches('^\\p{Lu}[\\p{L}\\p{N} .\'-]*$')
+        && !n.lower().matches('.*(orospu|orosbu|siktir|sikerim|sikeyim|sikik|yarrak|dalyarak|am[iı]nak|amc[iı]k|ibne|pezevenk|kahpe|kaltak|yav[sş]ak|[sş]erefsiz|fuck|shit|bitch|cunt|nigg|faggot|whore|asshole).*');
+    }
 
     match /config/{doc} {
       allow read, write: if false;
@@ -31,11 +38,11 @@ service cloud.firestore {
       allow create: if signedIn() && request.auth.uid == uid
         && existsAfter(/databases/$(database)/documents/joins/$(uid))
         && request.resource.data.keys().hasOnly(['name', 'joined'])
-        && str(request.resource.data.name, 24)
+        && validName(request.resource.data.name)
         && request.resource.data.joined == request.time;
       allow update: if signedIn() && request.auth.uid == uid
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name'])
-        && str(request.resource.data.name, 24);
+        && validName(request.resource.data.name);
       allow delete: if false;
     }
 
@@ -116,6 +123,37 @@ service cloud.firestore {
         && did == request.resource.data.day + '_' + request.auth.uid
         && request.resource.data.gids is list && request.resource.data.gids.size() <= 30
         && request.resource.data.updatedAt == request.time;
+    }
+
+    // recovery/{uid}: güvenlik sorusunun (takım + oyuncu) tuzlu SHA-256 özeti.
+    // Yalnızca sahibi yazar ve okur; şifre sıfırlamayı GitHub'daki görev (yönetici yetkisiyle) yapar.
+    match /recovery/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow create, update: if isPlayer() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['salt', 'h', 'setAt'])
+        && request.resource.data.salt is string && request.resource.data.salt.size() == 32
+        && request.resource.data.h is string && request.resource.data.h.size() == 64
+        && request.resource.data.setAt == request.time;
+      allow delete: if false;
+    }
+
+    // resets/{id}: "şifremi unuttum" isteği. Girişsiz oluşturulur, kimse okuyamaz;
+    // GitHub görevi birkaç dakikada bir işler ve siler.
+    match /resets/{id} {
+      allow read, update, delete: if false;
+      allow create: if id.size() >= 16 && id.size() <= 40
+        && request.resource.data.keys().hasOnly(['name', 'team', 'playerId', 'pin', 'at'])
+        && str(request.resource.data.name, 40)
+        && str(request.resource.data.team, 6)
+        && str(request.resource.data.playerId, 20)
+        && request.resource.data.pin is string && request.resource.data.pin.matches('^[0-9]{6}$')
+        && request.resource.data.at == request.time;
+    }
+
+    // resetStatus/{id}: isteğin sonucu (ok / wrong / locked / nouser / nosetup). İsteği atan, kimliğini bildiği için okur.
+    match /resetStatus/{id} {
+      allow read: if true;
+      allow write: if false;
     }
   }
 }

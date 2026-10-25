@@ -439,6 +439,7 @@ function gameCard(g){
   };
   let body = `<div class="teams">${t("away")}${t("home")}</div>`;
   if(!lock){
+    body += infoBox(g);
     const d = draftFor(g);
     body += `<div class="row-lbl">Fark</div><div class="margins">${MARGINS.map(m=>`<button class="mbtn" data-act="mar" data-g="${g.id}" data-v="${m}" aria-pressed="${d.margin===m}">${m}</button>`).join("")}</div>
       <div class="row-lbl">Maçın en skoreri</div>
@@ -450,7 +451,7 @@ function gameCard(g){
       : same ? `<span class="saved">✓ Kaydedildi</span>` : missing.length ? `<span class="need">Eksik: ${missing.join(", ")}</span>`
       : saved ? `<span class="need">Değişiklik kaydedilmedi</span>` : `<span class="need">Kaydedilmedi</span>`;
     const canSave = !d.saving && !missing.length && !same;
-    body += `<div class="g-foot">${st}<button class="linkish" data-act="info" data-g="${g.id}">Maç önü</button></div>
+    body += `<div class="g-foot">${st}</div>
       <button class="save-btn" data-act="save" data-g="${g.id}" ${canSave?"":"disabled"}>${same?"✓ Kaydedildi":saved?"Değişikliği kaydet":"Tahmini kaydet"}</button>
       <div class="lock-note">${lockLeft(g)}</div>`;
   } else {
@@ -467,10 +468,37 @@ function gameCard(g){
   return `<article class="game ${g.state==="in"?"is-live":""}${missingCls}" data-gid="${g.id}">
     <div class="g-head"><span class="stt">${g.state==="in"?'<span class="badge-live">Canlı</span> ':""}${gameStatusTR(g)}</span>${conf}</div>${body}</article>`;
 }
+// Maç önü kutusu: ESPN kazanma olasılığı + son 5 maç + sakat sayısı (özet yüklendiyse)
+function infoBox(g){
+  const s = S.sums[g.id]?.data;
+  let inner = `<span class="ib-loading">Maç önü bilgileri yükleniyor…</span>`;
+  if(s){
+    const pr = s.predictor;
+    const a = pr?.awayTeam?.gameProjection!=null ? +pr.awayTeam.gameProjection : null;
+    const h = pr?.homeTeam?.gameProjection!=null ? +pr.homeTeam.gameProjection : null;
+    const l5 = t => ((s.lastFiveGames||[]).find(x=>x.team?.abbreviation===t.abbr)?.events||[]).map(e=>`<i class="${e.gameResult}">${e.gameResult==="W"?"G":"M"}</i>`).join("");
+    const inj = t => ((s.injuries||[]).find(x=>x.team?.abbreviation===t.abbr)?.injuries||[]).filter(i=>/out/i.test(i.status)).length;
+    const side = (t,p,cls) => `<div class="ib-side ${cls}"><b>${esc(t.name)}${p!=null?` %${Math.round(p)}`:""}</b><span class="ib-l5">${l5(t)||""}</span><small>${inj(t)?`${inj(t)} oyuncu oynamıyor`:"Sakat yok"}</small></div>`;
+    inner = (a!=null ? `<div class="ib-bar"><i style="width:${a}%"></i><i style="width:${h}%"></i></div>` : "")
+      + `<div class="ib-row">${side(g.away,a,"l")}${side(g.home,h,"r")}</div>`;
+  }
+  return `<button class="info-box" data-act="info" data-g="${g.id}"><span class="ib-h"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Maç önü bilgileri<span class="ib-more">Ayrıntılar ›</span></span>${inner}</button>`;
+}
+function prefetchInfo(D){
+  const need = D.games.filter(g => !started(g) && !S.sums[g.id]);
+  if(!need.length || prefetchInfo.busy) return;
+  prefetchInfo.busy = true;
+  Promise.allSettled(need.map(g => loadSummary(g))).then(() => {
+    prefetchInfo.busy = false;
+    // kartları yeniden çiz ama yazılmakta olan seçimi bozma (taslaklar S.draft'ta)
+    if(S.tab==="tahmin" && S.sub==="maclar" && S.days[S.day]===D) renderGames();
+  });
+}
 function renderGames(){
   const D = S.days[S.day];
   if(!D){ $("#games").innerHTML = `<div class="note">Maçlar yükleniyor.</div>`; return; }
   $("#games").innerHTML = D.games.map(gameCard).join("");
+  prefetchInfo(D);
   // açılış animasyonu bir kez oynasın
   let changed=false;
   for(const g of D.games) if(started(g) && !S.seen.has(g.id)){ S.seen.add(g.id); changed=true; }
@@ -624,7 +652,7 @@ async function openBox(g){
   $("#shBody").innerHTML = `<h3 id="shTitle">${esc(g.away.name)} ${g.away.score??""} – ${g.home.score??""} ${esc(g.home.name)}</h3><p class="muted" style="margin-top:-6px">${gameStatusTR(g)} · SA: isabet-deneme, 3S: üçlük, SB: serbest atış</p>${table("away")}${table("home")}`;
 }
 function openSheet(html){ $("#shBody").innerHTML=html; $("#sheet").classList.remove("hide"); document.body.style.overflow="hidden"; $("#shClose").focus(); }
-function closeSheet(){ $("#sheet").classList.add("hide"); document.body.style.overflow=""; }
+function closeSheet(){ if(S.sheetLocked) return; $("#sheet").classList.add("hide"); document.body.style.overflow=""; }
 $("#shClose").onclick = closeSheet;
 $("#sheet").addEventListener("click", e => { if(e.target.id==="sheet") closeSheet(); });
 document.addEventListener("keydown", e => { if(e.key==="Escape") closeSheet(); });
@@ -871,10 +899,49 @@ async function nightSummary(){
   const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=file.name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),4000);
 }
 
+
+/* ====================================================== Eksik tahmin uyarısı */
+function renderAlert(){
+  const el=$("#alert"); if(!el) return;
+  const D=S.days[S.today];
+  el.classList.remove("sticky");
+  if(!S.uid || !D || !D.games.length){ el.innerHTML=""; return; }
+  const open = D.games.filter(g=>!started(g));
+  if(!open.length){ el.innerHTML=""; return; }
+  const missing = open.filter(g=>!D.picks[g.id]?.[S.uid]);
+  const daily = D.daily[S.uid]||{};
+  const noBanko = !daily.confGame;
+  const noDp = !daily.dayPlayerId && !D.games.some(started);
+  if(!missing.length && !noBanko && !noDp){ el.innerHTML=""; return; }
+  // en yakın kilit: eksik maçlar ya da (günün oyuncusu eksikse) ilk maç
+  const locks = missing.map(g=>g.start.getTime()-LOCK_MS);
+  if(noDp || noBanko) locks.push(Math.min(...open.map(g=>g.start.getTime()))-LOCK_MS);
+  const ms = Math.min(...locks) - Date.now();
+  if(ms > 12*36e5){ el.innerHTML=""; return; }          // 12 saatten uzaksa gösterme
+  const h=Math.floor(ms/36e5), m=Math.max(0,Math.floor(ms%36e5/6e4));
+  const when = ms<=0 ? "Kilitleniyor" : `Sıradaki kilit ${h?h+" sa ":""}${m} dk sonra`;
+  const parts=[];
+  if(missing.length) parts.push(`<b>${missing.length} maçın eksik</b>`);
+  if(noBanko) parts.push("banko seçilmedi");
+  if(noDp) parts.push("günün oyuncusu seçilmedi");
+  const urgent = ms < 60*60e3;
+  el.classList.toggle("sticky", urgent);   // son 1 saatte ekranın üstüne yapışır
+  el.innerHTML = `<button class="alert ${urgent?"urgent":""}" id="alertBtn"><span class="al-dot"></span><span class="al-tx"><span>${when}</span><span>${parts.join(" · ")}</span></span><span class="al-go">Tamamla ›</span></button>`;
+  $("#alertBtn").onclick = () => {
+    if(S.day!==S.today){ S.day=S.today; }
+    S.sub="maclar"; $$("#subSel button").forEach(x=>x.setAttribute("aria-pressed", x.dataset.v==="maclar"));
+    $("#subMaclar").classList.remove("hide"); $("#subTahminler").classList.add("hide");
+    if(location.hash!=="#tahmin") location.hash="#tahmin"; else showDay();
+    setTimeout(()=>{ const first=$(".game.missing"); first?.scrollIntoView({behavior:"smooth",block:"center"}); }, 900);
+  };
+}
+setInterval(()=>{ if(S.uid) { renderAlert(); if(S.tab==="tahmin" && S.sub==="maclar") $$(".lock-note").forEach(el=>{ const g=S.days[S.day]?.games.find(x=>x.id===el.closest(".game")?.dataset.gid); if(g) el.textContent=lockLeft(g); }); } }, 30e3);
+
 /* ====================================================== gezinme ve yenileme */
 function render(){
   if(!S.uid) return;
   renderBoard();
+  renderAlert();
   $("#navLive").classList.toggle("hide", !(S.days[S.today]?.games.some(g=>g.state==="in")));
   if(S.tab==="tahmin"){ renderDayLabel(); renderStatus(); if(S.sub==="maclar"){ renderDayPlayer(); renderGames(); } else renderDayView(); }
   if(S.tab==="sonuclar") renderResults();
@@ -924,15 +991,111 @@ function schedule(){
 document.addEventListener("visibilitychange", ()=>{ if(!document.hidden && S.uid) refresh(); });
 new IntersectionObserver(([e])=>{ const on=!e.isIntersecting && !!$("#mini").innerHTML; $("#mini").classList.toggle("show",on); $(".topbar").classList.toggle("scrolled",on); },{rootMargin:"-52px 0px 0px 0px"}).observe($("#board"));
 
+/* ====================================================== ad kuralı */
+// Ad büyük harfle başlar, küfür/argo/hakaret içermez. Firebase kuralları da en bariz olanları ayrıca engeller.
+const LEET={"0":"o","1":"i","2":"z","3":"e","4":"a","5":"s","6":"g","7":"t","8":"b","9":"g","@":"a","$":"s","!":"i","|":"i","€":"e"};
+const foldName = s => s.toLocaleLowerCase("tr").replace(/[0-9@$!|€]/g, c=>LEET[c]).normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/ı/g,"i");
+const squeeze = s => s.replace(/(.)\1+/g, "$1");
+// birleşik yazımda (boşluk/nokta atlatmaları dahil) aranan kökler
+const BAD_SUB = ["orospu","orosbu","oruspu","siktir","sikerim","sikeyim","sikiyim","sikik","sikis","sikici","sikko","sokuk",
+  "yarrak","yarak","yarag","dalyarak","tasak","tasag","aminak","aminako","amcik","amcig","amck","ibne","ipne","kahpe","kaltak",
+  "pezevenk","gavat","yavsak","yavsag","serefsiz","surtuk","fahise","kevase","gerizekali","dangalak","angut","godos","kancik","gotveren",
+  "gotlek","gotunu","ananisik","anasini","avradini","bacini","pic kurusu","haysiyetsiz","oglanci",
+  "fuck","shit","bitch","cunt","asshole","bastard","whore","slut","nigger","nigga","faggot","retard","pussy","motherf","wanker",
+  "dildo","penis","vagina","porn","hitler"].map(x=>squeeze(x.replace(/ /g,"")));
+// yalnızca tek başına kelime olarak yasak olanlar (başka adların içinde geçebildikleri için)
+const BAD_WORD = new Set(["amk","aq","amq","mk","oc","pic","got","sik","sg","mal","salak","aptal","pust","lan","ulan","ananı","anani","dick","cock","fag","ass","fck","sex","seks","kro","pezo","fuk","nazi","amina","sikim"].map(x=>squeeze(foldName(x))));
+function nameProblem(name){
+  if(!name) return "Adını yaz.";
+  if(name.length > 40) return "Ad en fazla 40 karakter olabilir.";
+  if(!/^\p{Lu}/u.test(name)) return "Ad büyük harfle başlamalı (ör. Andaç).";
+  if(!/^\p{Lu}[\p{L}\p{N} .'\-]*$/u.test(name)) return "Adda yalnızca harf, rakam, boşluk ve . - ' olabilir.";
+  const f = foldName(name), joined = squeeze(f.replace(/[^a-z]/g,"")), words = f.split(/[^a-z]+/).filter(Boolean).map(squeeze);
+  if(BAD_SUB.some(x=>joined.includes(x)) || words.some(w=>BAD_WORD.has(w))) return "Bu ad uygun değil. Küfür, argo ya da hakaret içermeyen bir ad seç.";
+  return null;
+}
+
+/* ====================================================== güvenlik sorusu */
+// Herkes bir takım ve bir basketbolcu seçer. Cevap tuzlu SHA-256 olarak saklanır (recovery/{uid});
+// "Şifremi unuttum" isteğini GitHub'daki görev birkaç dakikada bir işler.
+let ALLP=null;
+async function allPlayers(){ if(!ALLP) ALLP = await getJSON("data/allplayers.json"); return ALLP; }
+const hex = buf => [...new Uint8Array(buf)].map(x=>x.toString(16).padStart(2,"0")).join("");
+const randHex = n => hex(crypto.getRandomValues(new Uint8Array(n)));
+const sha256hex = async s => hex(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s)));
+async function saveRecovery(uid, v){
+  const salt = randHex(16), h = await sha256hex(`${salt}${v.team}:${v.playerId}`);
+  await setDoc(doc(S.db,"recovery",uid), {salt, h, setAt:serverTimestamp()});
+}
+function secPicker(box){
+  const st = {team:"", pid:""};
+  box.innerHTML = `<label class="fld"><span>En sevdiğin takım</span><select class="sec-team"><option value="">Yükleniyor…</option></select></label>
+    <label class="fld"><span>En sevdiğin basketbolcu</span><input class="sec-pl" autocomplete="off" placeholder="Ara: ör. Curry"></label>
+    <div class="sec-res"></div>`;
+  const sel = box.querySelector(".sec-team"), inp = box.querySelector(".sec-pl"), res = box.querySelector(".sec-res");
+  allPlayers().then(d => {
+    sel.innerHTML = `<option value="">Takım seç</option>` + d.teams.map(t=>`<option value="${esc(t.a)}">${esc(t.n)}</option>`).join("");
+  }).catch(() => { sel.innerHTML = `<option value="">Liste yüklenemedi, sayfayı yenile</option>`; });
+  sel.onchange = () => { st.team = sel.value; };
+  inp.oninput = async () => {
+    st.pid = ""; inp.classList.remove("chosen");
+    const q = slug(inp.value);
+    if(q.length < 2){ res.innerHTML = ""; return; }
+    const d = await allPlayers().catch(()=>null); if(!d) return;
+    const hits = d.players.filter(p=>slug(p.n).includes(q)).slice(0,8);
+    res.innerHTML = hits.length ? hits.map(p=>`<button type="button" data-id="${esc(p.id)}" data-n="${esc(p.n)}"><img src="${LOGO_SMALL(p.t)}" alt="">${esc(p.n)}<small>${esc(p.t)}</small></button>`).join("")
+      : `<p class="muted">Bulunamadı.</p>`;
+  };
+  res.onclick = e => {
+    const b = e.target.closest("button"); if(!b) return;
+    st.pid = b.dataset.id; inp.value = b.dataset.n; inp.classList.add("chosen"); res.innerHTML = "";
+  };
+  return { value: () => (st.team && st.pid) ? {team:st.team, playerId:st.pid} : null, focus: () => sel.focus() };
+}
+function openRecoverySheet(required){
+  S.sheetLocked = required;
+  $("#shClose").classList.toggle("hide", required);
+  openSheet(`<h3 id="shTitle">Güvenlik sorusu</h3>
+    <p class="muted">${required?"Şifreni unutursan sıfırlayabilmen için bir kez seçmen gerekiyor.":"Yeni cevabın eskisinin yerine geçer."} Takım ve oyuncuyu başkalarına söyleme.</p>
+    <div id="recBox"></div><p class="err" id="recErr"></p><button class="btn-primary" id="recSave" type="button">Kaydet</button>`);
+  const pk = secPicker($("#recBox"));
+  $("#recSave").onclick = async () => {
+    const v = pk.value(); if(!v){ $("#recErr").textContent = "Takımı seç ve listeden bir oyuncuya dokun."; return; }
+    $("#recSave").disabled = true;
+    try{ await saveRecovery(S.uid, v); S.sheetLocked=false; $("#shClose").classList.remove("hide"); closeSheet(); toast("Güvenlik sorusu kaydedildi."); }
+    catch(e){ $("#recErr").textContent = "Kaydedilemedi, tekrar dene."; $("#recSave").disabled = false; }
+  };
+}
+async function checkRecovery(){
+  if(S.joinP) await S.joinP.catch(()=>{});
+  try{ const r = await getDoc(doc(S.db,"recovery",S.uid)); if(!r.exists()) openRecoverySheet(true); }catch(e){}
+}
+
 /* ====================================================== giriş */
-let authMode="login";
-$("#authMode").addEventListener("click", e=>{
-  const c=e.target.closest(".chip"); if(!c) return; authMode=c.dataset.v;
-  $$("#authMode .chip").forEach(x=>x.setAttribute("aria-pressed",x===c));
-  $("#fInvite").classList.toggle("hide", authMode!=="join");
-  $("#inPin").autocomplete = authMode==="join"?"new-password":"current-password";
-  $("#authBtn").textContent = authMode==="join"?"Oyuna katıl":"Giriş yap";
+let authMode="login", authSec=null;
+function setAuthMode(m){
+  authMode=m;
+  $$("#authMode .chip").forEach(x=>x.setAttribute("aria-pressed", x.dataset.v===(m==="reset"?"login":m)));
+  $("#fInvite").classList.toggle("hide", m!=="join");
+  $("#nameHint").classList.toggle("hide", m!=="join");
+  $("#fSec").classList.toggle("hide", m==="login");
+  $("#secHead").innerHTML = m==="reset" ? `Güvenlik sorusu <small>Kayıtta seçtiğin takım ve oyuncu.</small>` : `Güvenlik sorusu <small>Şifreni unutursan bu ikisiyle sıfırlarsın.</small>`;
+  if(m!=="login" && !authSec) authSec = secPicker($("#secPick"));
+  $("#pinLbl").textContent = m==="reset" ? "Yeni şifre (6 hane)" : "Şifre (6 hane)";
+  $("#inPin").autocomplete = m==="login" ? "current-password" : "new-password";
+  $("#authBtn").textContent = {login:"Giriş yap", join:"Oyuna katıl", reset:"Şifremi sıfırla"}[m];
+  $("#forgotBtn").textContent = m==="reset" ? "Girişe dön" : "Şifremi unuttum";
+  $("#forgotBtn").classList.toggle("hide", m==="join");
+  $("#authTitle").textContent = m==="reset" ? "Şifreni sıfırla" : "Oyuna gir";
   $("#authErr").textContent="";
+}
+$("#authMode").addEventListener("click", e=>{ const c=e.target.closest(".chip"); if(c) setAuthMode(c.dataset.v); });
+$("#forgotBtn").onclick = () => setAuthMode(authMode==="reset" ? "login" : "reset");
+$("#inName").addEventListener("input", () => {
+  if(authMode!=="join") return;
+  const p = $("#inName").value.trim() ? nameProblem($("#inName").value.trim()) : null;
+  $("#nameHint").textContent = p || "Büyük harfle başlamalı. Küfür, argo ya da hakaret içeremez.";
+  $("#nameHint").classList.toggle("bad", !!p);
 });
 const AUTH_ERR = {
   "auth/invalid-credential":"Ad ya da şifre yanlış.", "auth/wrong-password":"Ad ya da şifre yanlış.", "auth/user-not-found":"Bu adla oyuncu yok. Yeni oyuncu sekmesinden katıl.",
@@ -944,27 +1107,77 @@ $("#authForm").addEventListener("submit", async e=>{
   const name=$("#inName").value.trim(), pin=$("#inPin").value.trim(), inv=$("#inInvite").value.trim();
   const err=t=>{$("#authErr").textContent=t;};
   if(!slug(name)) return err("Adında en az bir harf ya da rakam olmalı.");
-  if(!/^\d{6}$/.test(pin)) return err("Şifre 6 rakam olmalı.");
+  if(authMode==="join"){ const p=nameProblem(name); if(p) return err(p); }
+  if(!/^\d{6}$/.test(pin)) return err(authMode==="reset" ? "Yeni şifre 6 rakam olmalı." : "Şifre 6 rakam olmalı.");
+  const sec = authMode==="login" ? null : authSec.value();
+  if(authMode!=="login" && !sec) return err("Takımı seç ve listeden bir oyuncuya dokun.");
   if(authMode==="join" && !inv) return err("Davet kodunu gir.");
   const email=`${slug(name)}@${S.cfg.authEmailDomain}`;
   $("#authBtn").disabled=true; err("");
   try{
     if(authMode==="login"){ await signInWithEmailAndPassword(S.auth, email, pin); }
-    else{
-      const cred=await createUserWithEmailAndPassword(S.auth, email, pin);
-      try{
-        const b=writeBatch(S.db);
-        b.set(doc(S.db,"joins",cred.user.uid),{invite:inv});
-        b.set(doc(S.db,"players",cred.user.uid),{name, joined:serverTimestamp()});
-        await b.commit();
-      }catch(x){ await cred.user.delete().catch(()=>{}); throw {code:"invite"}; }
+    else if(authMode==="reset"){
+      const id = randHex(12);
+      await setDoc(doc(S.db,"resets",id), {name, team:sec.team, playerId:sec.playerId, pin, at:serverTimestamp()});
+      try{ localStorage.setItem("resetReq", JSON.stringify({id, name, t:Date.now()})); }catch(x){}
+      showResetWait();
     }
-  }catch(x){ err(x.code==="invite"?"Davet kodu yanlış.":AUTH_ERR[x.code]||"Giriş yapılamadı, tekrar dene."); }
+    else{
+      S.joinP = (async()=>{
+        const cred=await createUserWithEmailAndPassword(S.auth, email, pin);
+        try{
+          const b=writeBatch(S.db);
+          b.set(doc(S.db,"joins",cred.user.uid),{invite:inv});
+          b.set(doc(S.db,"players",cred.user.uid),{name, joined:serverTimestamp()});
+          await b.commit();
+        }catch(x){ await cred.user.delete().catch(()=>{}); throw {code:"invite"}; }
+        await saveRecovery(cred.user.uid, sec).catch(()=>{}); // olmazsa girişte tekrar sorulur
+      })();
+      await S.joinP;
+    }
+  }catch(x){ err(x.code==="invite"?"Davet kodu yanlış ya da ad uygun değil.":AUTH_ERR[x.code]||(authMode==="reset"?"İstek gönderilemedi, tekrar dene.":"Giriş yapılamadı, tekrar dene.")); }
+  S.joinP=null;
   $("#authBtn").disabled=false;
 });
+
+// Şifre sıfırlama isteğinin sonucunu bekle (GitHub görevi birkaç dakikada bir çalışır)
+const RESET_MSG = {
+  ok:      ["ok",   "Şifren değişti. Yeni şifrenle giriş yapabilirsin."],
+  wrong:   ["bad",  "Takım ya da oyuncu tutmadı. Tekrar deneyebilirsin (3 yanlıştan sonra 1 saat beklenir)."],
+  locked:  ["bad",  "Çok fazla yanlış deneme oldu. 1 saat sonra tekrar dene."],
+  nouser:  ["bad",  "Bu adla bir oyuncu bulunamadı. Adı kayıttaki gibi yazdığından emin ol."],
+  nosetup: ["bad",  "Bu hesapta güvenlik sorusu yok. Oyunu kuran kişiden yardım iste."],
+  error:   ["bad",  "İstek işlenemedi. Tekrar dene."]
+};
+let resetTimer=null;
+function showResetWait(){
+  let rq=null; try{ rq=JSON.parse(localStorage.getItem("resetReq")||"null"); }catch(e){}
+  if(!rq) return;
+  if(Date.now()-rq.t > 6*36e5){ try{localStorage.removeItem("resetReq");}catch(e){} return; }
+  $("#authForm").classList.add("hide"); $("#authMode").classList.add("hide");
+  const box=$("#resetWait"); box.classList.remove("hide");
+  const done = () => { clearTimeout(resetTimer); try{localStorage.removeItem("resetReq");}catch(e){} };
+  const back = (keep) => { clearTimeout(resetTimer); if(!keep) done(); box.classList.add("hide"); $("#authForm").classList.remove("hide"); $("#authMode").classList.remove("hide"); $("#inName").value=rq.name; $("#inPin").value=""; setAuthMode("login"); };
+  const paint = st => {
+    const m = st && RESET_MSG[st];
+    box.innerHTML = m
+      ? `<div class="reset-box ${m[0]}"><b>${m[0]==="ok"?"✓ Tamam":"Olmadı"}</b><p>${m[1]}</p></div><button class="btn-primary" id="rwBack" type="button">${m[0]==="ok"?"Giriş yap":"Geri dön"}</button>`
+      : `<div class="reset-box"><div class="spin"></div><b>İsteğin alındı</b><p>Yeni şifren genelde 5–15 dakika içinde geçerli olur. Bu sayfayı açık bırakabilir ya da sonra dönebilirsin, sonuç burada görünür.</p></div><button class="linkish" id="rwBack" type="button">Girişe dön</button>`;
+    $("#rwBack").onclick = () => m ? (back(false), m[0]!=="ok" && st!=="locked" && setAuthMode("reset")) : back(true);
+    if(m) done();
+  };
+  paint(null);
+  const poll = async () => {
+    try{ const r=await getDoc(doc(S.db,"resetStatus",rq.id)); if(r.exists()){ paint(r.data().state); return; } }catch(e){}
+    resetTimer=setTimeout(poll, 20e3);
+  };
+  poll();
+}
 $("#me").onclick=()=>{
   openSheet(`<h3 id="shTitle">${esc(pname(S.uid))}</h3><p class="muted">Bu cihazda girişli kalırsın. Başka cihazda adın ve şifrenle girebilirsin.</p>
+    <button class="btn" id="secChange" style="margin-top:12px">Güvenlik sorusunu değiştir</button>
     <button class="btn" id="logout" style="margin-top:12px">Çıkış yap</button>`);
+  $("#secChange").onclick=()=>openRecoverySheet(false);
   $("#logout").onclick=async()=>{ closeSheet(); await signOut(S.auth); };
 };
 
@@ -976,7 +1189,7 @@ $("#me").onclick=()=>{
   S.today = espnToday(); S.day = S.today;
   await Promise.all([loadPlayers().catch(()=>{}), loadArchive().catch(()=>{})]);
   onAuthStateChanged(S.auth, async user=>{
-    if(!user){ S.uid=null; $("#app").classList.add("hide"); $("#me").classList.add("hide"); $("#auth").classList.remove("hide"); return; }
+    if(!user){ S.uid=null; $("#app").classList.add("hide"); $("#me").classList.add("hide"); $("#auth").classList.remove("hide"); showResetWait(); return; }
     S.uid=user.uid;
     await loadPlayers().catch(()=>{});
     if(!S.players[S.uid]){ // kayıt yarıda kaldıysa
@@ -988,5 +1201,6 @@ $("#me").onclick=()=>{
     S.statFor=S.uid;
     $("#foot").innerHTML="Kazanan 1 · fark +1 · en skorer +1 · banko 2 / -1 · günün oyuncusu +2<br>Veriler ESPN'den alınır. Maç varken 30 saniyede bir yenilenir.";
     route(); showDay(); refresh();
+    checkRecovery();
   });
 })();

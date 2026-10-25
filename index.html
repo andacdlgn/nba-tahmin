@@ -40,10 +40,15 @@
     </div>
     <form id="authForm" autocomplete="on">
       <label class="fld" id="fName"><span>Adın</span>
-        <input id="inName" list="playerNames" autocomplete="username" maxlength="24" required placeholder="ör. Andaç">
+        <input id="inName" list="playerNames" autocomplete="username" maxlength="40" required placeholder="ör. Andaç">
         <datalist id="playerNames"></datalist>
+        <small class="hint hide" id="nameHint">Büyük harfle başlamalı. Küfür, argo ya da hakaret içeremez.</small>
       </label>
-      <label class="fld"><span>Şifre (6 hane)</span>
+      <div class="sec-q hide" id="fSec">
+        <div class="sec-head" id="secHead">Güvenlik sorusu <small>Şifreni unutursan bu ikisiyle sıfırlarsın.</small></div>
+        <div id="secPick"></div>
+      </div>
+      <label class="fld"><span id="pinLbl">Şifre (6 hane)</span>
         <input id="inPin" type="password" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" autocomplete="current-password" required placeholder="••••••">
       </label>
       <label class="fld hide" id="fInvite"><span>Davet kodu</span>
@@ -51,7 +56,9 @@
       </label>
       <p class="err" id="authErr" role="alert"></p>
       <button class="btn-primary" id="authBtn" type="submit">Giriş yap</button>
+      <button class="linkish forgot" id="forgotBtn" type="button">Şifremi unuttum</button>
     </form>
+    <div id="resetWait" class="hide"></div>
   </div>
 </section>
 
@@ -60,6 +67,7 @@
   <div class="wrap">
     <section class="board" id="board" aria-label="Skor"></section>
 
+    <div id="alert"></div>
     <main>
       <!-- TAHMİN -->
       <section id="view-tahmin" data-view>

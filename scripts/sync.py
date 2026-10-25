@@ -229,6 +229,25 @@ def valid_before(doc, start_iso):
 
 
 # ---------------------------------------------------------------- ana akış
+def save_all_players():
+    """Tüm NBA oyuncuları (güvenlik sorusu için seçim listesi) -> data/allplayers.json"""
+    teams = get(f"{ESPN}/teams")["sports"][0]["leagues"][0]["teams"]
+    out, tl = [], []
+    for t in teams:
+        t = t["team"]
+        tl.append({"a": t["abbreviation"], "n": t["displayName"]})
+        for a in get(f"{ESPN}/teams/{t['id']}/roster").get("athletes", []):
+            out.append({"id": str(a["id"]), "n": a["displayName"], "t": t["abbreviation"]})
+    if len(out) < 300:
+        raise RuntimeError(f"yalnızca {len(out)} oyuncu geldi")
+    # Listeden oyuncu silinmez (kadrodan çıkan oyuncu, onu güvenlik cevabı seçen için listede kalır).
+    seen = {x["id"] for x in out}
+    out += [x for x in load("allplayers.json", {}).get("players", []) if x["id"] not in seen]
+    out.sort(key=lambda x: (x["n"], x["id"]))
+    tl.sort(key=lambda x: x["n"])
+    return save("allplayers.json", {"teams": tl, "players": out})
+
+
 def main(full=False):
     games = load("games.json", {})
     pstats = load("players.json", {"counted": [], "p": {}})
@@ -346,6 +365,10 @@ def main(full=False):
     sc["weeks"] = weeks
 
     changed = [save("games.json", games), save("players.json", pstats), save("scores.json", sc)]
+    try:
+        changed.append(save_all_players())
+    except Exception as e:  # kadro listesi olmasa da puanlar yazılsın
+        print("Kadro listesi alınamadı:", e)
     print(f"{len(games)} maç, {len(players)} oyuncu. Değişen dosya: {sum(changed)}")
     return 0
 

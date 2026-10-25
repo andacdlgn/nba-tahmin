@@ -113,6 +113,37 @@ button,input,select{font:inherit;color:inherit}
 
 .logo-fb{display:inline-grid;place-items:center;flex:none;border-radius:50%;background:var(--panel-2);color:var(--muted);font-family:"Barlow Condensed";font-weight:800;font-size:11px;min-width:24px;min-height:24px}
 
+
+/* ---------- Eksik tahmin uyarısı ---------- */
+#alert.sticky{position:sticky;top:calc(var(--top-h) + env(safe-area-inset-top));z-index:15}
+.alert{width:100%;display:flex;align-items:center;gap:10px;margin-top:10px;border:1px solid var(--amber);background:var(--amber-soft);color:var(--ink);border-radius:14px;padding:10px 12px;text-align:left;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.12)}
+.alert .al-dot{width:10px;height:10px;border-radius:50%;background:var(--amber);flex:none}
+.alert .al-tx{flex:1;display:flex;flex-direction:column;font-size:14px;line-height:1.3}
+.alert .al-tx span:first-child{font-weight:700;color:var(--amber-ink)}
+.alert .al-go{font-weight:700;font-size:14px;white-space:nowrap}
+.alert.urgent{border-color:var(--live);background:color-mix(in srgb,var(--live) 14%,var(--panel))}
+.alert.urgent .al-dot{background:var(--live);animation:pulse 1.4s infinite}
+.alert.urgent .al-tx span:first-child{color:var(--live)}
+
+/* ---------- Maç önü kutusu ---------- */
+.info-box{display:block;width:100%;margin-top:10px;border:1px solid var(--line);background:var(--panel-2);border-radius:14px;padding:10px 12px;text-align:left;cursor:pointer;font:inherit;color:inherit}
+.info-box:hover{border-color:var(--muted)}
+.ib-h{display:flex;align-items:center;gap:6px;font-weight:700;font-size:14px}
+.ib-h svg{width:16px;height:16px;color:var(--amber-ink)}
+.ib-more{margin-left:auto;font-size:13px;color:var(--muted);font-weight:600}
+.ib-loading{display:block;margin-top:6px;font-size:13px;color:var(--muted)}
+.ib-bar{display:flex;height:8px;border-radius:4px;overflow:hidden;margin:8px 0 6px;background:var(--track)}
+.ib-bar i{display:block;height:100%}
+.ib-bar i:first-child{background:var(--p0)} .ib-bar i:last-child{background:var(--p1)}
+.ib-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.ib-side{display:flex;flex-direction:column;gap:3px;min-width:0}
+.ib-side.r{align-items:flex-end;text-align:right}
+.ib-side b{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.ib-side small{font-size:12px;color:var(--muted)}
+.ib-l5{display:flex;gap:3px}
+.ib-l5 i{font-style:normal;width:18px;height:18px;border-radius:5px;display:grid;place-items:center;font-size:10.5px;font-weight:800;background:var(--panel)}
+.ib-l5 i.W{color:var(--win)} .ib-l5 i.L{color:var(--lose)}
+
 /* ---------- Ortak ---------- */
 main{padding-top:14px}
 .chips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding:2px 0 4px}
@@ -312,3 +343,33 @@ footer{color:var(--muted);font-size:12px;text-align:center;margin:28px 0 8px}
 .nav a[aria-current="page"]::after{content:"";position:absolute;top:0;width:28px;height:3px;border-radius:0 0 3px 3px;background:var(--amber)}
 .live-dot{position:absolute;top:10px;left:calc(50% + 8px);width:8px;height:8px;border-radius:50%;background:var(--live);border:2px solid var(--panel);animation:pulse 1.4s infinite}
 @media (prefers-reduced-motion:reduce){ .badge-live::before,.live-dot{animation:none} }
+
+/* ---- kayıt: ad kuralı ve güvenlik sorusu */
+.hint{display:block;margin-top:5px;font-size:12.5px;color:var(--muted)}
+.hint.bad{color:var(--lose);font-weight:600}
+.sec-q{margin-top:16px;padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--panel-2)}
+.sec-head{font-weight:700;font-size:15px}
+.sec-head small{display:block;font-weight:500;color:var(--muted);font-size:12.5px;margin-top:2px}
+.sec-q .fld input,.sec-q .fld select,#recBox select,#recBox input{background:var(--panel)}
+.fld select{width:100%;border:1px solid var(--line);background:var(--panel-2);border-radius:12px;padding:12px;font-size:17px;color:var(--ink);appearance:none;
+  background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);
+  background-position:calc(100% - 20px) 52%,calc(100% - 14px) 52%;background-size:6px 6px;background-repeat:no-repeat}
+#recBox .fld input,#recBox .fld select{width:100%;border:1px solid var(--line);border-radius:12px;padding:12px;font-size:17px}
+.sec-pl.chosen{border-color:var(--win)!important;box-shadow:0 0 0 2px color-mix(in srgb,var(--win) 25%,transparent)}
+.sec-res{display:flex;flex-direction:column;margin-top:4px}
+.sec-res button{display:flex;align-items:center;gap:8px;border:0;border-top:1px solid var(--line);background:none;padding:9px 4px;text-align:left;font-size:15px;cursor:pointer;color:var(--ink)}
+.sec-res button:first-child{border-top:0}
+.sec-res button img{width:22px;height:22px}
+.sec-res button small{margin-left:auto;color:var(--muted);font-size:12px}
+.sec-res .muted{margin:6px 0;font-size:14px}
+.forgot{display:block;margin:12px auto 0;font-size:14px}
+.reset-box{border:1px solid var(--line);background:var(--panel-2);border-radius:14px;padding:16px;margin:8px 0 12px;text-align:center}
+.reset-box b{display:block;font-size:18px}
+.reset-box p{margin:6px 0 0;color:var(--muted);font-size:14.5px}
+.reset-box.ok{border-color:var(--win)}
+.reset-box.ok b{color:var(--win)}
+.reset-box.bad{border-color:var(--lose)}
+.reset-box.bad b{color:var(--lose)}
+#resetWait .linkish{display:block;margin:0 auto}
+.spin{width:28px;height:28px;margin:0 auto 10px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--ink);animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}

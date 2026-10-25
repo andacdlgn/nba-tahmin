@@ -16,8 +16,16 @@ Her gecenin NBA maçlarına tahmin oyunu: kazanan, fark ve maçın en skoreri.
 - `config.json`: Firebase proje bilgileri ve ayarlar.
 - `firestore.rules`: Veritabanı güvenlik kuralları (kilit, gizlilik, davet kodu). Firebase konsoluna yapıştırılır.
 - `scripts/sync.py`: Biten maçları ESPN'den, tahminleri Firestore'dan okuyup puanları hesaplar → `data/`.
-- `.github/workflows/sync.yml`: Bu betiği saatte bir çalıştırır.
+- `.github/workflows/sync.yml`: Bu betiği saatte bir çalıştırır. Ayrıca `data/allplayers.json` (güvenlik sorusu için oyuncu listesi) güncellenir.
+- `scripts/reset.py` + `.github/workflows/reset.yml`: "Şifremi unuttum" isteklerini 5 dakikada bir işler.
+
+## Şifre sıfırlama
+- Kayıtta herkes bir **takım** ve bir **basketbolcu** seçer (güvenlik sorusu). Cevap tuzlu SHA-256 olarak `recovery/{uid}` belgesinde durur; yalnızca sahibi okuyabilir.
+- "Şifremi unuttum" → ad + takım + oyuncu + yeni şifre. İstek `resets/` koleksiyonuna düşer, GitHub görevi doğrular ve şifreyi değiştirir (genelde 5–15 dk).
+- 3 yanlış denemeden sonra o hesap için 1 saat bekleme konur.
+- Görevin çalışması için GitHub'da `FIREBASE_SA` adlı gizli değişken gerekir: Firebase konsolu → Proje ayarları → Hizmet hesapları → "Yeni özel anahtar oluştur" ile inen JSON dosyasının tüm içeriği.
 
 ## Yeni oyuncu eklemek
-Siteye girip **Yeni oyuncu** sekmesinden ad, 6 haneli şifre ve davet kodu ile katılınır.
+Siteye girip **Yeni oyuncu** sekmesinden ad, güvenlik sorusu, 6 haneli şifre ve davet kodu ile katılınır.
+Ad büyük harfle başlamalı ve küfür, argo ya da hakaret içermemeli (sitede ve Firebase kurallarında kontrol edilir).
 Davet kodu Firebase konsolunda `config/secret` belgesindeki `invite` alanıdır; değiştirmek için oradan düzenle.
