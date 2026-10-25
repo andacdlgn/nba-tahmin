@@ -250,6 +250,78 @@ def injuries(db, mail, day, games):
 
 
 # ---------------------------------------------------------------- 3) haftalık özet
+VOW = "aeıioöuü"
+FRONT_NAMES = {"kemal", "celal", "cemal", "bilal", "hilal", "nihal", "hayal", "iclal", "meral", "celâl", "kemâl", "cemâl"}
+
+
+def tr_gen(n):
+    """İlgi eki: Kemal'in, Mustafa'nın, Andaç'ın."""
+    low = n.replace("I", "ı").replace("İ", "i").lower()
+    v = next((c for c in reversed(low) if c in VOW), "e")
+    if low.split()[-1:] and low.split()[-1] in FRONT_NAMES:  # Kemal'in, Celal'in (ince l)
+        v = "e"
+    suf = {"a": "ın", "ı": "ın", "e": "in", "i": "in", "o": "un", "u": "un", "ö": "ün", "ü": "ün"}[v]
+    return n + "'" + ("n" if low[-1:] in VOW else "") + suf
+
+
+def week_notes(days, games_rows, games_meta, wk, nm, ranked):
+    """Haftalık maile insan gibi yazılmış birkaç cümle."""
+    notes = []
+    if len(ranked) > 1:
+        (u1, p1), (u2, p2) = ranked[0], ranked[1]
+        if p1 > p2:
+            d = p1 - p2
+            notes.append(f"{nm(u1)} haftayı {p1} puanla kapattı; {nm(u2)} {d} puan geride kaldı." if d > 2
+                         else f"Kıl payı bir hafta: {nm(u1)}, {nm(u2)} karşısında sadece {d} puan farkla öne geçti.")
+        else:
+            notes.append(f"Hafta {nm(u1)} ile {nm(u2)} arasında {p1}-{p2} berabere bitti.")
+    nights = {}
+    for d, row in days.items():
+        vals = {u: v.get("tot", v.get("pts", 0)) for u, v in row.items()}
+        if not vals:
+            continue
+        m = max(vals.values())
+        w = [u for u, x in vals.items() if x == m]
+        if len(w) == 1:
+            nights[w[0]] = nights.get(w[0], 0) + 1
+    if nights:
+        u, n = max(nights.items(), key=lambda x: x[1])
+        if n >= 2:
+            notes.append(f"Gecelerin hâkimi {nm(u)}: haftanın {n} gecesini kazandı.")
+    st = {}
+    for gid, row in games_rows.items():
+        g = games_meta.get(gid)
+        if not g or week_key(g["day"]) != wk:
+            continue
+        for u, r in row.items():
+            if not r.get("pick"):
+                continue
+            x = st.setdefault(u, {"n": 0, "ok": 0, "c": 0, "cok": 0, "full": 0})
+            x["n"] += 1
+            x["ok"] += r.get("w", 0) > 0
+            if r.get("c"):
+                x["c"] += 1
+                x["cok"] += r.get("w", 0) > 0
+            x["full"] += r.get("w", 0) > 0 and r.get("m", 0) > 0 and r.get("s", 0) > 0
+    acc = [(u, x["ok"] / x["n"], x) for u, x in st.items() if x["n"] >= 5]
+    if acc:
+        u, a, x = max(acc, key=lambda t: t[1])
+        notes.append(f"Kazananı en iyi bilen {nm(u)} oldu: {x['n']} maçın {x['ok']} tanesinde doğru taraftaydı (%{round(a * 100)}).")
+    bk = [(u, x) for u, x in st.items() if x["c"] >= 3]
+    if bk:
+        u, x = max(bk, key=lambda t: (t[1]["cok"] / t[1]["c"], t[1]["c"]))
+        if x["cok"] == x["c"]:
+            notes.append(f"{nm(u)} bankoda hata yapmadı: {x['c']} bankonun hepsi tuttu.")
+        elif x["cok"] / x["c"] >= 0.6:
+            notes.append(f"{tr_gen(nm(u))} bankoları sağlamdı: {x['c']} bankonun {x['cok']} tanesi tuttu.")
+    full = [(u, x["full"]) for u, x in st.items() if x["full"] > 0]
+    if full:
+        u, n = max(full, key=lambda t: t[1])
+        notes.append(f"{nm(u)} {n} maçta kazanan, fark ve en skorerin üçünü birden bildi." if n > 1
+                     else f"{nm(u)} bir maçta kazanan, fark ve en skorerin üçünü birden bildi.")
+    return notes
+
+
 def weekly(db, mail, force):
     now_tr = datetime.now(TR)
     if not force and not (now_tr.weekday() == 0 and now_tr.hour >= 10):
@@ -292,10 +364,13 @@ def weekly(db, mail, force):
         u, g, r = worst_banko
         facts.append(f"Haftanın yanan bankosu: {nm(u)}, {g['away']['abbr']} – {g['home']['abbr']}")
     head = f"Haftanın şampiyonu {nm(champ)}" if champ else "Hafta berabere bitti"
-    inner = ('<p style="margin:0 0 10px">Geçen haftanın puan durumu:</p>'
+    notes = week_notes(days, sc.get("games", {}), games_meta, wk, nm, ranked)
+    notes_html = "".join(f'<p style="margin:0 0 8px">{escape(x)}</p>' for x in notes)
+    inner = ((f'<div style="margin:0 0 14px;font-size:15px;line-height:1.5">{notes_html}</div>' if notes else "")
+             + '<p style="margin:0 0 10px">Geçen haftanın puan durumu:</p>'
              f'<table style="font-size:15px;margin:0 0 12px">{rows}</table>'
              f'<ul style="margin:0 0 14px;padding-left:20px;font-size:14px;color:#334">{"".join(f"<li>{escape(x)}</li>" for x in facts)}</ul>')
-    text = head + "\n\n" + "\n".join(f"{i + 1}. {nm(u)}: {p} puan" for i, (u, p) in enumerate(ranked)) + "\n\n" + "\n".join(facts)
+    text = head + "\n\n" + ("\n".join(notes) + "\n\n" if notes else "") + "\n".join(f"{i + 1}. {nm(u)}: {p} puan" for i, (u, p) in enumerate(ranked)) + "\n\n" + "\n".join(facts)
     for uid, name, email in people(db, "weekly"):
         ref = once(db, f"week_{wk}_{uid}")
         if not ref:

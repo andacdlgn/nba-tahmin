@@ -837,3 +837,24 @@ button.cc:hover{transform:scale(1.2)}
 .tm-r{width:22px;height:22px;border-radius:6px;display:grid;place-items:center;font-size:12px;font-weight:800;background:var(--line);flex:none}
 .tm-r.W{background:var(--win-soft);color:var(--win)} .tm-r.L{background:var(--lose-soft);color:var(--lose)} .tm-r.T{background:rgba(242,168,58,.18)}
 footer .ver{display:inline-block;margin-top:6px;opacity:.7;font-variant-numeric:tabular-nums}
+
+/* ---------- Kayan şerit ve gecenin manşeti ---------- */
+.ticker{overflow:hidden;margin:12px 0 10px;border:1px solid var(--line);border-radius:12px;background:var(--panel);font-size:14px;line-height:1;white-space:nowrap;
+  -webkit-mask-image:linear-gradient(90deg,transparent,#000 24px,#000 calc(100% - 24px),transparent);mask-image:linear-gradient(90deg,transparent,#000 24px,#000 calc(100% - 24px),transparent)}
+.ticker:empty{display:none}
+.ticker.has-hi{border-color:color-mix(in srgb,var(--amber) 55%,transparent);background:color-mix(in srgb,var(--amber) 10%,var(--panel))}
+.tk-track{display:flex;width:max-content;animation:tkMove var(--dur,40s) linear infinite}
+.ticker:hover .tk-track,.ticker:focus-within .tk-track{animation-play-state:paused}
+.tk-row{display:flex;align-items:center;padding:10px 0}
+.tk-i{padding:0 14px}
+.tk-i.hi{font-weight:700;color:var(--amber-ink)}
+.tk-sep{color:var(--muted);opacity:.6}
+@keyframes tkMove{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+@media (prefers-reduced-motion: reduce){
+  .ticker{white-space:normal;-webkit-mask-image:none;mask-image:none}
+  .tk-track{animation:none;width:auto}
+  .tk-row{flex-wrap:wrap;row-gap:6px;line-height:1.4}
+  .tk-row[aria-hidden]{display:none}
+}
+.headline{display:flex;gap:10px;align-items:flex-start;margin:0 0 12px;padding:12px 14px;border-radius:14px;background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--hc,var(--amber));font-size:15px;line-height:1.45}
+.headline b{font-family:"Barlow Condensed";font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:2px}
