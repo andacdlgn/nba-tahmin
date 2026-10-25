@@ -37,6 +37,8 @@ const timeTR = d => d.toLocaleTimeString("tr-TR",{timeZone:TZ,hour:"2-digit",min
 const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s).toLocaleDateString("tr-TR",{timeZone:"UTC",...o});
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
+// Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
+const VERSION = "v1";
 const LOGO_SMALL = a => `logos/${String(a).toLowerCase()}.png`;
 const LOGO_FULL  = a => `https://a.espncdn.com/i/teamlogos/nba/500/${String(a).toLowerCase()}.png`;
 document.addEventListener("error", e => {
@@ -1009,29 +1011,30 @@ document.addEventListener("keydown", e => { if(e.key==="Escape") closeSheet(); }
 /* ====================================================== Kurallar */
 function openRules(){
   openSheet(`<div class="rules"><h3 id="shTitle">Kurallar</h3>
-    <p>Her gece, o günün tüm NBA maçları için üç tahmin yapılır: <b>kazanan taraf</b>, <b>fark aralığı</b> ve <b>maçın en skoreri</b>. Üçü de zorunlu; doldurup "Tahmini kaydet"e basınca kaydedilir.</p>
+    <p>Her gece o günün bütün NBA maçları için üç tahmin yaparsın: <b>kazanan takım</b>, <b>fark aralığı</b> ve <b>maçın en skoreri</b>. Üçünü de doldurup "Tahmini kaydet"e basman gerekir.</p>
     <h4>Puanlar</h4>
-    <div class="pt"><span>Kazananı bilmek</span><b>1</b><span>Kazananla birlikte farkı da bilmek</span><b>+1</b><span>Maçın en skorerini bilmek</span><b>+1</b><span>Bir maçtan en fazla</span><b>3</b></div>
+    <div class="pt"><span>Kazananı bilirsen</span><b>+1</b><span>Kazananla birlikte farkı da bilirsen</span><b>+1</b><span>Maçın en skorerini bilirsen</span><b>+1</b><span>Bir maçtan alınabilecek en yüksek puan</span><b>3 puan</b></div>
     <h4>Günün bankosu</h4>
-    <p>Her gece bir maçı banko yaparsın. O maçta kazananı bilirsen 1 yerine <b>2 puan</b>, bilemezsen <b>-1</b>. Fark ve en skorer puanları normal sayılır. Banko başka bir maça taşınabilir ama kaldırılamaz.</p>
+    <p>Her gece bir maçı banko seçersin. O maçta kazananı bilirsen <b>+1</b> yerine <b>+2</b> alırsın, bilemezsen <b>-1</b> puan kaybedersin. Fark ve en skorer puanları değişmez. Bankoyu başka bir maça taşıyabilirsin ama tamamen kaldıramazsın.</p>
     <h4>Günün oyuncusu</h4>
-    <p>Gecenin tüm maçlarından bir oyuncu seçersin. O gece en çok sayıyı o atarsa <b>+2</b>.</p>
+    <p>O gecenin bütün maçları arasından bir oyuncu seçersin. Gecenin en çok sayı atan oyuncusu o olursa <b>+2</b>.</p>
     <h4>Gecenin sorusu</h4>
-    <p>Her gece evet/hayır diye cevaplanan bir soru gelir (ör. "Bu gece bir maç uzatmaya gider mi?"). Doğru cevap <b>+1</b>. Gece bitince sonuçlanır.</p>
+    <p>Her gece evet ya da hayır diye cevaplanan bir soru gelir (ör. "Bu gece uzatmaya giden maç olur mu?"). Doğru cevap <b>+1</b>. Sonuç, gecenin maçları bitince belli olur.</p>
     <h4>Playoff serileri</h4>
-    <p>Playoff'ta her seri başlamadan önce seriyi kimin, kaç maçta alacağını tahmin edersin. Kazananı bilmek <b>+3</b>, maç sayısını da bilmek <b>+2</b> daha. Seri ilk maçında kilitlenir.</p>
+    <p>Playoff'ta her seri başlamadan önce seriyi kimin kaç maçta kazanacağını tahmin edersin. Kazananı bilirsen <b>+3</b>, maç sayısını da bilirsen <b>+2</b> daha. Tahminler serinin ilk maçı başlayınca kilitlenir.</p>
     <h4>Fark aralıkları</h4>
-    <p>1-5 · 6-10 · 11-15 · 16+. Uzatmaya giden maçta da son skordaki fark sayılır. Fark puanı yalnızca kazanan doğruysa geçerli.</p>
+    <p>1-5 · 6-10 · 11-15 · 16+. Uzatmaya giden maçlarda da son skordaki fark geçerlidir. Fark puanını almak için kazananı da bilmen gerekir.</p>
     <h4>Kilit ve gizlilik</h4>
-    <p>Gecenin bütün tahminleri (maçlar, banko, günün oyuncusu, gecenin sorusu) <b>gecenin ilk maçı başladığı anda</b> kilitlenir; o ana kadar istediğin kadar değiştirebilirsin. Kilitlenene kadar rakiplerin seçimleri gizli; kimin hangi maçları girdiği ise "Günün tahminleri"nde görünür.</p>
+    <p>Gecenin bütün tahminleri (maçlar, banko, günün oyuncusu, gecenin sorusu) <b>gecenin ilk maçı başladığı anda</b> kilitlenir; o ana kadar istediğin kadar değiştirebilirsin. Kilitlenene kadar kimse başkasının seçimlerini göremez. Kimin kaç maçı doldurduğu ise "Günün tahminleri"nde görünür.</p>
     <h4>Eşitlikler</h4>
-    <p>Birden fazla oyuncu aynı en yüksek sayıyı atarsa, bunlardan herhangi birini seçen bilmiş sayılır.</p>
+    <p>Birden fazla oyuncu aynı en yüksek sayıyı atarsa bunlardan birini seçen herkes bilmiş sayılır.</p>
     <h4>Gece, hafta, sezon</h4>
-    <p>Gece: o gecenin en çok puanını tek başına alan kazanır. Hafta pazartesi–pazar. Sezon puanı tüm gecelerin toplamı. <b>Playoff'ta bütün puanlar iki katı.</b></p>
+    <p>Gecenin en çok puanını tek başına alan, o geceyi kazanır. Haftalar pazartesi başlar, pazar biter. Sezon puanı bütün gecelerin toplamıdır. <b>Playoff'ta bütün puanlar iki katına çıkar.</b></p>
     <h4>Yeni oyuncu</h4>
-    <p>Siteye girip "Yeni oyuncu" sekmesinden ad, güvenlik sorusu, 6 haneli şifre ve davet koduyla katılınır.</p>
+    <p>Siteye girip "Yeni oyuncu" sekmesinde adını, güvenlik sorusunun cevabını, 6 haneli şifreni ve davet kodunu girerek katılırsın.</p>
     <h4>Laf atma</h4>
-    <p>Maçlar kilitlenince her maça emoji bırakabilir ya da kısa bir yorum yazabilirsin. Küfür ve hakaret yazılamaz.</p></div>`);
+    <p>Maçlar kilitlendikten sonra her maça emoji bırakabilir ya da kısa bir yorum yazabilirsin. Küfür ve hakaret yazılamaz.</p>
+    <p class="muted" style="margin-top:18px;font-size:12px;text-align:center">Sürüm ${VERSION}</p></div>`);
 }
 $("#rulesBtn").onclick = openRules;
 
@@ -1486,12 +1489,18 @@ function renderBanners(){
   const later=+(lsGet("mailNudge")||0);
   if(S.contactLoaded && !S.contact?.verified && Date.now()>later) html += `<div class="banner nudge"><span class="bn-i">✉️</span><span class="bn-t"><b>Mail adresini ekle</b> Tahminin eksik kalınca ya da seçtiğin oyuncu sakatlanınca haber verelim.</span>
     <span class="bn-acts"><button class="btn sm" data-bn="mail">Ekle</button><button class="linkish" data-bn="later">Sonra</button></span></div>`;
+  // Profilini özelleştirmemiş olana (favori takım ya da avatar seçmemiş) hatırlatma
+  const me=S.players[S.uid];
+  if(me && !me.favTeam && !me.emoji && Date.now()>+(lsGet("profileNudge")||0)) html += `<div class="banner nudge"><span class="bn-i">🎨</span><span class="bn-t"><b>Profilini özelleştir</b> Favori takımını, avatarını ve rengini seç; puan tablosunda öyle görün.</span>
+    <span class="bn-acts"><button class="btn sm" data-bn="profile">Seç</button><button class="linkish" data-bn="plater">Sonra</button></span></div>`;
   box.innerHTML=html;
 }
 $("#banners").addEventListener("click", e=>{
   const b=e.target.closest("[data-bn]"); if(!b) return;
   if(b.dataset.bn==="notice"){ lsSet("noticeSeen", String(S.notice?.at)); }
   if(b.dataset.bn==="later"){ lsSet("mailNudge", String(Date.now()+3*864e5)); }
+  if(b.dataset.bn==="plater"){ lsSet("profileNudge", String(Date.now()+3*864e5)); }
+  if(b.dataset.bn==="profile"){ openProfile(); setTimeout(()=>{ $(".pf-emojis")?.closest(".pf-sec")?.scrollIntoView({block:"start"}); }, 300); }
   if(b.dataset.bn==="mail"){ openProfile(); setTimeout(()=>{ $("#pfMail")?.scrollIntoView({block:"center"}); $("#pfMail")?.focus(); }, 300); }
   renderBanners();
 });
@@ -2095,7 +2104,7 @@ if("serviceWorker" in navigator && location.protocol==="https:") navigator.servi
     $("#auth").classList.add("hide"); $("#app").classList.remove("hide");
     $("#me").classList.remove("hide"); paintMe(); applyTheme();
     S.statFor=S.uid;
-    $("#foot").innerHTML="Kazanan 1 · fark +1 · en skorer +1 · banko 2 / -1 · günün oyuncusu +2 · gecenin sorusu +1<br>Veriler ESPN'den alınır. Maç varken 30 saniyede bir yenilenir.";
+    $("#foot").innerHTML=`Kazanan +1 · fark +1 · en skorer +1 · banko +2 / -1 · günün oyuncusu +2 · gecenin sorusu +1<br>Veriler ESPN'den alınır. Maç varken 30 saniyede bir yenilenir.<br><span class="ver">${VERSION}</span>`;
     route(); showDay(); refresh();
     checkRecovery();
     getDoc(doc(S.db,"config","secret")).then(r=>{ S.isAdmin=true; S.invite=r.data()?.invite||""; }).catch(()=>{ S.isAdmin=false; });

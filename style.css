@@ -836,3 +836,4 @@ button.cc:hover{transform:scale(1.2)}
 .tm-g b + small{margin-left:8px}
 .tm-r{width:22px;height:22px;border-radius:6px;display:grid;place-items:center;font-size:12px;font-weight:800;background:var(--line);flex:none}
 .tm-r.W{background:var(--win-soft);color:var(--win)} .tm-r.L{background:var(--lose-soft);color:var(--lose)} .tm-r.T{background:rgba(242,168,58,.18)}
+footer .ver{display:inline-block;margin-top:6px;opacity:.7;font-variant-numeric:tabular-nums}
