@@ -17,9 +17,42 @@
 <meta name="apple-mobile-web-app-title" content="NBA Tahmin">
 <meta name="mobile-web-app-capable" content="yes">
 <script>try{const t=localStorage.getItem("theme");if(t)document.documentElement.dataset.theme=t;}catch(e){}</script>
-<link rel="stylesheet" href="style.css">
+<script>
+// Açılış ekranı + sürüm kontrolü. Her güncellemede BUILD, version.json, app.js'deki VERSION ve
+// aşağıdaki ?v= numaraları birlikte artırılır (scripts/surum.py hepsini birden yapar).
+window.BUILD = "v5";
+(function(){
+  var t0 = Date.now(), MIN = 2000, MAX = 8000, ready = false, done = false;
+  function hide(){ if(done) return; done = true; var s = document.getElementById("splash"); if(!s) return; s.classList.add("out"); setTimeout(function(){ s.remove(); }, 700); }
+  function tryHide(){ if(ready && Date.now() - t0 >= MIN) hide(); }
+  window.addEventListener("app-ready", function(){ ready = true; setTimeout(tryHide, Math.max(0, MIN - (Date.now() - t0))); });
+  setTimeout(function(){ ready = true; tryHide(); }, MAX);
+  // Sunucudaki sürüm, bu sayfanınkinden yeniyse önbelleği atlayıp yeni dosyaları çek ve bir kez yenile
+  fetch("version.json?t=" + Date.now(), {cache: "no-store"}).then(function(r){ return r.json(); }).then(function(j){
+    if(!j || !j.v || j.v === window.BUILD) return;
+    var k = "upd:" + j.v;
+    try{ if(sessionStorage.getItem(k)) return; sessionStorage.setItem(k, "1"); }catch(e){ return; }
+    var m = document.getElementById("spMsg"); if(m) m.textContent = "Yeni sürüm yükleniyor…";
+    Promise.all(["./", "index.html"].map(function(u){ return fetch(u, {cache: "reload"}).catch(function(){}); }))
+      .then(function(){ location.reload(); });
+  }).catch(function(){});
+})();
+</script>
+<link rel="stylesheet" href="style.css?v=v5">
 </head>
 <body>
+
+<!-- AÇILIŞ EKRANI -->
+<div id="splash" aria-hidden="true">
+  <div class="sp-court"></div>
+  <div class="sp-stage">
+    <div class="sp-ball"><svg viewBox="0 0 100 100"><defs><radialGradient id="spG" cx="35%" cy="30%" r="75%"><stop offset="0" stop-color="#ffa25a"/><stop offset=".55" stop-color="#e8692a"/><stop offset="1" stop-color="#b9471a"/></radialGradient></defs>
+      <circle cx="50" cy="50" r="46" fill="url(#spG)"/><g fill="none" stroke="#2a1408" stroke-width="3" stroke-linecap="round"><circle cx="50" cy="50" r="46"/><path d="M50 4v92M4 50h92"/><path d="M19 15c15 15 15 55 0 70M81 15c-15 15-15 55 0 70"/></g></svg></div>
+    <div class="sp-shadow"></div>
+  </div>
+  <div class="sp-title cond">NBA Tahmin</div>
+  <div class="sp-msg" id="spMsg">Maçlar yükleniyor…</div>
+</div>
 
 <div class="topbar">
   <div class="wrap">
@@ -144,6 +177,6 @@
 
 <div class="toast hide" id="toast" role="status" aria-live="polite"></div>
 
-<script type="module" src="app.js"></script>
+<script type="module" src="app.js?v=v5"></script>
 </body>
 </html>

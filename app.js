@@ -38,7 +38,7 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "v4";
+const VERSION = "v5";
 const LOGO_SMALL = a => `logos/${String(a).toLowerCase()}.png`;
 const LOGO_FULL  = a => `https://a.espncdn.com/i/teamlogos/nba/500/${String(a).toLowerCase()}.png`;
 document.addEventListener("error", e => {
@@ -2148,7 +2148,7 @@ if("serviceWorker" in navigator && location.protocol==="https:") navigator.servi
   if(Q.get("davet")){ setAuthMode("join"); $("#inInvite").value = Q.get("davet"); }
   await Promise.all([loadPlayers().catch(()=>{}), loadArchive().catch(()=>{})]);
   onAuthStateChanged(S.auth, async user=>{
-    if(!user){ S.uid=null; $("#app").classList.add("hide"); $("#me").classList.add("hide"); $("#auth").classList.remove("hide"); showResetWait(); return; }
+    if(!user){ S.uid=null; $("#app").classList.add("hide"); $("#me").classList.add("hide"); $("#auth").classList.remove("hide"); showResetWait(); dispatchEvent(new Event("app-ready")); return; }
     S.uid=user.uid;
     await loadPlayers().catch(()=>{});
     if(!S.players[S.uid]){ // kayıt yarıda kaldıysa
@@ -2162,7 +2162,7 @@ if("serviceWorker" in navigator && location.protocol==="https:") navigator.servi
     $("#me").classList.remove("hide"); paintMe(); applyTheme();
     S.statFor=S.uid;
     $("#foot").innerHTML=`Kazanan +1 · fark +1 · en skorer +1 · banko +2 / -1 · günün oyuncusu +2 · gecenin sorusu +1<br>Veriler ESPN'den alınır. Maç varken 30 saniyede bir yenilenir.<br><span class="ver">${VERSION}</span>`;
-    route(); showDay(); refresh();
+    route(); showDay(); Promise.resolve(refresh()).catch(()=>{}).finally(()=>dispatchEvent(new Event("app-ready")));
     checkRecovery();
     getDoc(doc(S.db,"config","secret")).then(r=>{ S.isAdmin=true; S.invite=r.data()?.invite||""; }).catch(()=>{ S.isAdmin=false; });
     getDoc(doc(S.db,"contacts",S.uid)).then(r=>{ S.contact = r.exists() ? r.data() : {email:"",remind:false}; }).catch(()=>{}).finally(()=>{ S.contactLoaded=true; renderBanners(); });

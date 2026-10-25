@@ -45,3 +45,8 @@ Her gecenin NBA maçlarına tahmin oyunu: kazanan, fark ve maçın en skoreri.
 Siteye girip **Yeni oyuncu** sekmesinden ad, güvenlik sorusu, 6 haneli şifre ve davet kodu ile katılınır.
 Ad büyük harfle başlamalı ve küfür, argo ya da hakaret içermemeli (sitede ve Firebase kurallarında kontrol edilir).
 Davet kodu Firebase konsolunda `config/secret` belgesindeki `invite` alanıdır; değiştirmek için oradan düzenle.
+
+## Sürüm ve açılış ekranı
+- Site her açılışta 2 saniyelik bir açılış ekranı (seken top) gösterir. Bu sırada `version.json` önbelleği atlayarak okunur; sunucudaki sürüm sayfadakinden yeniyse yeni dosyalar çekilip sayfa bir kez kendiliğinden yenilenir.
+- Her güncellemede sürümü artırmak için: `python scripts/surum.py v6` (app.js, index.html ve version.json birlikte değişir). Sitenin en altında ve Kurallar'da görünen numara budur.
+

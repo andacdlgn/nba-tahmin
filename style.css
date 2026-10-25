@@ -858,3 +858,27 @@ footer .ver{display:inline-block;margin-top:6px;opacity:.7;font-variant-numeric:
 }
 .headline{display:flex;gap:10px;align-items:flex-start;margin:0 0 12px;padding:12px 14px;border-radius:14px;background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--hc,var(--amber));font-size:15px;line-height:1.45}
 .headline b{font-family:"Barlow Condensed";font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:2px}
+
+/* ---------- Açılış ekranı ---------- */
+#splash{position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+  background:radial-gradient(120% 80% at 50% 0%, color-mix(in srgb,var(--amber) 14%,var(--bg)) 0%, var(--bg) 60%);transition:opacity .55s ease, visibility .55s}
+#splash.out{opacity:0;visibility:hidden}
+.sp-court{position:absolute;left:50%;top:50%;width:min(86vw,420px);aspect-ratio:1;transform:translate(-50%,-52%);border:2px solid color-mix(in srgb,var(--muted) 22%,transparent);border-radius:50%;pointer-events:none}
+.sp-court::before{content:"";position:absolute;left:50%;top:-30vh;bottom:-30vh;border-left:2px solid color-mix(in srgb,var(--muted) 18%,transparent)}
+.sp-court::after{content:"";position:absolute;inset:34%;border:2px solid color-mix(in srgb,var(--muted) 22%,transparent);border-radius:50%}
+.sp-stage{position:relative;width:120px;height:190px}
+.sp-ball{position:absolute;left:50%;top:0;width:86px;height:86px;margin-left:-43px;animation:spBounce .9s infinite;transform-origin:50% 100%}
+.sp-ball svg{width:100%;height:100%;display:block;animation:spSpin 1.8s linear infinite;filter:drop-shadow(0 6px 14px rgba(0,0,0,.25))}
+.sp-shadow{position:absolute;left:50%;bottom:6px;width:74px;height:12px;margin-left:-37px;border-radius:50%;background:rgba(0,0,0,.35);filter:blur(3px);animation:spShadow .9s ease-in-out infinite}
+.sp-title{font-family:"Barlow Condensed",sans-serif;font-weight:800;font-size:40px;letter-spacing:.02em;color:var(--ink,inherit);position:relative}
+.sp-msg{color:var(--muted);font-size:14px;position:relative}
+@keyframes spBounce{
+  0%{transform:translateY(0) scale(1,1);animation-timing-function:cubic-bezier(.55,0,.9,.45)}
+  46%{transform:translateY(96px) scale(1,1)}
+  50%{transform:translateY(100px) scale(1.15,.82);animation-timing-function:cubic-bezier(.1,.55,.45,1)}
+  56%{transform:translateY(90px) scale(.95,1.06)}
+  100%{transform:translateY(0) scale(1,1)}
+}
+@keyframes spShadow{0%,100%{transform:scale(.55);opacity:.35}50%{transform:scale(1.05);opacity:.8}}
+@keyframes spSpin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion: reduce){ .sp-ball,.sp-ball svg,.sp-shadow{animation-duration:2.4s} }
