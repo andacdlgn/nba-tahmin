@@ -6,8 +6,8 @@ Her gecenin NBA maçlarına tahmin oyunu: kazanan, fark ve maçın en skoreri.
 - Her maç için **kazanan**, **fark aralığı** (1-5 / 6-10 / 11-15 / 16+) ve **maçın en skoreri** zorunlu.
 - Kazanan doğru: **1 puan**. Kazananla birlikte fark da doğru: **+1**. En skorer doğru: **+1** (eşitlikte en çok sayı atanlardan biri yeter).
 - **Günün bankosu:** her gece bir maç seçilir; o maçta kazanan doğruysa 2 puan, yanlışsa **-1**.
-- **Günün oyuncusu:** gecenin en çok sayı atanı bilinirse **+2**. İlk maçtan 10 dakika önce kilitlenir.
-- Tahminler maç saatinden 10 dakika öncesine kadar değiştirilebilir ve "Tahmini kaydet" ile kaydedilir. Kilitlenince rakiplerin seçimleri açılır; kimin hangi maçları girdiği ise "Günün tahminleri"nde hemen görünür.
+- **Günün oyuncusu:** gecenin en çok sayı atanı bilinirse **+2**.
+- Gecenin bütün tahminleri (maçlar, banko, günün oyuncusu) **gecenin ilk maçı başladığı anda** kilitlenir; o ana kadar değiştirilebilir ve "Tahmini kaydet" ile kaydedilir. Kilitlenince rakiplerin seçimleri açılır; kimin hangi maçları girdiği ise "Günün tahminleri"nde hemen görünür.
 - **Playoff:** tüm puanlar 2 katı.
 - Haftalar pazartesi–pazar; tek başına en çok puanı alan haftayı kazanır.
 
@@ -18,6 +18,11 @@ Her gecenin NBA maçlarına tahmin oyunu: kazanan, fark ve maçın en skoreri.
 - `scripts/sync.py`: Biten maçları ESPN'den, tahminleri Firestore'dan okuyup puanları hesaplar → `data/`.
 - `.github/workflows/sync.yml`: Bu betiği saatte bir çalıştırır. Ayrıca `data/allplayers.json` (güvenlik sorusu için oyuncu listesi) güncellenir.
 - `scripts/reset.py` + `.github/workflows/reset.yml`: "Şifremi unuttum" isteklerini 5 dakikada bir işler.
+
+## Hatırlatma maili
+- Oyuncu profilinden e-posta adresini yazıp "Hatırlat"ı açarsa, gecenin ilk maçına 2 saat kala eksik tahmini varsa bir kez mail gelir.
+- Adres `contacts/{uid}` belgesinde durur; yalnızca sahibi okuyabilir. Gönderilenler `reminders/` koleksiyonunda tutulur (aynı gece ikinci mail gitmez).
+- `scripts/remind.py` + `.github/workflows/remind.yml` 10 dakikada bir çalışır. Gerekli gizli değişkenler: `FIREBASE_SA`, `GMAIL_USER` (gönderen Gmail adresi), `GMAIL_APP_PASSWORD` (Google hesabında oluşturulan uygulama şifresi).
 
 ## Şifre sıfırlama
 - Kayıtta herkes bir **takım** ve bir **basketbolcu** seçer (güvenlik sorusu). Cevap tuzlu SHA-256 olarak `recovery/{uid}` belgesinde durur; yalnızca sahibi okuyabilir.

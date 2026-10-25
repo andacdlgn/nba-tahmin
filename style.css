@@ -657,3 +657,13 @@ button.cc:hover{transform:scale(1.2)}
 .fo-sc{font-size:24px}
 .fo-p{gap:6px}
 .fo-p .av.sm{width:28px;height:28px;font-size:13px}
+.pf-mail{display:flex;gap:10px;align-items:center}
+.pf-mail input[type=email]{flex:1;min-width:0;border:1px solid var(--line);background:var(--panel-2);border-radius:12px;padding:11px 12px;font-size:16px;color:var(--ink)}
+.pf-sw{display:inline-flex;align-items:center;gap:8px;font-weight:600;font-size:14px;cursor:pointer;white-space:nowrap}
+.pf-sw input{position:absolute;opacity:0;width:0;height:0}
+.pf-sw span{width:42px;height:24px;border-radius:99px;background:var(--track);position:relative;transition:.2s;flex:none}
+.pf-sw span::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:.2s}
+.pf-sw input:checked+span{background:var(--win)}
+.pf-sw input:checked+span::after{transform:translateX(18px)}
+.pf-sw input:focus-visible+span{outline:2px solid var(--amber);outline-offset:2px}
+#pfMailMsg{min-height:16px}

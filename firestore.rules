@@ -1,7 +1,7 @@
 rules_version = '2';
 // NBA Tahmin — güvenlik kuralları
-// - Herkes yalnızca kendi tahminini yazar; maç başlayınca tahmin kilitlenir.
-// - Bir tahmin, maç başlayana kadar yalnızca sahibine görünür; sonra herkese açılır.
+// - Herkes yalnızca kendi tahminini yazar; gecenin ilk maçı başlayınca bütün tahminler kilitlenir.
+// - Bir tahmin, kilide kadar yalnızca sahibine görünür; sonra herkese açılır.
 // - Oyuna katılmak için davet kodu gerekir (config/secret içinde, kimse okuyamaz).
 // - Tahminlerdeki updatedAt alanı sunucu saatine eşit olmak zorunda; puanlama
 //   betiği bu saatle gerçek maç saatini ayrıca karşılaştırır.
@@ -11,8 +11,9 @@ service cloud.firestore {
     function signedIn() { return request.auth != null; }
     function isPlayer() { return signedIn() && exists(/databases/$(database)/documents/players/$(request.auth.uid)); }
     function str(v, maxLen) { return v is string && v.size() > 0 && v.size() <= maxLen; }
-    // Tahminler maç saatinden 10 dakika önce kilitlenir (ve o an herkese açılır).
-    function lockAt(t) { return t - duration.value(10, 'm'); }
+    // Tahminler kilit saatinde kapanır ve o an herkese açılır. Site, tahminin "start"
+    // alanına gecenin ilk maçının saatini yazar; puanlama betiği bunu ESPN'den ayrıca doğrular.
+    function lockAt(t) { return t; }
     // Oyuncu adı: büyük harfle başlar; harf, rakam, boşluk ve . - ' içerebilir; küfür/hakaret içermez.
     // (Ayrıntılı kontrol sitede yapılır; burada en bariz kelimeler engellenir.)
     function validName(n) {
@@ -58,7 +59,7 @@ service cloud.firestore {
     // picks/{maçId}_{uid}
     match /picks/{pid} {
       // Olmayan belgeyi okumak serbest (bilgi sızdırmaz); var olan belge sahibine
-      // ya da kilitlendikten sonra (maçtan 10 dk önce) herkese açık.
+      // ya da kilitlendikten sonra (gecenin ilk maçı başlayınca) herkese açık.
       allow read: if resource == null
         || (signedIn() && resource.data.uid == request.auth.uid)
         || request.time >= lockAt(resource.data.start);
@@ -163,6 +164,19 @@ service cloud.firestore {
     match /resetStatus/{id} {
       allow read: if true;
       allow write: if false;
+    }
+
+    // contacts/{uid}: hatırlatma maili için e-posta. Yalnızca sahibi okur ve yazar;
+    // GitHub'daki hatırlatma görevi yönetici yetkisiyle okur.
+    match /contacts/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow create, update: if isPlayer() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['email', 'remind', 'updatedAt'])
+        && request.resource.data.email is string && request.resource.data.email.size() <= 120
+        && (request.resource.data.email == '' || request.resource.data.email.matches('^[^@ ]+@[^@ ]+[.][^@ ]+$'))
+        && request.resource.data.remind is bool
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if signedIn() && request.auth.uid == uid;
     }
   }
 }

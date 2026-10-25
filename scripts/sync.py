@@ -218,7 +218,7 @@ def score_game(g, pick, conf, top_ids):
     return r
 
 
-LOCK = timedelta(minutes=10)  # tahminler maçtan 10 dk önce kilitlenir
+LOCK = timedelta(0)  # gecenin bütün tahminleri ilk maç başlayınca kilitlenir
 
 
 def valid_before(doc, start_iso):
@@ -314,7 +314,7 @@ def main(full=False):
             conf_game = None
             if daily and daily.get("confGame") and daily.get("confAt"):
                 cg = next((g for g in dgames if g["id"] == daily["confGame"]), None)
-                if cg and ts(daily["confAt"]) < ts(cg["start"]) - LOCK:
+                if cg and ts(daily["confAt"]) < ts(first_start) - LOCK:
                     conf_game = cg["id"]
             dp = 0
             dp_name = None
@@ -326,7 +326,8 @@ def main(full=False):
             n = 0
             for g in dgames:
                 pick = fs_doc(f"picks/{g['id']}_{uid}")
-                if not valid_before(pick, g["start"]) or not (pick.get("winner") and pick.get("margin") and pick.get("scorerId")):
+                # kilit saati = gecenin ilk maçı (ESPN'deki gerçek saat; sitenin yazdığı değere güvenilmez)
+                if not valid_before(pick, first_start) or not (pick.get("winner") and pick.get("margin") and pick.get("scorerId")):
                     pick = None
                 top_ids = {t["id"] for t in g["top"]}
                 r = score_game(g, pick, conf_game == g["id"], top_ids)
