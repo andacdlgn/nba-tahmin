@@ -38,7 +38,7 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "v7";
+const VERSION = "v8";
 const LOGO_SMALL = a => `logos/${String(a).toLowerCase()}.png`;
 const LOGO_FULL  = a => `https://a.espncdn.com/i/teamlogos/nba/500/${String(a).toLowerCase()}.png`;
 document.addEventListener("error", e => {
@@ -198,7 +198,7 @@ function dayPoints(day){
     const daily=D.daily[uid];
     for(const g of D.games){
       if(!started(g)) { p.final=false; continue; }
-      if(g.state!=="post") p.final=false;
+      if(g.state!=="post" || !topsOf(g)) p.final=false;   // skorer bilgisi gelmeden gece kesinleşmiş sayılmaz
       const pick = D.picks[g.id]?.[uid];
       if(pick) p.n++;
       if(g.state!=="post" && g.state!=="in") continue;
@@ -255,10 +255,18 @@ const progressRef = (day, uid) => doc(S.db, "progress", `${day}_${uid}`);
 async function readPick(gid, uid){ try{ const s=await getDoc(pickRef(gid,uid)); return s.exists()?s.data():null; }catch(e){ return null; } }
 async function readDaily(day, uid){ try{ const s=await getDoc(dailyRef(day,uid)); return s.exists()?s.data():null; }catch(e){ return null; } }
 
-async function loadDay(day, {force=false}={}){
+S.loadingDay = {};
+function loadDay(day, opts={}){
+  // aynı gün için süren bir yükleme varsa onu bekle (açılışta iki kez istenmesin)
+  if(S.loadingDay[day]) return S.loadingDay[day];
+  return S.loadingDay[day] = loadDayNow(day, opts).finally(()=>{ delete S.loadingDay[day]; });
+}
+async function loadDayNow(day, {force=false}={}){
   const old = S.days[day];
   if(old && !force && Date.now()-old.at < 20e3) return old;
-  const games = parseGames(await espn(`/scoreboard?dates=${day}&limit=50`));
+  let raw=null;
+  if(S.preSB?.day===day){ raw=await S.preSB.p; S.preSB=null; }   // açılışta önceden istenmiş liste
+  const games = parseGames(raw || await espn(`/scoreboard?dates=${day}&limit=50`));
   const D = { games, picks: old?.picks||{}, daily: old?.daily||{}, progress: old?.progress||{}, at:Date.now() };
   const firstStart = games.length ? Math.min(...games.map(g=>g.start.getTime())) : Infinity;
   const jobs=[];
@@ -287,10 +295,12 @@ async function loadDay(day, {force=false}={}){
     jobs.push(getDoc(doc(S.db,"series",`${g.series.key}_${uid}`)).then(x => { (D.series[g.series.key] ||= {})[uid] = x.exists() ? x.data() : null; }).catch(()=>{}));
   }
   await Promise.all(jobs);
-  // biten / süren maçların özetleri (en skorer ve canlı takip için)
-  await Promise.all(games.filter(g => g.state==="in" || (g.state==="post" && !S.arch.games[g.id]?.top))
-    .map(g => loadSummary(g).catch(()=>null)));
   S.days[day] = D;
+  // biten / süren maçların özetleri (en skorer ve canlı takip için). Sayfayı bekletmez:
+  // arka planda yüklenir, gelince ekran yeniden çizilir.
+  const need = games.filter(g => g.state==="in" || (g.state==="post" && !S.arch.games[g.id]?.top));
+  const fresh = need.filter(g => { const c=S.sums[g.id]; return !c || (g.state!=="post" && Date.now()-c.at>=25e3); });
+  if(fresh.length) Promise.all(fresh.map(g => loadSummary(g).catch(()=>null))).then(()=>{ if(S.uid && S.days[day]===D) render(); });
   return D;
 }
 
@@ -2141,6 +2151,8 @@ async function openAdmin(){
 /* ====================================================== başlangıç */
 if("serviceWorker" in navigator && location.protocol==="https:") navigator.serviceWorker.register("sw.js").catch(()=>{});
 (async()=>{
+  // Hız: bugünün maç listesi Firebase ve giriş beklenmeden hemen istenir
+  { const d=espnToday(); S.preSB = {day:d, p:espn(`/scoreboard?dates=${d}&limit=50`).catch(()=>null)}; }
   let ok=false;
   try{ ok = await initFirebase(); }catch(e){ console.error(e); }
   if(!ok){ $("#auth").classList.remove("hide"); $("#authForm").innerHTML=`<div class="note">Kurulum bekleniyor: config.json içine Firebase bilgileri girilince oyun açılacak.</div>`; return; }
@@ -2150,7 +2162,8 @@ if("serviceWorker" in navigator && location.protocol==="https:") navigator.servi
   onAuthStateChanged(S.auth, async user=>{
     if(!user){ S.uid=null; $("#app").classList.add("hide"); $("#me").classList.add("hide"); $("#auth").classList.remove("hide"); showResetWait(); dispatchEvent(new Event("app-ready")); return; }
     S.uid=user.uid;
-    await loadPlayers().catch(()=>{});
+    if(S.players?.[S.uid]) S.order=[S.uid, ...S.order.filter(u=>u!==S.uid)];
+    else await loadPlayers().catch(()=>{});
     if(!S.players[S.uid]){ // kayıt yarıda kaldıysa
       await new Promise(r=>setTimeout(r,800)); await loadPlayers().catch(()=>{});
       if(!S.players[S.uid]){
