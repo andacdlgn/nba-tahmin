@@ -10,7 +10,7 @@ Her gecenin NBA maçlarına tahmin oyunu: kazanan, fark ve maçın en skoreri.
 - Gecenin bütün tahminleri (maçlar, banko, günün oyuncusu) **gecenin ilk maçı başladığı anda** kilitlenir; o ana kadar değiştirilebilir ve "Tahmini kaydet" ile kaydedilir. Kilitlenince rakiplerin seçimleri açılır; kimin hangi maçları girdiği ise "Günün tahminleri"nde hemen görünür.
 - **Gecenin sorusu:** her gece evet/hayır sorusu (ör. "Bir maç uzatmaya gider mi?"), doğru cevap **+1**.
 - **Playoff:** tüm puanlar 2 katı. Her seri başlamadan seriyi kim, kaç maçta alır tahmini: kazanan **+3**, maç sayısı da doğruysa **+2**.
-- **Laf atma:** kilit sonrası maçlara emoji ve kısa yorum (küfür filtreli).
+- **Yorumlar:** kilit sonrası maçlara emoji ve kısa yorum (küfür filtreli).
 - Rozetler, ayın şampiyonları, takım karnesi, rakip analizi ve sezon ödülleri siteden hesaplanır.
 - Haftalar pazartesi–pazar; tek başına en çok puanı alan haftayı kazanır.
 

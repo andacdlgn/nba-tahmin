@@ -179,7 +179,7 @@ def reminders(db, mail, day, games, force):
         d = daily.to_dict() if daily.exists else {}
         parts = []
         if missing:
-            parts.append(f"{len(missing)} maç eksik" if len(missing) < len(games) else "bu gece hiç tahmin girmedin")
+            parts.append(f"{len(missing)} maç eksik" if len(missing) < len(games) else "bu gece hiç tahmin yapmadın")
         if not d.get("confGame"):
             parts.append("banko seçilmedi")
         if not d.get("dayPlayerId"):
