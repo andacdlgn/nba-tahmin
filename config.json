@@ -1,11 +1,32 @@
 {
   "firebase": {
-    "apiKey": "BURAYA",
-    "authDomain": "BURAYA.firebaseapp.com",
-    "projectId": "BURAYA",
-    "appId": "BURAYA"
+    "apiKey": "AIzaSyDK788BSF9TBRRnJuGEjLkelXtDYz01e7c",
+    "authDomain": "nba-tahmin.firebaseapp.com",
+    "projectId": "nba-tahmin",
+    "appId": "1:770805304273:web:9faea51a95d1bc4a046ef0"
   },
   "authEmailDomain": "nbatahmin.app",
   "seasonStart": "20261020",
-  "margins": [[1, 5, "1-5"], [6, 10, "6-10"], [11, 15, "11-15"], [16, 99, "16+"]]
+  "margins": [
+    [
+      1,
+      5,
+      "1-5"
+    ],
+    [
+      6,
+      10,
+      "6-10"
+    ],
+    [
+      11,
+      15,
+      "11-15"
+    ],
+    [
+      16,
+      99,
+      "16+"
+    ]
+  ]
 }
