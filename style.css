@@ -3,6 +3,7 @@
   --amber:#e09410; --amber-ink:#9a6200; --amber-soft:#fbefd8;
   --p0:#2457d6; --p0-soft:#e4ebfb; --p1:#d42a3c; --p1-soft:#fbe4e7;
   --p2:#0f8a6a; --p3:#7a3fd1; --p4:#c25e0a; --p5:#0a7fa8;
+  --p6:#c2387f; --p7:#5f8a12; --p8:#a8860b; --p9:#56657a;
   --win:#11905a; --win-soft:#def3e9; --lose:#b0412f; --lose-soft:#f8e5e1;
   --live:#e5263a; --track:#e3e8ed;
   --board:#121a24; --board-2:#1b2633; --board-ink:#f4f6f8; --board-muted:#8b98a8; --board-line:#243142;
@@ -12,7 +13,7 @@
   --bg:#10161e; --panel:#18212c; --panel-2:#1e2935; --ink:#eef2f6; --muted:#93a0af; --line:#283442;
   --amber:#f2a83a; --amber-ink:#f2a83a; --amber-soft:#3a2a12;
   --p0:#7ea2f6; --p0-soft:#1c2a45; --p1:#f2737f; --p1-soft:#3b1d24;
-  --p2:#4fd0aa; --p3:#b38cf5; --p4:#f0a35c; --p5:#5cc6ec;
+  --p2:#4fd0aa; --p3:#b38cf5; --p4:#f0a35c; --p5:#5cc6ec; --p6:#f07ab8; --p7:#a6d65a; --p8:#e8c84a; --p9:#a7b4c6;
   --win:#4fd093; --win-soft:#143325; --lose:#ef8d79; --lose-soft:#3a211c;
   --live:#ff4d5e; --track:#2a3644; --board:#0b1118; --board-2:#151e29;
 }
@@ -21,7 +22,7 @@
     --bg:#10161e; --panel:#18212c; --panel-2:#1e2935; --ink:#eef2f6; --muted:#93a0af; --line:#283442;
     --amber:#f2a83a; --amber-ink:#f2a83a; --amber-soft:#3a2a12;
     --p0:#7ea2f6; --p0-soft:#1c2a45; --p1:#f2737f; --p1-soft:#3b1d24;
-    --p2:#4fd0aa; --p3:#b38cf5; --p4:#f0a35c; --p5:#5cc6ec;
+    --p2:#4fd0aa; --p3:#b38cf5; --p4:#f0a35c; --p5:#5cc6ec; --p6:#f07ab8; --p7:#a6d65a; --p8:#e8c84a; --p9:#a7b4c6;
     --win:#4fd093; --win-soft:#143325; --lose:#ef8d79; --lose-soft:#3a211c;
     --live:#ff4d5e; --track:#2a3644; --board:#0b1118; --board-2:#151e29;
   }
@@ -386,10 +387,9 @@ footer{color:var(--muted);font-size:12px;text-align:center;margin:28px 0 8px}
 .av.sm{width:32px;height:32px;font-size:14px;box-shadow:0 0 0 2px color-mix(in srgb,var(--pc) 45%,transparent)}
 .av.empty{background:var(--board-2);color:var(--board-muted)}
 .pl .av{margin:12px auto 6px}
-/* skorbord rakamları: sönük 88 arka planı + oyuncu renginde ışık */
+/* skorbord rakamları: oyuncu renginde ışık + ince tarama çizgileri */
 .digits{position:relative;overflow:hidden}
 .digits span{position:relative;text-shadow:0 0 18px color-mix(in srgb,var(--pc,#fff) 55%,transparent)}
-.digits::before{content:attr(data-g);position:absolute;inset:6px 0 4px;color:var(--board-ink);opacity:.06}
 .digits::after{content:"";position:absolute;inset:0;pointer-events:none;
   background:repeating-linear-gradient(0deg,rgba(0,0,0,.16) 0 1px,transparent 1px 3px)}
 .digits.bump span{animation:bump .5s ease}
@@ -511,3 +511,149 @@ button.cc:hover{transform:scale(1.2)}
 .e-ln{fill:none;stroke:#7a3610;stroke-width:1.8}
 .empty svg circle.e-ball,.empty svg .e-ln{animation:roll 3s ease-in-out infinite;transform-origin:128px 100px}
 @keyframes roll{0%,100%{transform:translateX(0) rotate(0)}50%{transform:translateX(-8px) rotate(-40deg)}}
+
+/* ================= Profil */
+.av{position:relative}
+.av.emo{font-size:24px;font-family:system-ui,"Apple Color Emoji","Segoe UI Emoji",sans-serif}
+.av.sm.emo{font-size:17px}
+.av-team{position:absolute;right:-6px;bottom:-4px;width:22px;height:22px;object-fit:contain;border-radius:50%;background:var(--board);padding:2px;box-shadow:0 0 0 2px var(--board)}
+.av.sm .av-team{width:16px;height:16px;right:-5px;bottom:-3px;padding:1px}
+.av.lg{width:64px;height:64px;font-size:28px;box-shadow:0 0 0 3px var(--panel),0 0 0 5px color-mix(in srgb,var(--pc) 55%,transparent)}
+.av.lg.emo{font-size:34px}
+.av.lg .av-team{width:28px;height:28px;background:var(--panel);box-shadow:0 0 0 2px var(--panel)}
+.me-btn{background:var(--pc)!important;border-color:transparent!important;color:#fff!important;font-size:17px;border-radius:50%!important}
+.pf-head{display:flex;align-items:center;gap:16px;margin:4px 0 14px}
+.pf-sec{border-top:1px solid var(--line);padding:12px 0}
+.pf-sec h4{margin:0 0 8px;font-size:15px}
+.pf-sec small{display:block;margin-top:6px;font-size:12.5px}
+.pf-colors{display:flex;flex-wrap:wrap;gap:10px}
+.pf-col{position:relative;width:38px;height:38px;border-radius:50%;border:0;background:var(--c);cursor:pointer;box-shadow:0 0 0 2px var(--panel),0 0 0 3px var(--line)}
+.pf-col[aria-pressed="true"]{box-shadow:0 0 0 3px var(--panel),0 0 0 5px var(--c)}
+.pf-col i{position:absolute;right:-1px;top:-1px;width:11px;height:11px;border-radius:50%;background:var(--panel);box-shadow:inset 0 0 0 3px var(--muted)}
+.pf-emojis{display:grid;grid-template-columns:repeat(auto-fill,minmax(42px,1fr));gap:6px}
+.pf-emo{height:42px;border-radius:12px;border:1px solid var(--line);background:var(--panel-2);font-size:22px;cursor:pointer}
+.pf-emo.ini{font-family:"Barlow Condensed";font-weight:800;font-size:18px}
+.pf-emo[aria-pressed="true"],.pf-tm[aria-pressed="true"]{border-color:var(--ink);background:var(--panel);box-shadow:0 0 0 1px var(--ink) inset}
+.pf-teams{display:grid;grid-template-columns:repeat(auto-fill,minmax(46px,1fr));gap:6px;margin-top:8px}
+.pf-tm{height:46px;border-radius:12px;border:1px solid var(--line);background:var(--panel-2);cursor:pointer;display:grid;place-items:center}
+.pf-tm img{width:32px;height:32px;object-fit:contain}
+.pf-tm.none{font-weight:700;font-size:13px;color:var(--muted)}
+.pf-theme{margin:0}
+.pf-theme button:disabled{opacity:.45;cursor:default}
+.pf-acts{display:flex;gap:8px;flex-wrap:wrap}
+
+/* ================= Kartlar 2 */
+/* çeyrek skor tablosu */
+.ls{width:100%;border-collapse:collapse;margin:10px 0 4px;font-variant-numeric:tabular-nums;font-size:13px}
+.ls th{text-align:left;font-weight:700;white-space:nowrap;padding:3px 4px}
+.ls th img{width:18px;height:18px;object-fit:contain;vertical-align:-4px;margin-right:5px}
+.ls td{text-align:center;padding:3px 2px;color:var(--muted);min-width:26px}
+.ls thead td{font-size:11px;font-weight:700;color:var(--muted)}
+.ls tbody td{color:var(--ink)}
+.ls td.tot{font-family:"Barlow Condensed";font-weight:800;font-size:16px;color:var(--ink)}
+.ls td.cur{color:var(--live);font-weight:700}
+.ls tbody tr+tr{border-top:1px solid var(--line)}
+.rg .ls{margin:8px 0 2px}
+.g-links{display:inline-flex;gap:14px}
+/* küçük biten maç kartı */
+.game.compact{padding:0}
+.cm{display:flex;align-items:center;gap:8px;width:100%;border:0;background:none;padding:12px 12px 10px;cursor:pointer;color:var(--ink);text-align:left}
+.cm-t{display:inline-flex;align-items:center;gap:6px}
+.cm-t img{width:26px;height:26px;object-fit:contain}
+.cm-t b{font-size:14px}
+.cm-t .sc{font-family:"Barlow Condensed";font-weight:800;font-size:22px;font-variant-numeric:tabular-nums}
+.cm-t.lose b,.cm-t.lose .sc{color:var(--muted)}
+.cm-sep{color:var(--muted)}
+.cm-r{margin-left:auto;display:inline-flex;align-items:center;gap:8px}
+.cm-dots{display:inline-flex;gap:3px}
+.cm-dots i{width:8px;height:8px;border-radius:50%}
+.cm-dots i.ok{background:var(--win)} .cm-dots i.no{background:var(--lose);opacity:.55}
+.cm-none{font-size:12px}
+.chev{width:18px;height:18px;fill:none;stroke:var(--muted);stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+/* gecenin tahmini */
+.best{grid-column:1/-1;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:12px;border-radius:18px;padding:14px;
+  background:linear-gradient(110deg,color-mix(in srgb,var(--pc) 22%,var(--panel)),var(--panel) 70%);border:1px solid color-mix(in srgb,var(--pc) 45%,var(--line));position:relative;overflow:hidden}
+.best::after{content:"";position:absolute;inset:0;background:linear-gradient(100deg,transparent 30%,rgba(255,255,255,.12) 45%,transparent 60%);transform:translateX(-100%);animation:shine 2.8s 0.6s ease-in-out 2}
+@keyframes shine{to{transform:translateX(100%)}}
+.best-l{display:flex;flex-direction:column;align-items:center;gap:6px}
+.best-k{font-size:10.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--amber-ink);white-space:nowrap}
+.best .av{box-shadow:0 0 0 3px var(--panel),0 0 0 5px color-mix(in srgb,var(--pc) 55%,transparent)}
+.best .av .av-team{background:var(--panel);box-shadow:0 0 0 2px var(--panel)}
+.best-m{min-width:0;display:flex;flex-direction:column;gap:5px}
+.best-m b{font-size:17px}
+.best-g{display:inline-flex;align-items:center;gap:6px;font-weight:600;font-size:14px;font-variant-numeric:tabular-nums}
+.best-g img{width:20px;height:20px;object-fit:contain}
+.best .pk{display:flex;flex-wrap:wrap;gap:4px}
+.best-p{font-family:"Barlow Condensed";font-weight:800;font-size:40px;line-height:.9;text-align:center;color:var(--win)}
+.best-p small{display:block;font-family:Barlow;font-size:11px;font-weight:600;color:var(--muted)}
+.ib-bar i+i{border-left:2px solid var(--panel)}
+
+/* ================= Skor alanı ve gezinme 2 */
+.delta{display:inline-flex;align-items:baseline;gap:3px;margin-top:6px;font-family:"Barlow Condensed";font-weight:700;font-size:15px;color:var(--board-muted);border-radius:6px;padding:1px 7px;background:var(--board-2)}
+.delta small{font-family:Barlow;font-weight:600;font-size:10.5px;opacity:.8}
+.delta.up{color:var(--win)} .delta.down{color:var(--lose)}
+.lb-row .tn{display:flex;flex-direction:column;align-items:flex-end;line-height:1}
+.lb-row .tn .delta{margin-top:3px;font-size:12px;padding:0 5px}
+.lb-row .tn .delta small{display:none}
+.av-crown{position:absolute;top:-15px;left:50%;transform:translateX(-50%) rotate(-8deg);font-size:20px;line-height:1;filter:drop-shadow(0 2px 3px rgba(0,0,0,.5));font-family:system-ui,"Apple Color Emoji","Segoe UI Emoji",sans-serif}
+.av.sm .av-crown{font-size:14px;top:-11px}
+.av-star{position:absolute;top:-4px;right:-6px;width:18px;height:18px;border-radius:50%;display:grid;place-items:center;font-size:11px;color:#1a1200;background:var(--amber);box-shadow:0 0 0 2px var(--board)}
+.av.sm .av-star{width:14px;height:14px;font-size:9px;top:-3px;right:-5px}
+/* kayan alt menü hapı */
+.nav .in{position:relative}
+.nav-pill{position:absolute;top:7px;left:0;height:calc(100% - 14px);border-radius:14px;background:color-mix(in srgb,var(--amber) 16%,transparent);
+  transition:transform .35s cubic-bezier(.3,1.3,.5,1),width .35s;pointer-events:none;z-index:0}
+.nav a{z-index:1}
+.nav a[aria-current="page"]::after{display:none}
+.nav a[aria-current="page"] svg{color:var(--amber-ink)}
+.live-n{position:absolute;top:7px;left:calc(50% + 6px);min-width:17px;height:17px;padding:0 4px;border-radius:9px;background:var(--live);color:#fff;font-size:10.5px;font-weight:800;
+  display:grid;place-items:center;border:2px solid var(--panel);box-sizing:content-box;animation:pulse 1.6s infinite}
+@media (prefers-reduced-motion:reduce){.live-n{animation:none}.nav-pill{transition:none}}
+/* geniş ekran: iki sütun */
+@media (min-width:900px){
+  .wrap{max-width:1120px}
+  .res{grid-template-columns:1fr 1fr;align-items:start}
+  .games{align-items:start}
+  .daylist{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  #view-puan .cards2,#view-istatistik .cards2{grid-template-columns:repeat(4,1fr)}
+}
+
+/* ================= Ayrışma: yüz yüze */
+@media (min-width:900px){ .split{grid-template-columns:1fr 1fr;align-items:start} }
+.faceoff{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:12px;overflow:hidden}
+.faceoff.is-live{border-color:var(--live)}
+.fo-h{display:flex;justify-content:space-between;gap:8px;font-weight:700;font-size:14px;margin-bottom:10px}
+.fo-h small{color:var(--muted);font-weight:600;white-space:nowrap}
+.fo-body{display:grid;grid-template-columns:1fr 26px 1fr;align-items:stretch}
+.fo-vs{position:relative;display:grid;place-items:center}
+.fo-vs::before{content:"";position:absolute;top:6px;bottom:6px;left:50%;width:2px;background:linear-gradient(var(--line),var(--muted),var(--line));transform:translateX(-50%)}
+.fo-vs span{position:relative;background:var(--panel);font-family:"Barlow Condensed";font-weight:800;font-size:14px;color:var(--muted);padding:4px 0}
+.fo-side{--tc:var(--line);position:relative;display:flex;flex-direction:column;gap:8px;border-radius:14px;padding:10px;
+  background:linear-gradient(170deg,color-mix(in srgb,var(--tc) 18%,var(--panel-2)),var(--panel-2) 60%);border:2px solid transparent;transition:.3s}
+.fo-side.won{border-color:var(--win);box-shadow:0 0 0 3px color-mix(in srgb,var(--win) 22%,transparent),0 8px 24px color-mix(in srgb,var(--win) 18%,transparent)}
+.fo-side.leading{border-color:color-mix(in srgb,var(--win) 55%,transparent)}
+.fo-side.lost{opacity:.55;filter:saturate(.6)}
+.fo-tm{display:flex;align-items:center;gap:8px}
+.fo-tm img{width:34px;height:34px;object-fit:contain}
+.fo-tm b{display:block;font-size:16px;line-height:1.1}
+.fo-tm small{color:var(--muted);font-size:11.5px}
+.fo-sc{margin-left:auto;font-family:"Barlow Condensed";font-weight:800;font-size:28px;font-variant-numeric:tabular-nums}
+.fo-p{display:flex;align-items:center;gap:8px;min-width:0}
+.fo-p .av{box-shadow:none}
+.fo-p .av .av-team{display:none}
+.fo-pi{min-width:0;flex:1}
+.fo-pi b{display:block;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fo-pi small{display:block;color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fo-pts{font-family:"Barlow Condensed";font-weight:800;font-size:18px}
+.fo-pts.pos{color:var(--win)} .fo-pts.neg{color:var(--lose)}
+.fo-flag{align-self:flex-start;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#fff;background:var(--win);border-radius:6px;padding:2px 7px}
+.fo-flag.lead{background:transparent;color:var(--win);border:1px solid var(--win)}
+.fo-body{grid-template-columns:minmax(0,1fr) 22px minmax(0,1fr)}
+.fo-side{min-width:0;padding:9px}
+.fo-tm{min-width:0}
+.fo-tm span{min-width:0;overflow:hidden}
+.fo-tm small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fo-tm img{width:28px;height:28px;flex:none}
+.fo-sc{font-size:24px}
+.fo-p{gap:6px}
+.fo-p .av.sm{width:28px;height:28px;font-size:13px}

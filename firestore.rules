@@ -21,6 +21,13 @@ service cloud.firestore {
         && !n.lower().matches('.*(orospu|orosbu|siktir|sikerim|sikeyim|sikik|yarrak|dalyarak|am[iı]nak|amc[iı]k|ibne|pezevenk|kahpe|kaltak|yav[sş]ak|[sş]erefsiz|fuck|shit|bitch|cunt|nigg|faggot|whore|asshole).*');
     }
 
+    function profileOk(d) {
+      return (!('color' in d) || d.color in ['p0', 'p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8', 'p9'])
+        && (!('emoji' in d) || d.emoji in ['', '🏀', '🔥', '🐐', '👑', '🦅', '🐺', '🦁', '🐻', '🐍', '🦈', '⚡', '🌪️', '🎯', '💎', '🚀', '🧊', '☄️', '🌙', '⭐', '🍀', '🎲', '🛡️', '🥷', '🤖'])
+        && (!('favTeam' in d) || (d.favTeam is string && d.favTeam.size() <= 5))
+        && (!('theme' in d) || d.theme in ['default', 'team']);
+    }
+
     match /config/{doc} {
       allow read, write: if false;
     }
@@ -40,9 +47,11 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(['name', 'joined'])
         && validName(request.resource.data.name)
         && request.resource.data.joined == request.time;
+      // Profil: ad, renk, emoji, favori takım ve tema değiştirilebilir (listeden seçilir)
       allow update: if signedIn() && request.auth.uid == uid
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name'])
-        && validName(request.resource.data.name);
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'color', 'emoji', 'favTeam', 'theme'])
+        && (!('name' in request.resource.data.diff(resource.data).affectedKeys()) || validName(request.resource.data.name))
+        && profileOk(request.resource.data);
       allow delete: if false;
     }
 
