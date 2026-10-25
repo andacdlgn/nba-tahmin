@@ -218,11 +218,14 @@ def score_game(g, pick, conf, top_ids):
     return r
 
 
+LOCK = timedelta(minutes=10)  # tahminler maçtan 10 dk önce kilitlenir
+
+
 def valid_before(doc, start_iso):
-    """Tahmin maç başlamadan önce mi kaydedildi? (sunucu saatiyle)"""
+    """Tahmin kilitten (maçtan 10 dk önce) önce mi kaydedildi? (sunucu saatiyle)"""
     if not doc or not doc.get("updatedAt"):
         return False
-    return ts(doc["updatedAt"]) < ts(start_iso)
+    return ts(doc["updatedAt"]) < ts(start_iso) - LOCK
 
 
 # ---------------------------------------------------------------- ana akış
@@ -292,11 +295,11 @@ def main(full=False):
             conf_game = None
             if daily and daily.get("confGame") and daily.get("confAt"):
                 cg = next((g for g in dgames if g["id"] == daily["confGame"]), None)
-                if cg and ts(daily["confAt"]) < ts(cg["start"]):
+                if cg and ts(daily["confAt"]) < ts(cg["start"]) - LOCK:
                     conf_game = cg["id"]
             dp = 0
             dp_name = None
-            if daily and daily.get("dayPlayerId") and daily.get("dayAt") and ts(daily["dayAt"]) < ts(first_start):
+            if daily and daily.get("dayPlayerId") and daily.get("dayAt") and ts(daily["dayAt"]) < ts(first_start) - LOCK:
                 dp_name = daily.get("dayPlayerName")
                 if daily["dayPlayerId"] in night_ids:
                     dp = 2

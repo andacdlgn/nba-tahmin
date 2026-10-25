@@ -67,9 +67,16 @@
           <div class="dl" id="dayLabel"></div>
           <button id="dayNext" aria-label="Sonraki gün">›</button>
         </div>
+        <div class="seg2" role="tablist" id="subSel">
+          <button data-v="maclar" aria-pressed="true">Maçlar</button>
+          <button data-v="tahminler" aria-pressed="false">Günün tahminleri</button>
+        </div>
         <div id="dayStatus"></div>
-        <div id="dayPlayer"></div>
-        <div class="games" id="games"></div>
+        <div id="subMaclar">
+          <div id="dayPlayer"></div>
+          <div class="games" id="games"></div>
+        </div>
+        <div id="subTahminler" class="hide"><div id="dayView"></div></div>
       </section>
 
       <!-- AYRIŞMA -->

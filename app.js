@@ -4,7 +4,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, connectAuthEmulator }
   from "https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, getDocs, setDoc, collection, writeBatch, serverTimestamp, Timestamp, connectFirestoreEmulator }
+import { getFirestore, doc, getDoc, getDocs, setDoc, collection, writeBatch, serverTimestamp, Timestamp, arrayUnion, connectFirestoreEmulator }
   from "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js";
 
 const $ = s => document.querySelector(s);
@@ -23,7 +23,7 @@ const S = {
   days:{},                // gün -> {games, picks:{gid:{uid:pick}}, daily:{uid:doc}, at}
   rosters:{}, sums:{},    // takım kadroları, maç özetleri (ESPN summary)
   pstats:{}, arch:{games:{}, scores:{days:{}, games:{}, totals:{}, weeks:{}}},
-  draft:{}, statFor:null, timer:null, seen:new Set()
+  draft:{}, statFor:null, timer:null, seen:new Set(), sub:"maclar", viewFor:null
 };
 try{ S.seen = new Set(JSON.parse(localStorage.getItem("seenReveal")||"[]")); }catch(e){}
 
@@ -39,7 +39,9 @@ const esc = s => String(s??"").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;"
 const bucket = m => m<=5?"1-5":m<=10?"6-10":m<=15?"11-15":"16+";
 const slug = s => s.toLocaleLowerCase("tr").replace(/[çğıöşü]/g, c => ({ç:"c",ğ:"g",ı:"i",ö:"o",ş:"s",ü:"u"}[c])).replace(/[^a-z0-9]/g, "");
 const weekKey = s => { const d = parseYmd(s); const w = (d.getUTCDay()+6)%7; d.setUTCDate(d.getUTCDate()-w); return ymd(d); };
-const started = g => g.state !== "pre" || Date.now() >= g.start.getTime();
+// Tahmin, maç saatinden 10 dakika önce kilitlenir; rakiplerin seçimleri o an açılır.
+const LOCK_MS = 10*60e3;
+const started = g => g.state !== "pre" || Date.now() >= g.start.getTime() - LOCK_MS;
 // renk katılma sırasına sabit: herkes aynı oyuncuyu aynı renkte görür
 const col = uid => PCOL[Math.max(0, (S.colorOrder||S.order).indexOf(uid)) % PCOL.length];
 const pname = uid => S.players[uid]?.name || "?";
@@ -194,7 +196,8 @@ async function initFirebase(){
 async function loadPlayers(){
   const snap = await getDocs(collection(S.db, "players"));
   S.players = {};
-  snap.forEach(d => S.players[d.id] = {name:d.data().name, joined:d.data().joined?.toMillis?.()||0});
+  // katılma saati henüz sunucudan gelmediyse "en yeni" say (renk sırası kaymasın)
+  snap.forEach(d => S.players[d.id] = {name:d.data({serverTimestamps:"estimate"}).name, joined:d.data({serverTimestamps:"estimate"}).joined?.toMillis?.()||Date.now()});
   S.order = Object.keys(S.players).sort((a,b) => (S.players[a].joined-S.players[b].joined) || pname(a).localeCompare(pname(b),"tr"));
   S.colorOrder = [...S.order];
   // giriş yapan oyuncu her zaman ilk sırada (iki kişide solda)
@@ -203,6 +206,7 @@ async function loadPlayers(){
 }
 const pickRef = (gid, uid) => doc(S.db, "picks", `${gid}_${uid}`);
 const dailyRef = (day, uid) => doc(S.db, "daily", `${day}_${uid}`);
+const progressRef = (day, uid) => doc(S.db, "progress", `${day}_${uid}`);
 async function readPick(gid, uid){ try{ const s=await getDoc(pickRef(gid,uid)); return s.exists()?s.data():null; }catch(e){ return null; } }
 async function readDaily(day, uid){ try{ const s=await getDoc(dailyRef(day,uid)); return s.exists()?s.data():null; }catch(e){ return null; } }
 
@@ -210,7 +214,7 @@ async function loadDay(day, {force=false}={}){
   const old = S.days[day];
   if(old && !force && Date.now()-old.at < 20e3) return old;
   const games = parseGames(await espn(`/scoreboard?dates=${day}&limit=50`));
-  const D = { games, picks: old?.picks||{}, daily: old?.daily||{}, at:Date.now() };
+  const D = { games, picks: old?.picks||{}, daily: old?.daily||{}, progress: old?.progress||{}, at:Date.now() };
   const firstStart = games.length ? Math.min(...games.map(g=>g.start.getTime())) : Infinity;
   const jobs=[];
   for(const g of games){
@@ -222,7 +226,8 @@ async function loadDay(day, {force=false}={}){
     }
   }
   for(const uid of S.order){
-    if(uid!==S.uid && Date.now()<firstStart) continue;
+    jobs.push(getDoc(progressRef(day, uid)).then(s => { D.progress[uid] = new Set(s.exists() ? s.data().gids||[] : []); }).catch(()=>{}));
+    if(uid!==S.uid && Date.now()<firstStart-LOCK_MS) continue;
     jobs.push(readDaily(day, uid).then(d => { if(d) D.daily[uid]=d; else delete D.daily[uid]; }));
   }
   await Promise.all(jobs);
@@ -237,7 +242,7 @@ async function loadDay(day, {force=false}={}){
 async function savePick(g){
   const d = S.draft[g.id]; if(!d) return;
   if(!(d.winner && d.margin && d.scorerId)) return;
-  if(started(g)){ toast("Maç başladı, tahmin kilitlendi."); return; }
+  if(started(g)){ toast("Tahmin kilitlendi (maçtan 10 dk önce kapanır)."); return; }
   const D = S.days[S.day];
   const prev = D.picks[g.id]?.[S.uid];
   if(prev && prev.winner===d.winner && prev.margin===d.margin && prev.scorerId===d.scorerId) return;
@@ -248,8 +253,11 @@ async function savePick(g){
     await setDoc(pickRef(g.id, S.uid), data);
     D.picks[g.id][S.uid] = {...data, updatedAt:Timestamp.now()};
     d.err = null;
+    toast("Tahmin kaydedildi.");
+    setDoc(progressRef(S.day, S.uid), {uid:S.uid, day:S.day, gids:arrayUnion(g.id), updatedAt:serverTimestamp()}, {merge:true})
+      .then(()=>{ (D.progress[S.uid] ||= new Set()).add(g.id); renderDayView(); }).catch(()=>{});
   }catch(e){
-    d.err = started(g) ? "Maç başladı, kaydedilemedi." : "Kaydedilemedi, tekrar dene.";
+    d.err = started(g) ? "Kilitlendi, kaydedilemedi (maçtan 10 dk önce kapanır)." : "Kaydedilemedi, tekrar dene.";
   }
   d.saving = false; renderGames(); renderStatus();
 }
@@ -356,7 +364,7 @@ function renderDayPlayer(){
   if(!locked){
     $("#dayPlayer").innerHTML = `<button class="dp" id="dpBtn" style="width:100%;cursor:pointer;text-align:left">
       <span class="ico">⭐</span><span class="tx"><b>Günün oyuncusu ${mine?.dayPlayerName?": "+esc(mine.dayPlayerName):""}</b>
-      <small>${mine?.dayPlayerName?"Değiştirmek için dokun. ":"Gecenin en çok sayı atanını bil, +2 puan. "}İlk maç başlayınca kilitlenir.</small></span></button>`;
+      <small>${mine?.dayPlayerName?"Değiştirmek için dokun. ":"Gecenin en çok sayı atanını bil, +2 puan. "}İlk maçtan 10 dk önce kilitlenir.</small></span></button>`;
     $("#dpBtn").onclick = () => openPlayerPicker({mode:"day"});
     return;
   }
@@ -406,8 +414,12 @@ function gameCard(g){
     const same = saved && saved.winner===d.winner && saved.margin===d.margin && saved.scorerId===d.scorerId;
     const missing = [!d.winner&&"taraf", !d.margin&&"fark", !d.scorerId&&"en skorer"].filter(Boolean);
     const st = d.saving ? `<span class="muted">Kaydediliyor…</span>` : d.err ? `<span class="no">${d.err}</span>`
-      : same ? `<span class="saved">✓ Kaydedildi</span>` : missing.length ? `<span class="need">Eksik: ${missing.join(", ")}</span>` : `<span class="muted">Kaydediliyor…</span>`;
-    body += `<div class="g-foot">${st}<button class="linkish" data-act="info" data-g="${g.id}">Maç önü</button></div>`;
+      : same ? `<span class="saved">✓ Kaydedildi</span>` : missing.length ? `<span class="need">Eksik: ${missing.join(", ")}</span>`
+      : saved ? `<span class="need">Değişiklik kaydedilmedi</span>` : `<span class="need">Kaydedilmedi</span>`;
+    const canSave = !d.saving && !missing.length && !same;
+    body += `<div class="g-foot">${st}<button class="linkish" data-act="info" data-g="${g.id}">Maç önü</button></div>
+      <button class="save-btn" data-act="save" data-g="${g.id}" ${canSave?"":"disabled"}>${same?"✓ Kaydedildi":saved?"Değişikliği kaydet":"Tahmini kaydet"}</button>
+      <div class="lock-note">${lockLeft(g)}</div>`;
   } else {
     const rows = S.order.map(u => { const p = D.picks[g.id]?.[u]; return p ? pickCell(g, p, u, D.daily[u]?.confGame===g.id) : `<div class="prow" style="--pc:${col(u)}"><span class="who">${esc(pname(u))}</span><span class="pk muted">tahmin yok</span><span class="pts">0</span></div>`; }).join("");
     body += `<div class="plist">${rows}</div>`;
@@ -416,7 +428,9 @@ function gameCard(g){
   }
   const conf = !lock ? `<button class="conf-btn" data-act="conf" data-g="${g.id}" aria-pressed="${confHere}" ${confLocked&&!confHere?"disabled":""} title="Günün güveni: kazanan doğruysa 2 puan, yanlışsa -1">★ ${confHere?"Güven":"Güven ver"}</button>`
     : confHere ? `<span class="conf-btn" aria-pressed="true">★ Güven</span>` : "";
-  const missingCls = !lock && !D.picks[g.id]?.[S.uid] ? " missing" : "";
+  const dd = S.draft[g.id], sv = D.picks[g.id]?.[S.uid];
+  const dirty = !lock && sv && dd && (dd.winner!==sv.winner || dd.margin!==sv.margin || dd.scorerId!==sv.scorerId);
+  const missingCls = !lock && (!sv || dirty) ? " missing" : "";
   return `<article class="game ${g.state==="in"?"is-live":""}${missingCls}" data-gid="${g.id}">
     <div class="g-head"><span class="stt">${g.state==="in"?'<span class="badge-live">Canlı</span> ':""}${gameStatusTR(g)}</span>${conf}</div>${body}</article>`;
 }
@@ -436,7 +450,8 @@ $("#games").addEventListener("click", e => {
   const act = b.dataset.act;
   if(act==="info") return openInfo(g);
   if(act==="box") return openBox(g);
-  if(started(g)) return toast("Maç başladı, tahmin kilitlendi.");
+  if(started(g)) return toast("Tahmin kilitlendi (maçtan 10 dk önce kapanır).");
+  if(act==="save") return savePick(g);
   if(act==="win"){ d.winner=b.dataset.v; }
   if(act==="mar"){ d.margin=b.dataset.v; }
   if(act==="scorer") return openPlayerPicker({mode:"game", g});
@@ -445,7 +460,57 @@ $("#games").addEventListener("click", e => {
     if(cur===g.id) return toast("Güveni başka maça taşıyabilirsin; kaldırılamaz.");
     return saveDaily({confGame:g.id, confStart:g.start});
   }
-  renderGames(); savePick(g);
+  d.err=null; renderGames();
+});
+
+
+/* ====================================================== Günün tahminleri */
+function lockLeft(g){
+  const ms = g.start.getTime() - LOCK_MS - Date.now();
+  if(ms<=0) return "Kilitlendi";
+  const h=Math.floor(ms/36e5), m=Math.floor(ms%36e5/6e4);
+  return `Değiştirmek için ${h?h+" sa ":""}${m} dk var · ${timeTR(new Date(g.start.getTime()-LOCK_MS))}'de kilitlenir`;
+}
+function renderDayView(){
+  const D = S.days[S.day]; const box=$("#dayView"); if(!box) return;
+  if(!D){ box.innerHTML=`<div class="note">Yükleniyor.</div>`; return; }
+  if(!D.games.length){ box.innerHTML=""; return; }
+  const u = S.order.includes(S.viewFor) ? S.viewFor : S.uid;
+  const prog = D.progress[u] || new Set();
+  const count = D.games.filter(g => D.picks[g.id]?.[u] || prog.has(g.id)).length;
+  const daily = D.daily[u];
+  const firstLocked = D.games.some(started);
+  let dp;
+  if(u===S.uid || firstLocked) dp = daily?.dayPlayerName ? `Günün oyuncusu: <b>${esc(daily.dayPlayerName)}</b>` : "Günün oyuncusu seçilmedi";
+  else dp = "Günün oyuncusu ilk maçtan 10 dk önce açılır";
+  let html = `<div class="chips" id="dvSel">${S.order.map(x=>`<button class="chip" data-v="${x}" aria-pressed="${x===u}">${esc(pname(x))}</button>`).join("")}</div>
+    <div class="dv-head"><span><b style="color:${col(u)}">${esc(pname(u))}</b> · ${count}/${D.games.length} maç girdi</span><span class="muted">${dp}</span></div><div class="dv-list">`;
+  for(const g of D.games){
+    const p = D.picks[g.id]?.[u];
+    const conf = daily?.confGame===g.id;
+    const st = g.state==="in" ? `<span class="badge-live">Canlı</span> ${g.away.score??0}–${g.home.score??0}` : g.state==="post" ? `Bitti ${g.away.score}–${g.home.score}` : timeTR(g.start);
+    let body;
+    if(p && (u===S.uid || started(g))){
+      const t = p.winner===g.home.abbr ? g.home : g.away;
+      const r = scorePick(g, p, conf);
+      const pts = (g.state==="post"||g.state==="in") ? `<span class="p" style="color:${r.pts>0?"var(--win)":r.pts<0?"var(--lose)":"var(--muted)"}">${r.pts>0?"+":""}${r.pts}</span>` : "";
+      body = `<div class="dv-pick"><img src="${t.logo||""}" alt=""><div><div class="w">${esc(t.name)} ${conf?'<span class="star">★</span>':""}</div><div class="m">${p.margin} fark · ${esc(p.scorerName)}</div></div>${pts}</div>`;
+    } else if(u!==S.uid && !started(g)){
+      body = `<div class="dv-hidden">${prog.has(g.id)?"<b>✓ Girdi</b> · ":"Henüz girmedi · "}seçim ${timeTR(new Date(g.start.getTime()-LOCK_MS))}'de açılır</div>`;
+    } else {
+      body = `<div class="dv-hidden">${started(g)?"Tahmin girilmedi":"Henüz kaydedilmedi"}</div>`;
+    }
+    html += `<div class="dv" style="--pc:${col(u)}"><div class="dv-top"><img src="${g.away.logo||""}" alt="">${esc(g.away.name)} @ <img src="${g.home.logo||""}" alt="">${esc(g.home.name)}<span class="t">${st}</span></div>${body}</div>`;
+  }
+  box.innerHTML = html + `</div>`;
+  $("#dvSel").onclick = e => { const c=e.target.closest(".chip"); if(!c) return; S.viewFor=c.dataset.v; renderDayView(); };
+}
+$("#subSel").addEventListener("click", e => {
+  const b=e.target.closest("button"); if(!b) return; S.sub=b.dataset.v;
+  $$("#subSel button").forEach(x=>x.setAttribute("aria-pressed", x===b));
+  $("#subMaclar").classList.toggle("hide", S.sub!=="maclar");
+  $("#subTahminler").classList.toggle("hide", S.sub!=="tahminler");
+  render();
 });
 
 /* ====================================================== oyuncu seçici */
@@ -477,10 +542,10 @@ async function openPlayerPicker({mode, g}){
     const b = e.target.closest(".plr"); if(!b) return;
     closeSheet();
     if(mode==="game"){
-      if(started(g)) return toast("Maç başladı, tahmin kilitlendi.");
-      const d=draftFor(g); d.scorerId=b.dataset.id; d.scorerName=b.dataset.name; renderGames(); savePick(g);
+      if(started(g)) return toast("Tahmin kilitlendi (maçtan 10 dk önce kapanır).");
+      const d=draftFor(g); d.scorerId=b.dataset.id; d.scorerName=b.dataset.name; d.err=null; renderGames();
     } else {
-      if(D.games.some(started)) return toast("İlk maç başladı, günün oyuncusu kilitlendi.");
+      if(D.games.some(started)) return toast("Günün oyuncusu kilitlendi (ilk maçtan 10 dk önce kapanır).");
       saveDaily({dayPlayerId:b.dataset.id, dayPlayerName:b.dataset.name});
     }
   };
@@ -717,7 +782,7 @@ function render(){
   if(!S.uid) return;
   renderBoard();
   $("#navLive").classList.toggle("hide", !(S.days[S.today]?.games.some(g=>g.state==="in")));
-  if(S.tab==="tahmin"){ renderDayLabel(); renderStatus(); renderDayPlayer(); renderGames(); }
+  if(S.tab==="tahmin"){ renderDayLabel(); renderStatus(); if(S.sub==="maclar"){ renderDayPlayer(); renderGames(); } else renderDayView(); }
   if(S.tab==="ayrisma") renderAyrisma();
   if(S.tab==="puan") renderPuan();
   if(S.tab==="istatistik") renderStats();
@@ -801,7 +866,7 @@ $("#authForm").addEventListener("submit", async e=>{
 });
 $("#me").onclick=()=>{
   openSheet(`<h3 id="shTitle">${esc(pname(S.uid))}</h3><p class="muted">Bu cihazda girişli kalırsın. Başka cihazda adın ve şifrenle girebilirsin.</p>
-    <div class="box"><b>Kurallar</b><p style="margin:6px 0 0;font-size:14px;line-height:1.55">Her maç için kazanan, fark ve en skorer zorunlu. Kazanan doğruysa 1 puan; kazananla birlikte fark da doğruysa +1; en skorer doğruysa +1.<br>Günün güveni: seçtiğin maçta kazanan doğruysa 2 puan, yanlışsa -1.<br>Günün oyuncusu: gecenin en çok sayı atanını bilirsen +2.<br>Maç başlayınca tahmin kilitlenir; rakiplerin seçimleri o an açılır. Playoffta tüm puanlar 2 katı.</p></div>
+    <div class="box"><b>Kurallar</b><p style="margin:6px 0 0;font-size:14px;line-height:1.55">Her maç için kazanan, fark ve en skorer zorunlu. Kazanan doğruysa 1 puan; kazananla birlikte fark da doğruysa +1; en skorer doğruysa +1.<br>Günün güveni: seçtiğin maçta kazanan doğruysa 2 puan, yanlışsa -1.<br>Günün oyuncusu: gecenin en çok sayı atanını bilirsen +2.<br>Tahmin maçtan 10 dakika önce kilitlenir; rakiplerin seçimleri o an açılır. Playoffta tüm puanlar 2 katı.</p></div>
     <button class="btn" id="logout" style="margin-top:12px">Çıkış yap</button>`);
   $("#logout").onclick=async()=>{ closeSheet(); await signOut(S.auth); };
 };

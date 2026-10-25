@@ -11,6 +11,8 @@ service cloud.firestore {
     function signedIn() { return request.auth != null; }
     function isPlayer() { return signedIn() && exists(/databases/$(database)/documents/players/$(request.auth.uid)); }
     function str(v, maxLen) { return v is string && v.size() > 0 && v.size() <= maxLen; }
+    // Tahminler maç saatinden 10 dakika önce kilitlenir (ve o an herkese açılır).
+    function lockAt(t) { return t - duration.value(10, 'm'); }
 
     match /config/{doc} {
       allow read, write: if false;
@@ -40,10 +42,10 @@ service cloud.firestore {
     // picks/{maçId}_{uid}
     match /picks/{pid} {
       // Olmayan belgeyi okumak serbest (bilgi sızdırmaz); var olan belge sahibine
-      // ya da maç başladıktan sonra herkese açık.
+      // ya da kilitlendikten sonra (maçtan 10 dk önce) herkese açık.
       allow read: if resource == null
         || (signedIn() && resource.data.uid == request.auth.uid)
-        || request.time >= resource.data.start;
+        || request.time >= lockAt(resource.data.start);
 
       function validPick() {
         let d = request.resource.data;
@@ -56,13 +58,13 @@ service cloud.firestore {
           && d.margin in ['1-5', '6-10', '11-15', '16+']
           && str(d.scorerId, 20) && str(d.scorerName, 60)
           && d.updatedAt == request.time
-          && request.time < d.start;
+          && request.time < lockAt(d.start);
       }
       allow create: if isPlayer() && validPick();
       allow update: if isPlayer() && validPick()
         && resource.data.uid == request.auth.uid
         && request.resource.data.start == resource.data.start
-        && request.time < resource.data.start;
+        && request.time < lockAt(resource.data.start);
       allow delete: if false;
     }
 
@@ -70,7 +72,7 @@ service cloud.firestore {
     match /daily/{did} {
       allow read: if resource == null
         || (signedIn() && resource.data.uid == request.auth.uid)
-        || request.time >= resource.data.firstStart;
+        || request.time >= lockAt(resource.data.firstStart);
 
       function baseOk() {
         let d = request.resource.data;
@@ -83,9 +85,9 @@ service cloud.firestore {
         let d = request.resource.data;
         return !('confGame' in d) || (
           (old != null && 'confGame' in old && d.confGame == old.confGame && d.confAt == old.confAt && d.confStart == old.confStart)
-          || (str(d.confGame, 20) && d.confStart is timestamp && request.time < d.confStart
+          || (str(d.confGame, 20) && d.confStart is timestamp && request.time < lockAt(d.confStart)
               && d.confAt == request.time
-              && (old == null || !('confStart' in old) || request.time < old.confStart))
+              && (old == null || !('confStart' in old) || request.time < lockAt(old.confStart)))
         );
       }
       function dayOk(old) {
@@ -93,7 +95,7 @@ service cloud.firestore {
         return !('dayPlayerId' in d) || (
           (old != null && 'dayPlayerId' in old && d.dayPlayerId == old.dayPlayerId && d.dayAt == old.dayAt)
           || (str(d.dayPlayerId, 20) && str(d.dayPlayerName, 60)
-              && d.dayAt == request.time && request.time < d.firstStart)
+              && d.dayAt == request.time && request.time < lockAt(d.firstStart))
         );
       }
       allow create: if isPlayer() && baseOk() && confOk(null) && dayOk(null);
@@ -102,6 +104,18 @@ service cloud.firestore {
         && request.resource.data.firstStart == resource.data.firstStart
         && confOk(resource.data) && dayOk(resource.data);
       allow delete: if false;
+    }
+
+    // progress/{gün}_{uid}: hangi maçlara tahmin girildiği (seçimler değil). Herkese açık,
+    // böylece "Mustafa 5/7 maç girdi" gösterilebilir.
+    match /progress/{did} {
+      allow read: if true;
+      allow write: if isPlayer()
+        && request.resource.data.keys().hasOnly(['uid', 'day', 'gids', 'updatedAt'])
+        && request.resource.data.uid == request.auth.uid
+        && did == request.resource.data.day + '_' + request.auth.uid
+        && request.resource.data.gids is list && request.resource.data.gids.size() <= 30
+        && request.resource.data.updatedAt == request.time;
     }
   }
 }

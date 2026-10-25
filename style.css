@@ -180,6 +180,28 @@ footer{color:var(--muted);font-size:12px;text-align:center;margin:28px 0 8px}
 .leaders{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:13px;color:var(--muted);margin-top:8px}
 .leaders b{color:var(--ink)}
 
+.save-btn{width:100%;margin-top:10px;border:0;border-radius:12px;background:var(--ink);color:var(--bg);font-weight:700;font-size:16px;padding:11px;cursor:pointer}
+.save-btn:disabled{background:var(--panel-2);color:var(--muted);cursor:default}
+.lock-note{font-size:12px;color:var(--muted);text-align:center;margin-top:6px}
+.seg2{display:grid;grid-template-columns:1fr 1fr;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:3px;margin-bottom:10px}
+.seg2 button{border:0;background:none;border-radius:9px;padding:9px;font-weight:700;color:var(--muted);cursor:pointer}
+.seg2 button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+/* Günün tahminleri */
+.dv-head{display:flex;flex-direction:column;gap:2px;margin:10px 2px 8px;font-size:14px}
+.dv-head b{font-size:18px}
+.dv-list{display:grid;gap:8px}
+.dv{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:10px 12px;border-left:4px solid var(--pc,var(--line))}
+.dv-top{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)}
+.dv-top img{width:20px;height:20px}
+.dv-top .t{margin-left:auto;font-weight:600}
+.dv-pick{display:flex;align-items:center;gap:10px;margin-top:6px}
+.dv-pick img{width:30px;height:30px}
+.dv-pick .w{font-weight:800;font-size:17px}
+.dv-pick .m{font-size:14px;color:var(--muted)}
+.dv-pick .p{margin-left:auto;font-family:"Barlow Condensed";font-weight:800;font-size:22px}
+.dv-hidden{margin-top:6px;font-size:14px;color:var(--muted)}
+.dv-hidden b{color:var(--win)}
+
 /* ---------- Ayrışma ---------- */
 .split{display:grid;gap:10px}
 .split .box h4{margin:0 0 6px;display:flex;align-items:center;gap:8px;font-size:16px}
