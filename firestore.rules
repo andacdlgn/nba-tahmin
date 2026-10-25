@@ -202,17 +202,42 @@ service cloud.firestore {
     }
 
     // contacts/{uid}: hatırlatma maili için e-posta. Yalnızca sahibi okur ve yazar;
-    // GitHub'daki hatırlatma görevi yönetici yetkisiyle okur.
+    // GitHub'daki görev yönetici yetkisiyle okur. "verified" ancak mailine gelen kod doğruysa true olur.
+    function otpOk(d, uid) {
+      let path = /databases/$(database)/documents/otp/$(uid);
+      return exists(path) && d.code is string && d.code.size() == 6
+        && get(path).data.email == d.email
+        && request.time < get(path).data.exp
+        && hashing.sha256(get(path).data.salt + d.code) == get(path).data.h;
+    }
     match /contacts/{uid} {
       allow read: if signedIn() && request.auth.uid == uid;
       allow create, update: if isPlayer() && request.auth.uid == uid
-        && request.resource.data.keys().hasOnly(['email', 'remind', 'weekly', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['email', 'remind', 'weekly', 'verified', 'code', 'updatedAt'])
         && (!('weekly' in request.resource.data) || request.resource.data.weekly is bool)
         && request.resource.data.email is string && request.resource.data.email.size() <= 120
         && (request.resource.data.email == '' || request.resource.data.email.matches('^[^@ ]+@[^@ ]+[.][^@ ]+$'))
         && request.resource.data.remind is bool
-        && request.resource.data.updatedAt == request.time;
+        && request.resource.data.updatedAt == request.time
+        && (!('verified' in request.resource.data) || request.resource.data.verified == false
+            || (resource != null && resource.data.get('verified', false) == true && resource.data.email == request.resource.data.email)
+            || otpOk(request.resource.data, uid));
       allow delete: if signedIn() && request.auth.uid == uid;
+    }
+
+    // verifyReq/{uid}: "onay kodu gönder" isteği (GitHub görevi işler ve siler)
+    match /verifyReq/{uid} {
+      allow read: if false;
+      allow create, update: if isPlayer() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['email', 'at'])
+        && request.resource.data.email is string && request.resource.data.email.matches('^[^@ ]+@[^@ ]+[.][^@ ]+$')
+        && request.resource.data.email.size() <= 120
+        && request.resource.data.at == request.time;
+    }
+    // otpStatus/{uid}: kodun gönderildiği adres ve saat (sahibi görür); otp/{uid} hiç okunamaz
+    match /otpStatus/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow write: if false;
     }
 
     // series/{seriKey}_{uid}: playoff seri tahmini (kazanan + kaç maçta). Serinin ilk maçında kilitlenir.

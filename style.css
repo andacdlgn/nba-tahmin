@@ -767,3 +767,10 @@ button.cc:hover{transform:scale(1.2)}
 .adm-p>span:nth-child(2){flex:1;min-width:0;display:flex;flex-direction:column}
 .adm-p small{color:var(--muted);font-size:12px}
 .adm-p .av.sm{box-shadow:none}
+.mail-st{font-size:13px;font-weight:700;white-space:nowrap}
+.pf-otp{margin-top:10px;padding:10px;border:1px dashed var(--line);border-radius:12px}
+.pf-otp small{display:block;margin:0 0 8px}
+.otp-in{letter-spacing:6px;font-family:ui-monospace,Menlo,monospace;font-size:20px;text-align:center}
+#pfMailSave{display:block}
+.pf-sw2{display:flex}
+.otp-in::placeholder{letter-spacing:normal;font-family:Barlow,system-ui,sans-serif;font-size:16px}

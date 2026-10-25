@@ -1731,6 +1731,13 @@ async function saveProfile(patch){
   try{ await updateDoc(doc(S.db,"players",S.uid), patch); }
   catch(e){ Object.assign(me, old); applyTheme(); render(); paintProfile(); toast("Kaydedilemedi, tekrar dene."); }
 }
+function paintMail(){
+  const inp=$("#pfMail"); if(!inp) return;
+  const email=inp.value.trim(), ver=!!(S.contact?.verified && S.contact.email===email);
+  $("#pfMailSt").innerHTML = !email ? "" : ver ? '<span class="ok">✓ Onaylı</span>' : '<span class="need">Onaylanmadı</span>';
+  $("#pfSendCode").classList.toggle("hide", !email || ver || S.otpSentTo===email);
+  $("#pfOtp").classList.toggle("hide", ver || !S.otpSentTo || S.otpSentTo!==email);
+}
 function openProfile(){
   openSheet(`<div id="prof"></div>`); paintProfile();
 }
@@ -1748,11 +1755,15 @@ function paintProfile(){
       <div class="pf-teams"><button class="pf-tm none" data-tm="" aria-pressed="${!me.favTeam}">Yok</button>${teams.map(t=>`<button class="pf-tm" data-tm="${t.a}" aria-pressed="${me.favTeam===t.a}" title="${esc(t.n)}"><img src="${LOGO_SMALL(t.a)}" alt="${esc(t.n)}"></button>`).join("")}</div></div>
     <div class="pf-sec"><h4>Site renkleri</h4><div class="seg2 pf-theme"><button data-th="default" aria-pressed="${me.theme!=="team"}">Varsayılan</button><button data-th="team" aria-pressed="${me.theme==="team"}" ${me.favTeam?"":"disabled"}>Favori takımım</button></div>
       <small class="muted">${me.favTeam?"Üst alan ve vurgu renkleri takımının renklerine geçer. Yalnızca sende görünür.":"Önce bir favori takım seç."}</small></div>
-    <div class="pf-sec"><h4>Hatırlatma maili</h4><small class="muted" style="margin:0 0 8px">Tahminin eksikse ilk maçtan 2 saat önce, seçtiğin oyuncu sakatlanırsa hemen mail gelir. Adresini yalnızca sen görürsün.</small>
-      <div class="pf-mail"><input id="pfMail" type="email" inputmode="email" autocomplete="email" placeholder="ornek@gmail.com" value="${esc(S.contact?.email||"")}">
-      <label class="pf-sw"><input type="checkbox" id="pfRemind" ${S.contact?.remind?"checked":""}><span></span>Hatırlat</label></div>
-      <label class="pf-sw pf-sw2"><input type="checkbox" id="pfWeekly" ${S.contact?.weekly?"checked":""}><span></span>Pazartesi haftalık özet gelsin</label>
-      <button class="btn" id="pfMailSave" style="margin-top:8px">Kaydet</button><small class="muted" id="pfMailMsg"></small></div>
+    <div class="pf-sec"><h4>Hatırlatma maili</h4><small class="muted" style="margin:0 0 8px">Tahminin eksikse ilk maçtan 2 saat önce, seçtiğin oyuncu sakatlanırsa hemen mail gelir. Mail gelmesi için adresini bir kez onaylaman gerekir. Adresini yalnızca sen görürsün.</small>
+      <div class="pf-mail"><input id="pfMail" type="email" inputmode="email" autocomplete="email" placeholder="ornek@gmail.com" value="${esc(S.contact?.email||"")}"><span class="mail-st" id="pfMailSt"></span></div>
+      <div id="pfOtp" class="pf-otp hide"><small class="muted" id="pfOtpMsg"></small>
+        <div class="adm-row"><input id="pfCode" class="adm-in otp-in" inputmode="numeric" maxlength="6" placeholder="6 haneli kod" autocomplete="one-time-code"><button class="btn" id="pfCodeOk" type="button">Onayla</button></div>
+        <button class="linkish" id="pfResend" type="button">Kodu tekrar gönder</button></div>
+      <button class="btn" id="pfSendCode" type="button" style="margin-top:8px">Onay kodu gönder</button>
+      <label class="pf-sw pf-sw2"><input type="checkbox" id="pfRemind" ${S.contact?.remind?"checked":""}><span></span>Eksik tahmin ve sakatlık uyarıları</label>
+      <label class="pf-sw pf-sw2"><input type="checkbox" id="pfWeekly" ${S.contact?.weekly?"checked":""}><span></span>Pazartesi haftalık özet</label>
+      <button class="btn" id="pfMailSave" style="margin-top:10px">Tercihleri kaydet</button><small class="muted" id="pfMailMsg"></small></div>
     ${S.isAdmin?`<div class="pf-sec"><button class="btn admin-btn" id="adminBtn" type="button">🛠️ Yönetim paneli</button></div>`:""}
     <div class="pf-sec pf-acts"><button class="btn" id="secChange">Güvenlik sorusunu değiştir</button><button class="btn" id="logout">Çıkış yap</button></div>`;
   if(!ALLP) allPlayers().then(()=>paintProfile()).catch(()=>{});
@@ -1767,18 +1778,48 @@ function paintProfile(){
   $("#logout").onclick=async()=>{ closeSheet(); S.contact=null; await signOut(S.auth); applyTheme(); };
   if(!S.contact && !S.contactLoading){
     S.contactLoading=true;
-    getDoc(doc(S.db,"contacts",S.uid)).then(r=>{ S.contactLoading=false; S.contact = r.exists() ? r.data() : {email:"",remind:false}; if($("#pfMail")){ $("#pfMail").value=S.contact.email||""; $("#pfRemind").checked=!!S.contact.remind; $("#pfWeekly").checked=!!S.contact.weekly; } }).catch(()=>{ S.contactLoading=false; });
+    getDoc(doc(S.db,"contacts",S.uid)).then(r=>{ S.contactLoading=false; S.contact = r.exists() ? r.data() : {email:"",remind:false}; if($("#pfMail")){ $("#pfMail").value=S.contact.email||""; $("#pfRemind").checked=!!S.contact.remind; $("#pfWeekly").checked=!!S.contact.weekly; paintMail(); } }).catch(()=>{ S.contactLoading=false; });
   }
+  const contactData = (extra={}) => { const email=$("#pfMail").value.trim();
+    const ver = !!(S.contact?.verified && S.contact.email===email);
+    return {email, remind:$("#pfRemind").checked, weekly:$("#pfWeekly").checked, verified:ver, updatedAt:serverTimestamp(), ...extra}; };
+  const validMail = e => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e);
+  $("#pfMail").oninput = paintMail;
   $("#pfMailSave").onclick = async () => {
-    const email=$("#pfMail").value.trim(), remind=$("#pfRemind").checked, weekly=$("#pfWeekly").checked, msg=$("#pfMailMsg");
-    if(email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ msg.textContent="E-posta adresi geçerli görünmüyor."; return; }
-    if((remind||weekly) && !email){ msg.textContent="Önce bir e-posta adresi yaz."; return; }
+    const d=contactData(), msg=$("#pfMailMsg");
+    if(d.email && !validMail(d.email)){ msg.textContent="E-posta adresi geçerli görünmüyor."; return; }
+    if((d.remind||d.weekly) && !d.email){ msg.textContent="Önce bir e-posta adresi yaz."; return; }
     $("#pfMailSave").disabled=true;
-    try{ await setDoc(doc(S.db,"contacts",S.uid), {email, remind, weekly, updatedAt:serverTimestamp()}); S.contact={email,remind,weekly};
-      msg.textContent = remind||weekly ? "Kaydedildi." : "Kaydedildi. Mail gelmeyecek."; }
+    try{ await setDoc(doc(S.db,"contacts",S.uid), d); S.contact={...d};
+      msg.textContent = !(d.remind||d.weekly) ? "Kaydedildi. Mail gelmeyecek." : d.verified ? "Kaydedildi." : "Kaydedildi. Mail gelmesi için adresini onaylaman gerekiyor."; paintMail(); }
     catch(e){ msg.textContent="Kaydedilemedi, tekrar dene."; }
     $("#pfMailSave").disabled=false;
   };
+  const sendCode = async () => {
+    const email=$("#pfMail").value.trim(), msg=$("#pfOtpMsg");
+    if(!validMail(email)){ $("#pfMailMsg").textContent="Önce geçerli bir e-posta adresi yaz."; return; }
+    $("#pfSendCode").disabled=true;
+    try{
+      const d=contactData(); await setDoc(doc(S.db,"contacts",S.uid), d); S.contact={...d};
+      await setDoc(doc(S.db,"verifyReq",S.uid), {email, at:serverTimestamp()});
+      S.otpSentTo=email; paintMail();
+      msg.textContent=`Kod ${email} adresine gönderilecek. Genelde 5–15 dakika sürer, gelince buraya yaz. Gereksiz klasörüne de bak.`;
+    }catch(e){ $("#pfMailMsg").textContent="İstek gönderilemedi, tekrar dene."; }
+    $("#pfSendCode").disabled=false;
+  };
+  $("#pfSendCode").onclick = sendCode;
+  $("#pfResend").onclick = sendCode;
+  $("#pfCodeOk").onclick = async () => {
+    const code=$("#pfCode").value.trim(), msg=$("#pfOtpMsg");
+    if(!/^\d{6}$/.test(code)){ msg.textContent="Kod 6 rakam olmalı."; return; }
+    $("#pfCodeOk").disabled=true;
+    try{ const d=contactData({verified:true, code}); await setDoc(doc(S.db,"contacts",S.uid), d); S.contact={...d, code:undefined}; S.otpSentTo=null;
+      $("#pfMailMsg").textContent="E-posta adresin onaylandı."; paintMail(); toast("E-posta adresin onaylandı."); }
+    catch(e){ msg.textContent="Kod yanlış ya da süresi dolmuş. Tekrar dene ya da yeni kod iste."; }
+    $("#pfCodeOk").disabled=false;
+  };
+  paintMail();
+
 }
 // Takım teması: üst alan ve vurgu rengi favori takımın renklerine geçer (yalnızca o oyuncuda)
 function paintMe(){ const p=S.players[S.uid]||{}; $("#me").innerHTML = p.emoji || esc(pname(S.uid).slice(0,1).toLocaleUpperCase("tr")); $("#me").style.setProperty("--pc", col(S.uid)); $("#me").classList.add("me-btn"); }

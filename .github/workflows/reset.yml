@@ -1,4 +1,4 @@
-name: Şifre sıfırlama isteklerini işle
+name: Şifre sıfırlama ve e-posta onayı
 
 on:
   schedule:
@@ -31,3 +31,10 @@ jobs:
         env:
           FIREBASE_SA: ${{ secrets.FIREBASE_SA }}
         run: python scripts/reset.py
+
+      - name: E-posta onay kodlarını gönder
+        env:
+          FIREBASE_SA: ${{ secrets.FIREBASE_SA }}
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+        run: python scripts/verify.py

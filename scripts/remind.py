@@ -137,8 +137,8 @@ def people(db, flag):
     for c in db.collection("contacts").stream():
         info = c.to_dict() or {}
         email = (info.get("email") or "").strip()
-        if not info.get(flag) or "@" not in email:
-            continue
+        if not info.get(flag) or not info.get("verified") or "@" not in email:
+            continue  # yalnızca onaylanmış adreslere
         p = db.collection("players").document(c.id).get()
         if not p.exists:
             continue

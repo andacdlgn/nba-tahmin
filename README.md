@@ -25,6 +25,7 @@ Her gecenin NBA maçlarına tahmin oyunu: kazanan, fark ve maçın en skoreri.
 ## Hatırlatma maili
 - Oyuncu profilinden e-posta adresini yazıp "Hatırlat"ı açarsa, gecenin ilk maçına 2 saat kala eksik tahmini varsa bir kez mail gelir; seçtiği skorer ya da günün oyuncusu ESPN'de "Out" görünürse kilitten önce uyarı maili gelir.
 - "Pazartesi haftalık özet" açıksa her pazartesi 10:00'dan sonra geçen haftanın özeti gelir.
+- Mailler yalnızca **onaylanmış** adreslere gider. Profilde "Onay kodu gönder" → `verifyReq/{uid}`; `scripts/verify.py` (şifre sıfırlama göreviyle 5 dakikada bir) 6 haneli kodu mailler ve özetini `otp/{uid}`'ye yazar. Kod 30 dakika geçerli; doğruluğunu Firebase kuralı kontrol eder (`contacts.verified`).
 - Adres `contacts/{uid}` belgesinde durur; yalnızca sahibi okuyabilir. Gönderilenler `reminders/` koleksiyonunda tutulur (aynı gece ikinci mail gitmez).
 - `scripts/remind.py` + `.github/workflows/remind.yml` 10 dakikada bir çalışır. Gerekli gizli değişkenler: `FIREBASE_SA`, `GMAIL_USER` (gönderen Gmail adresi), `GMAIL_APP_PASSWORD` (Google hesabında oluşturulan uygulama şifresi).
 
