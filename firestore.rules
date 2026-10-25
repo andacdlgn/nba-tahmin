@@ -14,6 +14,11 @@ service cloud.firestore {
     // Tahminler kilit saatinde kapanır ve o an herkese açılır. Site, tahminin "start"
     // alanına gecenin ilk maçının saatini yazar; puanlama betiği bunu ESPN'den ayrıca doğrular.
     function lockAt(t) { return t; }
+    // Yönetici: config/admin belgesindeki uids listesinde olanlar (Firebase konsolundan eklenir)
+    function isAdmin() {
+      return signedIn() && exists(/databases/$(database)/documents/config/admin)
+        && request.auth.uid in get(/databases/$(database)/documents/config/admin).data.uids;
+    }
     // Oyuncu adı: büyük harfle başlar; harf, rakam, boşluk ve . - ' içerebilir; küfür/hakaret içermez.
     // (Ayrıntılı kontrol sitede yapılır; burada en bariz kelimeler engellenir.)
     function validName(n) {
@@ -32,6 +37,24 @@ service cloud.firestore {
     match /config/{doc} {
       allow read, write: if false;
     }
+    // Davet kodunu yalnızca yönetici görür ve değiştirir
+    match /config/secret {
+      allow read: if isAdmin();
+      allow write: if isAdmin() && request.resource.data.keys().hasOnly(['invite'])
+        && str(request.resource.data.invite, 40);
+    }
+
+    // league/settings: ligin başladığı gece ve geçmiş ligler. Herkes okur, yönetici yazar.
+    match /league/{doc} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // banned/{uid}: ligden çıkarılan oyuncular (tekrar katılamaz). Yönetici yönetir.
+    match /banned/{uid} {
+      allow read: if isAdmin() || (signedIn() && request.auth.uid == uid);
+      allow write: if isAdmin();
+    }
 
     // Davet kodunu doğrulayan kayıt; okunamaz.
     match /joins/{uid} {
@@ -45,6 +68,7 @@ service cloud.firestore {
       allow read: if true;
       allow create: if signedIn() && request.auth.uid == uid
         && existsAfter(/databases/$(database)/documents/joins/$(uid))
+        && !exists(/databases/$(database)/documents/banned/$(uid))
         && request.resource.data.keys().hasOnly(['name', 'joined'])
         && validName(request.resource.data.name)
         && request.resource.data.joined == request.time;
@@ -53,7 +77,10 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'color', 'emoji', 'favTeam', 'theme'])
         && (!('name' in request.resource.data.diff(resource.data).affectedKeys()) || validName(request.resource.data.name))
         && profileOk(request.resource.data);
-      allow delete: if false;
+      allow delete: if isAdmin();
+      // yönetici, ligden çıkardığı oyuncuyu eski adı ve katılma saatiyle geri alabilir
+      allow create: if isAdmin() && request.resource.data.keys().hasOnly(['name', 'joined'])
+        && str(request.resource.data.name, 40) && request.resource.data.joined is timestamp;
     }
 
     // picks/{maçId}_{uid}

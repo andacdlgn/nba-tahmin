@@ -325,7 +325,9 @@ def main(full=False):
         d += timedelta(days=1)
     pstats["counted"] = sorted(counted)
 
-    # 2) puanlar
+    # 2) puanlar — yalnızca ligin başladığı geceden itibaren (yönetim panelinden sıfırlanabilir)
+    league = fs_doc("league/settings") or {}
+    league_start = max(CONFIG["seasonStart"], str(league.get("start") or ""))
     players = fs_players()
     old = load("scores.json", {})
     sc = {"players": players, "games": old.get("games", {}), "days": old.get("days", {})}
@@ -335,9 +337,17 @@ def main(full=False):
             sc[bucket_][k] = {u: v for u, v in sc[bucket_][k].items() if u in players}
             if not sc[bucket_][k]:
                 del sc[bucket_][k]
+    for bucket_ in ("days",):
+        for k in list(sc[bucket_]):
+            if k < league_start:
+                del sc[bucket_][k]
+    for gid in list(sc["games"]):
+        if games.get(gid, {}).get("day", "") < league_start:
+            del sc["games"][gid]
     by_day = {}
     for g in games.values():
-        by_day.setdefault(g["day"], []).append(g)
+        if g["day"] >= league_start:
+            by_day.setdefault(g["day"], []).append(g)
 
     recheck_from = (first - timedelta(days=1)).strftime("%Y%m%d")
     for day, dgames in by_day.items():
@@ -391,6 +401,8 @@ def main(full=False):
             series.setdefault(sr["key"], []).append(g)
     sc["series"] = {}
     for key, sg in series.items():
+        if any(g["day"] < league_start for g in sg):
+            continue  # lig sıfırlanmadan önce başlamış seri sayılmaz
         sg.sort(key=lambda g: g["start"])
         last = sg[-1]["series"]
         need = last.get("need", 4)
@@ -442,6 +454,7 @@ def main(full=False):
         if len(winners) == 1 and winners[0] in tot:
             tot[winners[0]]["weekWins"] += 1
     sc["totals"] = tot
+    sc["leagueStart"] = league_start
     sc["weeks"] = weeks
 
     changed = [save("games.json", games), save("players.json", pstats), save("scores.json", sc), save("nights.json", nights)]

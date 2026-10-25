@@ -390,7 +390,7 @@ const digitsHTML = (u, v) => `<div class="digits tnum" data-u="${u}" data-v="${v
 // Sezon toplamı ve kırılımı: arşivdeki günler + henüz arşive girmemiş günler (canlı)
 function seasonBreakdown(){
   const days = new Set(Object.keys(S.arch.scores.days||{}));
-  for(const d of [S.today, shiftDay(S.today,-1)]) if(S.days[d]) days.add(d);
+  for(const d of [S.today, shiftDay(S.today,-1)]) if(S.days[d] && inLeague(d)) days.add(d);
   const b = {}; for(const u of S.order) b[u] = {pts:0, w:0, m:0, s:0, dp:0, q:0, sr:0};
   for(const d of days){
     const dp = dayPoints(d);
@@ -402,7 +402,7 @@ function seasonTotals(){ const b=seasonBreakdown(); const t={}; for(const u of S
 function renderBoard(){
   const brk = seasonBreakdown();
   const tot = {}; for(const u of S.order) tot[u]=brk[u].pts;
-  const tonight = S.days[S.today] ? dayPoints(S.today) : {};
+  const tonight = S.days[S.today] && inLeague(S.today) ? dayPoints(S.today) : {};
   const ranked = [...S.order].sort((a,b)=>tot[b]-tot[a]);
   let html;
   if(S.order.length<=2){
@@ -427,7 +427,7 @@ function renderBoard(){
   }
   const tn = S.order.length<=2 && S.order.length ? `Bu gece <b>${S.order.map(u=>tonight[u]?.pts??0).join("–")}</b>` : "";
   const wk = weekKey(S.today), wkPts = {}; for(const u of S.order) wkPts[u]=(S.arch.scores.weeks?.[wk]?.[u]||0);
-  for(const day of [S.today, shiftDay(S.today,-1)]){ if(weekKey(day)!==wk || !S.days[day]) continue; const dp=dayPoints(day); for(const u of S.order) if(dp[u]?.src==="live") wkPts[u]+=dp[u].pts-(S.arch.scores.days?.[day]?.[u]?.pts||0); }
+  for(const day of [S.today, shiftDay(S.today,-1)]){ if(weekKey(day)!==wk || !S.days[day] || !inLeague(day)) continue; const dp=dayPoints(day); for(const u of S.order) if(dp[u]?.src==="live") wkPts[u]+=dp[u].pts-(S.arch.scores.days?.[day]?.[u]?.pts||0); }
   const wkTxt = S.order.length ? `Bu hafta <b>${S.order.slice(0,4).map(u=>wkPts[u]).join("–")}</b>` : "";
   html += `<div class="board-foot"><div class="lead">${lead}</div><div class="bf-meta">${[tn,wkTxt].filter(Boolean).join(" · ")}</div></div>`;
   $("#board").innerHTML = html;
@@ -1079,7 +1079,7 @@ function seasonChart(){
     <div class="chart-leg">${ranked.map(u=>`<span class="pn"><i style="background:${col(u)}"></i>${esc(pname(u))}</span>`).join("")}</div></div>`;
 }
 function nightCalendar(){
-  const start=S.cfg?.seasonStart||"20261020";
+  const start=leagueStart()||"20261020";
   if(S.today<start) return "";
   const first=weekKey(start);
   const weeks=[]; for(let wk=first; wk<=S.today; wk=shiftDay(wk,7)) weeks.push(wk);
@@ -1106,7 +1106,7 @@ function userRecs(u){
   const recs=[];
   for(const [gid,row] of Object.entries(S.arch.scores.games||{})){ const r=row[u], g=S.arch.games[gid]; if(r?.pick && g) recs.push({gid, day:g.day, start:g.start, home:g.home, away:g.away, winner:g.winner, r}); }
   for(const day of [S.today, shiftDay(S.today,-1)]){
-    const D=S.days[day]; if(!D) continue;
+    const D=S.days[day]; if(!D || !inLeague(day)) continue;
     for(const g of D.games){ if(g.state!=="post" || S.arch.scores.games?.[g.id]?.[u]) continue; const p=D.picks[g.id]?.[u]; if(!p) continue;
       const c=D.daily[u]?.confGame===g.id, r=scorePick(g,p,c);
       recs.push({gid:g.id, day, start:g.start.toISOString(), home:g.home, away:g.away, winner:(g.home.score>g.away.score?g.home.abbr:g.away.abbr), r:{...r,c,pick:{w:p.winner,m:p.margin,s:p.scorerName}}}); }
@@ -1193,7 +1193,7 @@ function openAwards(){
 function allDays(){
   const days = new Set(Object.keys(S.arch.scores.days||{}));
   for(const d of [S.today, shiftDay(S.today,-1)]) if(S.days[d]?.games.some(started)) days.add(d);
-  return [...days].filter(d => { const p=dayPoints(d); return S.order.some(u=>p[u]?.n); }).sort().reverse();
+  return [...days].filter(d => inLeague(d) && (() => { const p=dayPoints(d); return S.order.some(u=>p[u]?.n); })()).sort().reverse();
 }
 function renderPuan(){
   const tot = seasonTotals();
@@ -1213,7 +1213,7 @@ function renderPuan(){
     if(w.length===1 && wks[w[0]]!==undefined) wks[w[0]]++;
   }
   const ranked=[...S.order].sort((a,b)=>tot[b]-tot[a]);
-  let html = `<div class="sec-title"><h2>Puan tablosu</h2><span class="aside">sezon</span></div>
+  let html = `<div class="sec-title"><h2>Puan tablosu</h2><span class="aside">${S.league?.start ? dayNice(leagueStart(),{day:"numeric",month:"long"})+" gecesinden beri" : "sezon"}</span></div>
     <div class="tbl"><div class="tr th t-lb"><span>#</span><span>Oyuncu</span><span class="r">Puan</span><span class="c">Gece</span><span class="c">Hafta</span></div>
     ${ranked.map((u,i)=>`<div class="tr t-lb"><span class="muted">${i+1}</span><span class="pn"><i style="background:${col(u)}"></i><span>${esc(pname(u))}</span></span><span class="r big tnum">${tot[u]}</span><span class="c tnum">${wins[u]}</span><span class="c tnum">${wks[u]}</span></div>`).join("")}</div>
     <p class="muted" style="font-size:13px;margin:6px 2px">Gece: tek başına en çok puan aldığın geceler. Hafta: kazandığın haftalar (pazartesi–pazar).</p>`;
@@ -1231,6 +1231,10 @@ function renderPuan(){
       return `<div class="mo ${on?"live":"done"}"><span class="mo-n">${monthName(k)}</span><span class="mo-w">${on?"":"👑 "}${who}</span><span class="mo-s">${on?"sürüyor":"şampiyon"}</span></div>`; }).join("")}</div>`;
   }
   html += `<button class="btn awards-btn" id="awardsBtn" type="button">🏅 Sezon ödüllerine bak</button>`;
+  const hist=[...(S.league?.history||[])].reverse();
+  if(hist.length) html += `<div class="sec-title"><h2>Geçmiş ligler</h2></div><div class="months">${hist.map(h=>{ const w=h.rows?.[0];
+    return `<div class="mo done"><span class="mo-n" style="text-transform:none">${dayNice(h.start,{day:"numeric",month:"short"})} – ${dayNice(h.end,{day:"numeric",month:"short"})}</span>
+      <span class="mo-w">👑 <b>${esc(w?.name||"?")}</b><small>${w?.pts??0} puan</small></span><span class="mo-s">${(h.rows||[]).slice(1).map(r=>`${esc(r.name)} ${r.pts}`).join(" · ")}</span></div>`; }).join("")}</div>`;
   html += seasonChart() + nightCalendar();
 
   // bu hafta
@@ -1498,6 +1502,26 @@ async function loadArchive(){
   const get = async n => { try{ return await getJSON(base+n+"?t="+Date.now()); }catch(e){ return getJSON("data/"+n+"?t="+Date.now()).catch(()=>null); } };
   const [g,p,s] = await Promise.all([get("games.json"), get("players.json"), get("scores.json")]);
   if(g) S.arch.games=g; if(p) S.pstats=p.p||{}; if(s) S.arch.scores={days:{},games:{},totals:{},weeks:{},...s};
+  S.archRaw = S.arch.scores;
+  await loadLeague();
+}
+// Lig: yönetim panelinden sıfırlanınca yalnızca başlangıç gecesinden sonraki geceler sayılır
+const leagueStart = () => [S.cfg?.seasonStart||"", S.league?.start||""].sort().pop();
+const inLeague = d => d >= leagueStart();
+async function loadLeague(){
+  try{ const r=await getDoc(doc(S.db,"league","settings")); S.league = r.exists() ? r.data() : {}; }catch(e){ S.league = S.league || {}; }
+  applyLeague();
+}
+function applyLeague(){
+  const raw=S.archRaw||S.arch.scores, st=leagueStart();
+  const days=Object.fromEntries(Object.entries(raw.days||{}).filter(([d])=>d>=st));
+  const games=Object.fromEntries(Object.entries(raw.games||{}).filter(([gid])=>(S.arch.games[gid]?.day||"")>=st));
+  const series=Object.fromEntries(Object.entries(raw.series||{}).filter(([,x])=>(x.day||"")>=st));
+  // haftaları lig gecelerinden yeniden hesapla
+  const weeks={};
+  for(const [d,row] of Object.entries(days)) for(const [u,v] of Object.entries(row)){ const w=weekKey(d); (weeks[w] ||= {}); weeks[w][u]=(weeks[w][u]||0)+(v.tot ?? (v.pts+(v.sr||0))); }
+  S.arch.scores={...raw, days, games, series, weeks};
+  honors.k=null;
 }
 async function refresh(){
   const jobs=[loadDay(S.today,{force:true})];
@@ -1729,6 +1753,7 @@ function paintProfile(){
       <label class="pf-sw"><input type="checkbox" id="pfRemind" ${S.contact?.remind?"checked":""}><span></span>Hatırlat</label></div>
       <label class="pf-sw pf-sw2"><input type="checkbox" id="pfWeekly" ${S.contact?.weekly?"checked":""}><span></span>Pazartesi haftalık özet gelsin</label>
       <button class="btn" id="pfMailSave" style="margin-top:8px">Kaydet</button><small class="muted" id="pfMailMsg"></small></div>
+    ${S.isAdmin?`<div class="pf-sec"><button class="btn admin-btn" id="adminBtn" type="button">🛠️ Yönetim paneli</button></div>`:""}
     <div class="pf-sec pf-acts"><button class="btn" id="secChange">Güvenlik sorusunu değiştir</button><button class="btn" id="logout">Çıkış yap</button></div>`;
   if(!ALLP) allPlayers().then(()=>paintProfile()).catch(()=>{});
   box.onclick = e => {
@@ -1738,6 +1763,7 @@ function paintProfile(){
     const h=e.target.closest("[data-th]"); if(h && !h.disabled) return saveProfile({theme:h.dataset.th});
   };
   $("#secChange").onclick=()=>openRecoverySheet(false);
+  $("#adminBtn")?.addEventListener("click", openAdmin);
   $("#logout").onclick=async()=>{ closeSheet(); S.contact=null; await signOut(S.auth); applyTheme(); };
   if(!S.contact && !S.contactLoading){
     S.contactLoading=true;
@@ -1776,6 +1802,61 @@ function applyTheme(){
   $('meta[name="theme-color"]')?.setAttribute("content", "#"+[n>>16&255,n>>8&255,n&255].map(v=>mix(v).toString(16).padStart(2,"0")).join(""));
 }
 
+/* ====================================================== yönetim paneli (yalnızca yönetici) */
+// İki adımlı onay: ilk dokunuşta düğme "Emin misin?" olur, 4 sn içinde ikinci dokunuş işi yapar
+function confirmBtn(btn, label, fn){
+  if(btn.dataset.armed){ delete btn.dataset.armed; clearTimeout(btn._t); fn(); return; }
+  const old=btn.textContent; btn.dataset.armed="1"; btn.textContent=label; btn.classList.add("armed");
+  btn._t=setTimeout(()=>{ delete btn.dataset.armed; btn.textContent=old; btn.classList.remove("armed"); }, 4000);
+}
+async function openAdmin(){
+  S.sheetLocked=false;
+  openSheet(`<h3 id="shTitle">Yönetim paneli</h3><p class="muted">Bu bölümü yalnızca sen görüyorsun.</p><div id="adm"><p class="muted">Yükleniyor…</p></div>`);
+  let banned=[];
+  try{ const snap=await getDocs(collection(S.db,"banned")); snap.forEach(x=>banned.push({uid:x.id,...x.data()})); }catch(e){}
+  await loadLeague();
+  const st=leagueStart(), hist=S.league?.history||[];
+  const first=S.days[S.today]?.games.some(started);
+  const opts=[[first?shiftDay(S.today,1):S.today, first?"Yarın geceden":"Bu geceden"], [shiftDay(S.today,first?2:1), first?"Öbür geceden":"Yarın geceden"]];
+  const tot=seasonTotals();
+  $("#adm").innerHTML = `
+    <div class="pf-sec"><h4>Lig</h4>
+      <p class="muted" style="margin:0 0 8px">Şu anki lig <b>${dayNice(st,{day:"numeric",month:"long"})}</b> gecesinden beri sayılıyor${hist.length?`, ${hist.length} geçmiş lig var`:""}.</p>
+      <p style="margin:0 0 8px;font-size:14px">Ligi sıfırlarsan bütün puanlar, rozetler ve istatistikler seçtiğin geceden itibaren sıfırdan sayılır. Şu anki puan durumu "Geçmiş ligler"e kaydedilir, tahminler silinmez.</p>
+      <div class="adm-row"><select id="admStart" class="adm-in">${opts.map(([d,l])=>`<option value="${d}">${l} (${dayNice(d,{day:"numeric",month:"long"})})</option>`).join("")}<option value="custom">Başka bir gece…</option></select>
+      <input type="date" id="admDate" class="adm-in hide"></div>
+      <button class="btn danger" id="admReset" type="button">Ligi sıfırla</button><small class="muted" id="admResetMsg"></small></div>
+    <div class="pf-sec"><h4>Oyuncular</h4><div class="adm-pl">${S.order.map(u=>`<div class="adm-p">${avatar(u,"sm")}<span><b>${esc(pname(u))}</b><small>${tot[u]??0} puan · ${new Date(S.players[u].joined).toLocaleDateString("tr-TR",{timeZone:TZ,day:"numeric",month:"long"})} katıldı</small></span>
+      ${u===S.uid?'<small class="muted">sen</small>':`<button class="btn danger sm" data-kick="${u}" type="button">Ligden çıkar</button>`}</div>`).join("")}</div>
+      ${banned.length?`<h4 style="margin-top:12px">Çıkarılanlar</h4><div class="adm-pl">${banned.map(b=>`<div class="adm-p"><span class="av sm empty">?</span><span><b>${esc(b.name||"?")}</b><small>tekrar katılamaz</small></span><button class="btn sm" data-unban="${b.uid}" type="button">Geri al</button></div>`).join("")}</div>`:""}
+      <small class="muted">Çıkarılan oyuncu sitede görünmez, puanları sayılmaz ve davet koduyla yeniden katılamaz.</small></div>
+    <div class="pf-sec"><h4>Davet kodu</h4><div class="adm-row"><input id="admInv" class="adm-in" value="${esc(S.invite||"")}" maxlength="40"><button class="btn" id="admInvSave" type="button">Kaydet</button></div>
+      <small class="muted" id="admInvMsg">Yeni oyuncular bu kodla katılır. Kodu değiştirince eski kod çalışmaz.</small></div>`;
+  $("#admStart").onchange=()=>$("#admDate").classList.toggle("hide", $("#admStart").value!=="custom");
+  $("#admReset").onclick=e=>confirmBtn(e.currentTarget,"Emin misin? Tekrar dokun",async()=>{
+    let ns=$("#admStart").value; if(ns==="custom"){ const v=$("#admDate").value; if(!v){ $("#admResetMsg").textContent="Bir tarih seç."; return; } ns=v.replaceAll("-",""); }
+    const t=seasonTotals(), nights={}; for(const n of nightsOf()) if(n.w.st==="w") nights[n.w.u]=(nights[n.w.u]||0)+1;
+    const rows=[...S.order].sort((a,b)=>(t[b]||0)-(t[a]||0)).map(u=>({uid:u, name:pname(u), pts:t[u]||0, nights:nights[u]||0}));
+    const entry={start:leagueStart(), end:shiftDay(ns,-1), rows, at:new Date().toISOString()};
+    const history=[...(S.league?.history||[]), ...(rows.some(r=>r.pts) ? [entry] : [])];
+    try{ await setDoc(doc(S.db,"league","settings"), {start:ns, history}); S.league={start:ns, history}; applyLeague(); render(); toast("Lig sıfırlandı."); openAdmin(); }
+    catch(err){ $("#admResetMsg").textContent="Kaydedilemedi, tekrar dene."; }
+  });
+  $("#adm").addEventListener("click", e=>{
+    const k=e.target.closest("[data-kick]"); if(k) return confirmBtn(k,"Emin misin?",async()=>{
+      const u=k.dataset.kick, p=S.players[u];
+      try{ await setDoc(doc(S.db,"banned",u), {name:p.name, joined:Timestamp.fromMillis(p.joined), at:serverTimestamp()}); await deleteDoc(doc(S.db,"players",u));
+        await loadPlayers(); render(); toast(`${p.name} ligden çıkarıldı.`); openAdmin(); }catch(err){ toast("Yapılamadı, tekrar dene."); }
+    });
+    const ub=e.target.closest("[data-unban]"); if(ub) return confirmBtn(ub,"Emin misin?",async()=>{
+      const b=banned.find(x=>x.uid===ub.dataset.unban);
+      try{ await setDoc(doc(S.db,"players",b.uid), {name:b.name, joined:b.joined}); await deleteDoc(doc(S.db,"banned",b.uid));
+        await loadPlayers(); render(); toast(`${b.name} geri alındı.`); openAdmin(); }catch(err){ toast("Yapılamadı, tekrar dene."); }
+    });
+  });
+  $("#admInvSave").onclick=async()=>{ const v=$("#admInv").value.trim(); if(!v) return;
+    try{ await setDoc(doc(S.db,"config","secret"),{invite:v}); S.invite=v; $("#admInvMsg").textContent="Davet kodu değişti."; }catch(err){ $("#admInvMsg").textContent="Kaydedilemedi."; } };
+}
 /* ====================================================== başlangıç */
 if("serviceWorker" in navigator && location.protocol==="https:") navigator.serviceWorker.register("sw.js").catch(()=>{});
 (async()=>{
@@ -1790,7 +1871,10 @@ if("serviceWorker" in navigator && location.protocol==="https:") navigator.servi
     await loadPlayers().catch(()=>{});
     if(!S.players[S.uid]){ // kayıt yarıda kaldıysa
       await new Promise(r=>setTimeout(r,800)); await loadPlayers().catch(()=>{});
-      if(!S.players[S.uid]){ $("#authErr").textContent="Hesap bulunamadı. Tekrar katılmayı dene."; await signOut(S.auth); return; }
+      if(!S.players[S.uid]){
+        const ban = await getDoc(doc(S.db,"banned",S.uid)).then(r=>r.exists()).catch(()=>false);
+        $("#authErr").textContent = ban ? "Bu hesap ligden çıkarıldı. Oyunu kuran kişiyle konuş." : "Hesap bulunamadı. Tekrar katılmayı dene.";
+        await signOut(S.auth); return; }
     }
     $("#auth").classList.add("hide"); $("#app").classList.remove("hide");
     $("#me").classList.remove("hide"); paintMe(); applyTheme();
@@ -1798,5 +1882,6 @@ if("serviceWorker" in navigator && location.protocol==="https:") navigator.servi
     $("#foot").innerHTML="Kazanan 1 · fark +1 · en skorer +1 · banko 2 / -1 · günün oyuncusu +2 · gecenin sorusu +1<br>Veriler ESPN'den alınır. Maç varken 30 saniyede bir yenilenir.";
     route(); showDay(); refresh();
     checkRecovery();
+    getDoc(doc(S.db,"config","secret")).then(r=>{ S.isAdmin=true; S.invite=r.data()?.invite||""; }).catch(()=>{ S.isAdmin=false; });
   });
 })();

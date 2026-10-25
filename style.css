@@ -754,3 +754,16 @@ button.cc:hover{transform:scale(1.2)}
 .rv-t{display:flex;justify-content:space-between;gap:10px;font-size:13.5px;flex-wrap:wrap}
 .t-br{grid-template-columns:1fr 64px 44px 52px 48px}
 .badges.compact .bdg .bt b{white-space:nowrap}
+
+/* ================= Yönetim paneli */
+.admin-btn{width:100%;padding:12px;font-size:15px}
+.adm-row{display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap}
+.adm-in{flex:1;min-width:0;border:1px solid var(--line);background:var(--panel-2);border-radius:12px;padding:10px 12px;font-size:16px;color:var(--ink);font-family:inherit}
+.btn.danger{border-color:color-mix(in srgb,var(--lose) 55%,var(--line));color:var(--lose)}
+.btn.armed{background:var(--lose);color:#fff;border-color:var(--lose)}
+.btn.sm{padding:6px 10px;font-size:13px}
+.adm-pl{display:flex;flex-direction:column;gap:6px;margin-bottom:8px}
+.adm-p{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px 10px}
+.adm-p>span:nth-child(2){flex:1;min-width:0;display:flex;flex-direction:column}
+.adm-p small{color:var(--muted);font-size:12px}
+.adm-p .av.sm{box-shadow:none}

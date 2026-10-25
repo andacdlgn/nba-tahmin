@@ -34,6 +34,12 @@ Her gecenin NBA maçlarına tahmin oyunu: kazanan, fark ve maçın en skoreri.
 - 3 yanlış denemeden sonra o hesap için 1 saat bekleme konur.
 - Görevin çalışması için GitHub'da `FIREBASE_SA` adlı gizli değişken gerekir: Firebase konsolu → Proje ayarları → Hizmet hesapları → "Yeni özel anahtar oluştur" ile inen JSON dosyasının tüm içeriği.
 
+## Yönetim paneli
+- Profil penceresinde "Yönetim paneli" yalnızca yöneticilere görünür. Yöneticiler Firebase konsolunda `config/admin` belgesindeki `uids` listesidir.
+- **Ligi sıfırla:** seçilen geceden itibaren puanlar sıfırdan sayılır (`league/settings.start`). Eski puan durumu `history` listesine kaydedilir ve Puan sekmesinde "Geçmiş ligler"de görünür. Tahminler silinmez.
+- **Ligden çıkar:** oyuncunun `players` belgesi silinir, `banned/{uid}` eklenir; tekrar katılamaz. "Geri al" ile eski adı ve katılma tarihiyle döner.
+- **Davet kodu:** panelden görülüp değiştirilebilir.
+
 ## Yeni oyuncu eklemek
 Siteye girip **Yeni oyuncu** sekmesinden ad, güvenlik sorusu, 6 haneli şifre ve davet kodu ile katılınır.
 Ad büyük harfle başlamalı ve küfür, argo ya da hakaret içermemeli (sitede ve Firebase kurallarında kontrol edilir).
