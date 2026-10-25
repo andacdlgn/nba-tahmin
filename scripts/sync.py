@@ -270,7 +270,7 @@ def save_all_players():
     out, tl = [], []
     for t in teams:
         t = t["team"]
-        tl.append({"a": t["abbreviation"], "n": t["displayName"]})
+        tl.append({"a": t["abbreviation"], "n": t["displayName"], "id": str(t["id"])})
         for a in get(f"{ESPN}/teams/{t['id']}/roster").get("athletes", []):
             out.append({"id": str(a["id"]), "n": a["displayName"], "t": t["abbreviation"]})
     if len(out) < 300:
