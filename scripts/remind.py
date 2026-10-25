@@ -25,7 +25,7 @@ import ssl
 import sys
 from datetime import datetime, timedelta, timezone
 from email.message import EmailMessage
-from email.utils import formataddr
+from email.utils import formataddr, formatdate, make_msgid
 from html import escape
 from zoneinfo import ZoneInfo
 
@@ -107,6 +107,13 @@ class Mailer:
 
     def send(self, msg):
         msg["From"] = formataddr(("NBA Tahmin", self.user or "test@example.com"))
+        # Spam filtreleri eksik başlıklara takılmasın diye tarih, kimlik ve abonelikten çıkma bilgisi
+        if not msg["Date"]:
+            msg["Date"] = formatdate(localtime=False)
+        if not msg["Message-ID"]:
+            msg["Message-ID"] = make_msgid(domain=(self.user.split("@")[-1] if "@" in self.user else "nbatahmin.app"))
+        if not msg["List-Unsubscribe"] and self.user:
+            msg["List-Unsubscribe"] = f"<mailto:{self.user}?subject=unsubscribe>, <{SITE}>"
         if self.dry:
             print("[deneme]", msg["To"], "|", msg["Subject"])
             return True
