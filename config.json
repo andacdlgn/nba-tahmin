@@ -1,0 +1,11 @@
+{
+  "firebase": {
+    "apiKey": "BURAYA",
+    "authDomain": "BURAYA.firebaseapp.com",
+    "projectId": "BURAYA",
+    "appId": "BURAYA"
+  },
+  "authEmailDomain": "nbatahmin.app",
+  "seasonStart": "20261020",
+  "margins": [[1, 5, "1-5"], [6, 10, "6-10"], [11, 15, "11-15"], [16, 99, "16+"]]
+}

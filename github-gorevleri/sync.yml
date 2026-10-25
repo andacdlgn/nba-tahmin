@@ -1,0 +1,48 @@
+name: Sonuçları ve puanları güncelle
+
+on:
+  schedule:
+    # Saatte bir. Biten maçların sonuçlarını, en skorerleri ve puanları arşive yazar.
+    # (Site canlı skoru zaten ESPN'den doğrudan okur.)
+    - cron: "7 * * * *"
+  workflow_dispatch:
+    inputs:
+      full:
+        description: "Sezon başından baştan hesapla"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Sonuçları ve puanları hesapla
+        run: python scripts/sync.py ${{ inputs.full && '--full' || '' }}
+
+      - name: Değiştiyse kaydet
+        run: |
+          if git diff --quiet -- data/; then
+            echo "Değişiklik yok."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/
+          git commit -m "Sonuçlar ve puanlar güncellendi"
+          git pull --rebase -X theirs origin main
+          git push

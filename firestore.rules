@@ -1,0 +1,107 @@
+rules_version = '2';
+// NBA Tahmin — güvenlik kuralları
+// - Herkes yalnızca kendi tahminini yazar; maç başlayınca tahmin kilitlenir.
+// - Bir tahmin, maç başlayana kadar yalnızca sahibine görünür; sonra herkese açılır.
+// - Oyuna katılmak için davet kodu gerekir (config/secret içinde, kimse okuyamaz).
+// - Tahminlerdeki updatedAt alanı sunucu saatine eşit olmak zorunda; puanlama
+//   betiği bu saatle gerçek maç saatini ayrıca karşılaştırır.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function isPlayer() { return signedIn() && exists(/databases/$(database)/documents/players/$(request.auth.uid)); }
+    function str(v, maxLen) { return v is string && v.size() > 0 && v.size() <= maxLen; }
+
+    match /config/{doc} {
+      allow read, write: if false;
+    }
+
+    // Davet kodunu doğrulayan kayıt; okunamaz.
+    match /joins/{uid} {
+      allow read: if false;
+      allow create: if signedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['invite'])
+        && request.resource.data.invite == get(/databases/$(database)/documents/config/secret).data.invite;
+    }
+
+    match /players/{uid} {
+      allow read: if true;
+      allow create: if signedIn() && request.auth.uid == uid
+        && existsAfter(/databases/$(database)/documents/joins/$(uid))
+        && request.resource.data.keys().hasOnly(['name', 'joined'])
+        && str(request.resource.data.name, 24)
+        && request.resource.data.joined == request.time;
+      allow update: if signedIn() && request.auth.uid == uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name'])
+        && str(request.resource.data.name, 24);
+      allow delete: if false;
+    }
+
+    // picks/{maçId}_{uid}
+    match /picks/{pid} {
+      // Olmayan belgeyi okumak serbest (bilgi sızdırmaz); var olan belge sahibine
+      // ya da maç başladıktan sonra herkese açık.
+      allow read: if resource == null
+        || (signedIn() && resource.data.uid == request.auth.uid)
+        || request.time >= resource.data.start;
+
+      function validPick() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['uid', 'gameId', 'day', 'start', 'winner', 'margin', 'scorerId', 'scorerName', 'updatedAt'])
+          && d.uid == request.auth.uid
+          && pid == d.gameId + '_' + request.auth.uid
+          && str(d.gameId, 20) && str(d.day, 8)
+          && d.start is timestamp
+          && str(d.winner, 6)
+          && d.margin in ['1-5', '6-10', '11-15', '16+']
+          && str(d.scorerId, 20) && str(d.scorerName, 60)
+          && d.updatedAt == request.time
+          && request.time < d.start;
+      }
+      allow create: if isPlayer() && validPick();
+      allow update: if isPlayer() && validPick()
+        && resource.data.uid == request.auth.uid
+        && request.resource.data.start == resource.data.start
+        && request.time < resource.data.start;
+      allow delete: if false;
+    }
+
+    // daily/{gün}_{uid}: günün güveni ve günün oyuncusu
+    match /daily/{did} {
+      allow read: if resource == null
+        || (signedIn() && resource.data.uid == request.auth.uid)
+        || request.time >= resource.data.firstStart;
+
+      function baseOk() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['uid', 'day', 'firstStart', 'confGame', 'confStart', 'confAt', 'dayPlayerId', 'dayPlayerName', 'dayAt'])
+          && d.uid == request.auth.uid
+          && did == d.day + '_' + request.auth.uid
+          && d.firstStart is timestamp;
+      }
+      function confOk(old) {
+        let d = request.resource.data;
+        return !('confGame' in d) || (
+          (old != null && 'confGame' in old && d.confGame == old.confGame && d.confAt == old.confAt && d.confStart == old.confStart)
+          || (str(d.confGame, 20) && d.confStart is timestamp && request.time < d.confStart
+              && d.confAt == request.time
+              && (old == null || !('confStart' in old) || request.time < old.confStart))
+        );
+      }
+      function dayOk(old) {
+        let d = request.resource.data;
+        return !('dayPlayerId' in d) || (
+          (old != null && 'dayPlayerId' in old && d.dayPlayerId == old.dayPlayerId && d.dayAt == old.dayAt)
+          || (str(d.dayPlayerId, 20) && str(d.dayPlayerName, 60)
+              && d.dayAt == request.time && request.time < d.firstStart)
+        );
+      }
+      allow create: if isPlayer() && baseOk() && confOk(null) && dayOk(null);
+      allow update: if isPlayer() && baseOk()
+        && resource.data.uid == request.auth.uid
+        && request.resource.data.firstStart == resource.data.firstStart
+        && confOk(resource.data) && dayOk(resource.data);
+      allow delete: if false;
+    }
+  }
+}
