@@ -39,7 +39,7 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "v10";
+const VERSION = "v11";
 const LOGO_SMALL = a => `logos/${String(a).toLowerCase()}.png`;
 const LOGO_FULL  = a => `https://a.espncdn.com/i/teamlogos/nba/500/${String(a).toLowerCase()}.png`;
 document.addEventListener("error", e => {
@@ -700,7 +700,7 @@ $("#games").addEventListener("click", e => {
   const D = S.days[S.day]; const g = D.games.find(x=>x.id===b.dataset.g); if(!g) return;
   const d = draftFor(g);
   const act = b.dataset.act;
-  if(act==="expand"){ S.open.add(g.id); return renderGames(); }
+  if(act==="expand"){ S.open.add(g.id); if(!S.sums[g.id]) loadSummary(g).then(()=>{ if(S.tab==="tahmin") renderGames(); }).catch(()=>{}); return renderGames(); }
   if(act==="emo"){ const cur=D.talk?.[g.id]?.[S.uid]?.e; return saveTalk(g,{e: cur===b.dataset.v ? "" : b.dataset.v}); }
   if(act==="talk") return openTalk(g);
   if(act==="srw"||act==="srn"){ S.seriesDraft ||= {}; const k=g.series.key; const m=D.series?.[k]?.[S.uid]; const dd=(S.seriesDraft[k] ||= {w:m?.winner, n:m?.games}); if(act==="srw") dd.w=b.dataset.v; else dd.n=+b.dataset.v; return renderGames(); }
@@ -712,7 +712,7 @@ $("#games").addEventListener("click", e => {
   if(act==="save") return savePick(g);
   if(act==="win"){ d.winner=b.dataset.v; }
   if(act==="mar"){ d.margin=b.dataset.v; }
-  if(act==="scorer") return openPlayerPicker({mode:"game", g});
+  if(act==="scorer"){ S.swipeReturn=false; return openPlayerPicker({mode:"game", g}); }
   if(act==="conf"){
     const cur = D.daily[S.uid]?.confGame;
     if(cur===g.id) return toast("Bankoyu başka maça taşıyabilirsin; kaldırılamaz.");
@@ -1639,7 +1639,12 @@ function headlineOf(d){
 // Kayan şerit: son 24 saatte katılanlara hoş geldin + ligden haberler
 function tickerItems(){
   const out=[], now=Date.now();
-  for(const u of S.order){ const j=S.players[u]?.joined||0; if(now-j<864e5 && now-j>=0) out.push({cls:"hi", t:`👋 Ligimize hoş geldin, ${pname(u)}! İlk tahminlerini bekliyoruz.`}); }
+  // son 24 saatte katılanlar tek satırda; giriş yapan kişi kendine "hoş geldin" görmez
+  const fresh=S.order.filter(u=>{ const j=S.players[u]?.joined||0; return now-j<864e5 && now-j>=0; });
+  const others=fresh.filter(u=>u!==S.uid).map(pname);
+  if(others.length===1) out.push({cls:"hi", t:`👋 Ligimize hoş geldin, ${others[0]}! Bol puanlı geceler.`});
+  else if(others.length>1) out.push({cls:"hi", t:`👋 Ligimize hoş geldiniz: ${others.slice(0,-1).join(", ")} ve ${others.at(-1)}! Bol puanlı geceler.`});
+  if(fresh.includes(S.uid)) out.push({cls:"hi", t:`👋 Hoş geldin, ${pname(S.uid)}! Her akşam maçlara tahmin yap, puanları topla.`});
   const tot=seasonTotals(), ranked=[...S.order].sort((a,b)=>tot[b]-tot[a]);
   const nights=allDays().filter(d=>{ const w=dayWinner(d); return w && w.st!=="live"; });
   if(nights[0]){ const h=headlineOf(nights[0]); if(h) out.push({t:`🌙 ${nights[0]===shiftDay(S.today,-1)?"Dün gece":dayNice(nights[0],{day:"numeric",month:"long"})+" gecesi"} — ${h}`}); }

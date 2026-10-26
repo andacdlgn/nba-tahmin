@@ -4,6 +4,7 @@ name: Arka plan görevleri (onay kodu, şifre sıfırlama, hatırlatma)
 # Bu yüzden tek bir görev ~5,5 saat açık kalıp her 20 saniyede bir bakar:
 #   - e-posta onay kodları ve şifre sıfırlama istekleri (20 sn'de bir)
 #   - tahmin hatırlatma / sakatlık / haftalık özet mailleri (10 dakikada bir)
+#   - sonuç arşivini güncelleyen sync.yml'yi tetikleme (saatte bir)
 # Süresi dolunca kendini yeniden başlatır. Saatlik zamanlama da yedek olarak durur;
 # görev zaten çalışıyorsa sıraya girer, öbürü bitince devralır.
 on:
@@ -39,15 +40,22 @@ jobs:
           FIREBASE_SA: ${{ secrets.FIREBASE_SA }}
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           end=$(( $(date +%s) + 330*60 ))
           last_remind=0
+          last_sync=0
           while [ "$(date +%s)" -lt "$end" ]; do
             python scripts/verify.py || true
             python scripts/reset.py || true
             if [ $(( $(date +%s) - last_remind )) -ge 600 ]; then
               python scripts/remind.py || true
               last_remind=$(date +%s)
+            fi
+            # GitHub'ın saatlik zamanlaması güvenilmez; sonuç arşivini saatte bir buradan tetikle
+            if [ $(( $(date +%s) - last_sync )) -ge 3600 ]; then
+              gh workflow run sync.yml --ref main -R "$GITHUB_REPOSITORY" || true
+              last_sync=$(date +%s)
             fi
             sleep 20
           done
