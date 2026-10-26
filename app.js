@@ -39,7 +39,7 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "v17";
+const VERSION = "v18";
 const LOGO_SMALL = a => `logos/${String(a).toLowerCase()}.png`;
 const LOGO_FULL  = a => `https://a.espncdn.com/i/teamlogos/nba/500/${String(a).toLowerCase()}.png`;
 document.addEventListener("error", e => {
@@ -1754,7 +1754,7 @@ function tickerItems(){
   const wr=[...S.order].sort((a,b)=>(wp[b]||0)-(wp[a]||0)); if(wr.length>1 && (wp[wr[0]]||0)>(wp[wr[1]]||0)) out.push({t:`📆 Bu haftanın lideri ${pname(wr[0])}: ${wp[wr[0]]} puan.`});
   const D=S.days[S.today];
   if(D?.games.length){ const open=!D.games.some(started);
-    out.push({t: open ? `📅 Bu gece ${D.games.length} maç var. Tahminler ${timeTR(D.games[0].lock)} itibarıyla kapanıyor.` : (D.games.every(g=>g.state==="post") ? `🏁 Bu gecenin ${D.games.length} maçı bitti. Sonuçlar sekmesine bir göz at.` : `📺 Bu gecenin maçları başladı. Tahminler kapandı, herkesin seçimi artık görünüyor.`)});
+    out.push({t: open ? `📅 Bu gece ${D.games.length} maç var. Tahminler ${timeTR(D.games[0].lock)} itibarıyla kapanıyor.` : (D.games.every(g=>g.state==="post") ? `🏁 Bu gecenin ${D.games.length} maçı bitti. Skorlar sekmesine bir göz at.` : `📺 Bu gecenin maçları başladı. Tahminler kapandı, herkesin seçimi artık görünüyor.`)});
     if(open){ const q=questionOf(S.today); out.push({t:`❓ Gecenin sorusu: ${q.t}`});
       const miss=S.order.filter(u=>!(D.progress?.[u]?.size)); if(miss.length && miss.length<S.order.length) out.push({t:`⏳ Henüz tahmin yapmayanlar: ${miss.map(pname).join(", ")}.`}); }
   }
@@ -2020,6 +2020,8 @@ async function cached(key, url, ttl=10*60e3){
   const data=await getJSON(url); S.nbaC[key]={at:Date.now(), data}; return data;
 }
 const stOf = (e, n) => { const x=e.stats.find(s=>s.name===n || s.type===n || s.abbreviation===n); return x ? (x.displayValue ?? x.value) : ""; };
+const wlOf = e => `${stOf(e,"wins")||0}-${stOf(e,"losses")||0}`;
+const streakTR = v => String(v||"–").replace(/^W/,"G").replace(/^L/,"M");
 async function nbaStandings(){
   const d=await cached("st", `${WEB}/v2/sports/basketball/nba/standings?level=3`);
   const confs=(d.children||[]).map(c=>{ const divs=(c.children||[]).map(dv=>({name:dv.name, entries:dv.standings?.entries||[]}));
@@ -2032,9 +2034,9 @@ function teamStatsHTML(abbr){
   const all=(S.standings||[]).flatMap(c=>c.entries.map(e=>({e,c}))); const me=all.find(x=>x.e.team.abbreviation===abbr); if(!me) return "";
   const rank=(n,desc=true)=>{ const v=all.map(x=>+stOf(x.e,n)); const mine=+stOf(me.e,n); return 1+v.filter(x=> desc? x>mine : x<mine).length; };
   const k=(v,l,r)=>`<div class="kpi"><b>${v}</b><small>${l}${r?` · ligde ${r}.`:""}</small></div>`;
-  return `<div class="cards2 tm-kpis">${k(stOf(me.e,"overall")||"–","Galibiyet-mağlubiyet")}${k(`${stOf(me.e,"playoffSeed")}.`,`${me.c.abbr==="East"?"Doğu":"Batı"} sırası`)}
+  return `<div class="cards2 tm-kpis">${k(wlOf(me.e)||"–","Galibiyet-mağlubiyet")}${k(`${stOf(me.e,"playoffSeed")}.`,`${me.c.abbr==="East"?"Doğu":"Batı"} sırası`)}
     ${k(stOf(me.e,"avgPointsFor"),"Attığı sayı (ort.)",rank("avgPointsFor"))}${k(stOf(me.e,"avgPointsAgainst"),"Yediği sayı (ort.)",rank("avgPointsAgainst",false))}
-    ${k(stOf(me.e,"Home")||"–","İç saha")}${k(stOf(me.e,"Road")||"–","Dış saha")}${k(stOf(me.e,"Last Ten Games")||"–","Son 10 maç")}${k(stOf(me.e,"streak")||"–","Seri")}</div>`;
+    ${k(stOf(me.e,"Home")||"–","İç saha")}${k(stOf(me.e,"Road")||"–","Dış saha")}${k(stOf(me.e,"Last Ten Games")||"–","Son 10 maç")}${k(streakTR(stOf(me.e,"streak")),"Seri")}</div>`;
 }
 function renderNBA(){
   const box=$("#nba"); if(!box) return;
@@ -2053,7 +2055,7 @@ function standingsHTML(confs){
   const row=(e,i,mode)=>{ const t=e.team, a=t.abbreviation, l10=stOf(e,"Last Ten Games")||"0-0", [w10,lo10]=l10.split("-").map(Number), seed=+stOf(e,"playoffSeed");
     const cls = mode==="conf" ? (seed<=6?"po":seed<=10?"pi":"") : "";
     return `<button class="st-r ${cls} ${a===fav?"fav":""}" data-tp="${a}" style="--tc:${tcol(a)}"><span class="st-n">${mode==="conf"?seed:i+1}</span><img src="${LOGO_SMALL(a)}" alt=""><span class="st-t"><b>${esc(t.shortDisplayName||a)}</b><small>${esc(a)}</small></span>
-      <span class="st-wl tnum">${stOf(e,"overall")}</span><span class="st-pct tnum">${stOf(e,"winPercent")}</span><span class="st-gb tnum">${stOf(e,"gamesBehind")}</span>
+      <span class="st-wl tnum">${wlOf(e)}</span><span class="st-pct tnum">${stOf(e,"winPercent")}</span><span class="st-gb tnum">${stOf(e,"gamesBehind")}</span>
       <span class="st-l10"><i style="width:${(w10+lo10)?w10/(w10+lo10)*100:0}%"></i><small class="tnum">${l10}</small></span><span class="st-sk ${/^W/.test(stOf(e,"streak"))?"w":"l"} tnum">${(stOf(e,"streak")||"").replace(/^W/,"G").replace(/^L/,"M")}</span></button>`; };
   const hdr=`<div class="st-h"><span>#</span><span></span><span>Takım</span><span>G-M</span><span>%</span><span>Geri</span><span>Son 10</span><span>Seri</span></div>`;
   const tog=`<div class="chips nba-view"><button class="chip" data-nview="conf" aria-pressed="${S.nba.view==="conf"}">Konferans</button><button class="chip" data-nview="div" aria-pressed="${S.nba.view==="div"}">Grup</button></div>`;
@@ -2070,7 +2072,7 @@ function pickedVsReal(){
   const top=Object.entries(cnt).sort((a,b)=>b[1]-a[1]).slice(0,8); if(!top.length) return "";
   const all=(S.standings||[]).flatMap(c=>c.entries);
   return `<div class="sec-title"><h2 style="font-size:20px">Ligin inandığı takımlar</h2><span class="aside">en çok seçilen ve gerçek durumu</span></div><div class="pvr">${top.map(([a,n])=>{
-    const e=all.find(x=>x.team.abbreviation===a); const rec=e?stOf(e,"overall"):"–", pct=Math.round((ok[a]||0)/n*100);
+    const e=all.find(x=>x.team.abbreviation===a); const rec=e?wlOf(e):"–", pct=Math.round((ok[a]||0)/n*100);
     return `<button class="pvr-r" data-tp="${a}" style="--tc:${tcol(a)}"><img src="${LOGO_SMALL(a)}" alt=""><b>${esc(a)}</b><span>${n} kez seçildi</span><span class="muted">tutma %${pct}</span><em class="tnum">${rec}</em></button>`; }).join("")}</div>`;
 }
 const CATS=[["pts","Sayı","offensive.avgPoints","offensive",0],["reb","Ribaund","general.avgRebounds","general",11],["ast","Asist","offensive.avgAssists","offensive",10],
@@ -2103,7 +2105,7 @@ function teamsGridHTML(){
   const teams=(ALLP?.teams||[]).slice().sort((a,b)=>a.n.localeCompare(b.n,"tr"));
   const all=(S.standings||[]).flatMap(c=>c.entries);
   return `<div class="tm-grid">${teams.map(t=>{ const e=all.find(x=>x.team.abbreviation===t.a);
-    return `<button class="tg" data-tp="${t.a}" style="--tc:${tcol(t.a)}"><span class="tg-l"><img src="${LOGO_SMALL(t.a)}" alt=""></span><b>${esc(t.n.split(" ").slice(-1)[0])}</b><small class="tnum">${e?stOf(e,"overall"):""}</small></button>`; }).join("")}</div>`;
+    return `<button class="tg" data-tp="${t.a}" style="--tc:${tcol(t.a)}"><span class="tg-l"><img src="${LOGO_SMALL(t.a)}" alt=""></span><b>${esc(t.n.split(" ").slice(-1)[0])}</b><small class="tnum">${e?wlOf(e):""}</small></button>`; }).join("")}</div>`;
 }
 function playersHTML(){
   const D=S.days[S.today], tonight=D?.games.length ? new Set(D.games.flatMap(g=>[g.home.abbr,g.away.abbr])) : new Set();
@@ -2208,7 +2210,7 @@ addEventListener("scroll", ()=>{ if(S.tab) S.scrollY[S.tab]=scrollY; }, {passive
 document.addEventListener("click", e=>{ const a=e.target.closest(".nav a[data-tab]"); if(a && a.dataset.tab===S.tab){ e.preventDefault(); scrollTo({top:0, behavior:"smooth"}); } });
 function movePill(){
   const a=$(`.nav a[data-tab="${S.tab}"]`), pill=$("#navPill"); if(!a||!pill) return;
-  pill.style.width=a.offsetWidth+"px"; pill.style.transform=`translateX(${a.offsetLeft}px)`;
+  const w=Math.min(64, a.offsetWidth-8); pill.style.width=w+"px"; pill.style.transform=`translateX(${a.offsetLeft+(a.offsetWidth-w)/2}px)`;
 }
 addEventListener("resize", movePill);
 async function showDay(){
