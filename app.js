@@ -38,12 +38,13 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "v8";
+const VERSION = "v9";
 const LOGO_SMALL = a => `logos/${String(a).toLowerCase()}.png`;
 const LOGO_FULL  = a => `https://a.espncdn.com/i/teamlogos/nba/500/${String(a).toLowerCase()}.png`;
 document.addEventListener("error", e => {
   const img = e.target;
   if(!(img instanceof HTMLImageElement)) return;
+  if(img.classList.contains("av-img") && !img.classList.contains("logo")){ img.closest(".av")?.classList.remove("has-img"); img.remove(); return; }
   const src = img.getAttribute("src") || "";
   const local = /^logos\/([a-z]+)\.png$/i.exec(src);
   if(local){ img.src = LOGO_FULL(local[1]); return; }
@@ -242,7 +243,7 @@ async function loadPlayers(){
   S.players = {};
   // katılma saati henüz sunucudan gelmediyse "en yeni" say (renk sırası kaymasın)
   snap.forEach(d => { const x=d.data({serverTimestamps:"estimate"});
-    S.players[d.id] = {name:x.name, joined:x.joined?.toMillis?.()||Date.now(), color:x.color||"", emoji:x.emoji||"", favTeam:x.favTeam||"", theme:x.theme||"default"}; });
+    S.players[d.id] = {name:x.name, joined:x.joined?.toMillis?.()||Date.now(), color:x.color||"", emoji:x.emoji||"", favTeam:x.favTeam||"", theme:x.theme||"default", av:x.av||""}; });
   S.order = Object.keys(S.players).sort((a,b) => (S.players[a].joined-S.players[b].joined) || pname(a).localeCompare(pname(b),"tr"));
   S.colorOrder = [...S.order];
   // giriş yapan oyuncu her zaman ilk sırada (iki kişide solda)
@@ -366,10 +367,15 @@ function pairCols(a, h){
   return [ca,ch];
 }
 const initials = n => String(n||"?").trim().split(/\s+/).slice(0,2).map(w=>w[0]).join("").toLocaleUpperCase("tr");
-const avatar = (u, cls="") => { const p=S.players[u]||{}; const h=honors();
+// Avatar olarak seçilebilen 50 oyuncu (CBS Sports 2026-27 ilk 50 sıralaması) ve 30 takım logosu
+const STARS = [["5104157","Victor Wembanyama"],["4278073","Shai Gilgeous-Alexander"],["3112335","Nikola Jokic"],["3945274","Luka Doncic"],["4594268","Anthony Edwards"],["3032977","Giannis Antetokounmpo"],["3934672","Jalen Brunson"],["4432166","Cade Cunningham"],["4065648","Jayson Tatum"],["3975","Stephen Curry"],["6450","Kawhi Leonard"],["4396993","Tyrese Haliburton"],["4431678","Tyrese Maxey"],["3908809","Donovan Mitchell"],["3202","Kevin Durant"],["3136195","Karl-Anthony Towns"],["3917376","Jaylen Brown"],["4433134","Scottie Barnes"],["1966","LeBron James"],["4593803","Jalen Williams"],["3149673","Pascal Siakam"],["4432158","Evan Mobley"],["4066261","Bam Adebayo"],["3934719","OG Anunoby"],["5041939","Cooper Flagg"],["3136193","Devin Booker"],["4683021","Deni Avdija"],["4433255","Chet Holmgren"],["3936299","Jamal Murray"],["4701230","Jalen Johnson"],["4066457","Austin Reaves"],["4684740","Amen Thompson"],["3078576","Derrick White"],["4433621","Jalen Duren"],["4871144","Alperen Sengun"],["4277961","Jaren Jackson Jr."],["3059318","Joel Embiid"],["5037871","Dylan Harper"],["6583","Anthony Davis"],["4845367","Stephon Castle"],["4432816","LaMelo Ball"],["4066336","Lauri Markkanen"],["6442","Kyrie Irving"],["4566434","Franz Wagner"],["4432573","Paolo Banchero"],["3032976","Rudy Gobert"],["3992","James Harden"],["5061575","Kon Knueppel"],["4431671","Jaden McDaniels"],["4397688","Trey Murphy III"]];
+const HEADSHOT = id => `https://a.espncdn.com/combiner/i?img=/i/headshots/nba/players/full/${id}.png&w=160&h=117&scale=crop&cquality=70`;
+const avImg = av => { const m=/^(t|p):(\w+)$/.exec(av||""); if(!m) return ""; return m[1]==="t" ? `<img class="av-img logo" src="${LOGO_SMALL(m[2])}" alt="">` : `<img class="av-img" src="${HEADSHOT(m[2])}" alt="" loading="lazy">`; };
+const avatar = (u, cls="") => { const p=S.players[u]||{}; const h=honors(); const img=avImg(p.av);
   const crown = h.week===u ? `<span class="av-crown" title="Geçen haftanın şampiyonu">👑</span>` : "";
   const star = h.night===u ? `<span class="av-star" title="Son gecenin kazananı">★</span>` : "";
-  return `<span class="av ${cls} ${p.emoji?"emo":""}" style="--pc:${col(u)}">${p.emoji?p.emoji:esc(initials(pname(u)))}${p.favTeam?`<img class="av-team" src="${LOGO_SMALL(p.favTeam)}" alt="">`:""}${crown}${star}</span>`; };
+  const badge = p.favTeam && p.av!==`t:${p.favTeam}` ? `<img class="av-team" src="${LOGO_SMALL(p.favTeam)}" alt="">` : "";
+  return `<span class="av ${cls} ${img?"has-img":p.emoji?"emo":""}" style="--pc:${col(u)}">${img?`<span class="av-ini">${esc(initials(pname(u)))}</span>${img}`:p.emoji?p.emoji:esc(initials(pname(u)))}${badge}${crown}${star}</span>`; };
 // Geçen haftanın tek şampiyonu ve son bitmiş gecenin tek kazananı (+ o gecenin puanları)
 function honors(){
   const key = S.today + "|" + Object.keys(S.arch.scores.days||{}).length + "|" + S.order.length + "|" + (S.days[S.today]?.at||0) + "|" + (S.days[shiftDay(S.today,-1)]?.at||0);
@@ -984,7 +990,7 @@ async function openInfo(g){
     const pts = ld.find(x=>/points/i.test(x.name))?.leaders?.[0];
     const reb = ld.find(x=>/rebounds/i.test(x.name))?.leaders?.[0];
     const ast = ld.find(x=>/assists/i.test(x.name))?.leaders?.[0];
-    return `<div class="box"><h4 style="margin:0 0 8px;display:flex;gap:8px;align-items:center"><img src="${t.logo}" alt="" width="26" height="26">${esc(t.name)} <small class="muted">${t.rec}</small><button class="linkish" data-tm="${t.abbr}" style="margin-left:auto;font-size:13px">Takım sayfası ›</button></h4>
+    return `<div class="box"><h4 style="margin:0 0 8px;display:flex;gap:8px;align-items:center"><img src="${t.logo}" alt="" width="26" height="26">${esc(t.name)} <small class="muted">${t.rec}</small><button class="linkish" data-tp="${t.abbr}" style="margin-left:auto;font-size:13px">Takım sayfası ›</button></h4>
       <div class="row-lbl">Son 5 maç</div><div class="l5">${l5.map(e=>`<span class="${e.gameResult}" title="${esc(e.atVs||"")} ${esc(e.opponent?.abbreviation||"")} ${esc(e.score||"")}">${e.gameResult==="W"?"G":"M"}</span>`).join("")||'<span class="muted">–</span>'}</div>
       <div class="row-lbl">Öne çıkan oyuncular (maç başına ortalama)</div><div style="font-size:14px">${[pts&&`${esc(pts.athlete.displayName)} ${pts.displayValue} sayı`,reb&&`${esc(reb.athlete.displayName)} ${reb.displayValue} ribaund`,ast&&`${esc(ast.athlete.displayName)} ${ast.displayValue} asist`].filter(Boolean).join("<br>")||"–"}</div>
       <div class="row-lbl">Sakatlar</div><div style="font-size:14px">${inj.length?inj.slice(0,6).map(i=>`${esc(i.athlete?.displayName)} <span class="inj ${/out/i.test(i.status)?"":"q"}">${/out/i.test(i.status)?"Oynamıyor":"Belirsiz"}</span>`).join("<br>"):'<span class="muted">Sakat oyuncu yok</span>'}</div></div>`;
@@ -1385,7 +1391,7 @@ function renderStats(){
   if(tl.length){
     const heat=p=>`color-mix(in srgb, ${p>=.5?"var(--win)":"var(--lose)"} ${Math.round(Math.abs(p-.5)*2*60+12)}%, var(--panel))`;
     html += `<div class="sec-title"><h2>Takım karnesi</h2><span class="aside">hangi takımın maçlarında ne kadar bildin</span></div>
-      <div class="tgrid">${tl.map(x=>`<div class="tcell" data-tm="${x.k}" style="background:${heat(x.p)}" title="${x.ok}/${x.n} maç"><img src="${LOGO_SMALL(x.k)}" alt=""><b>%${Math.round(x.p*100)}</b><small>${x.ok}/${x.n}</small></div>`).join("")}</div>`;
+      <div class="tgrid">${tl.map(x=>`<div class="tcell" data-tp="${x.k}" style="background:${heat(x.p)}" title="${x.ok}/${x.n} maç"><img src="${LOGO_SMALL(x.k)}" alt=""><b>%${Math.round(x.p*100)}</b><small>${x.ok}/${x.n}</small></div>`).join("")}</div>`;
   }
   // rakip analizi
   const others=S.order.filter(v=>v!==u);
@@ -1556,7 +1562,7 @@ function renderBanners(){
     <span class="bn-acts"><button class="btn sm" data-bn="mail">Ekle</button><button class="linkish" data-bn="later">Sonra</button></span></div>`;
   // Profilini özelleştirmemiş olana (favori takım ya da avatar seçmemiş) hatırlatma
   const me=S.players[S.uid];
-  const missP = me ? [!me.favTeam && "favori takımını", !me.emoji && "avatarını"].filter(Boolean) : [];
+  const missP = me ? [!me.favTeam && "favori takımını", !me.emoji && !me.av && "avatarını"].filter(Boolean) : [];
   if(missP.length && Date.now()>+(lsGet("profileNudge")||0)) html += `<div class="banner nudge"><span class="bn-i">🎨</span><span class="bn-t"><b>Profilini özelleştir</b> ${missP.length===2?"Favori takımını, avatarını ve rengini seç":missP[0][0].toLocaleUpperCase("tr")+missP[0].slice(1)+" da seç"}, puan tablosunda öyle görün.</span>
     <span class="bn-acts"><button class="btn sm" data-bn="profile">Seç</button><button class="linkish" data-bn="plater">Sonra</button></span></div>`;
   box.innerHTML=html;
@@ -1566,14 +1572,14 @@ $("#banners").addEventListener("click", e=>{
   if(b.dataset.bn==="notice"){ lsSet("noticeSeen", String(S.notice?.at)); }
   if(b.dataset.bn==="later"){ lsSet("mailNudge", String(Date.now()+3*864e5)); }
   if(b.dataset.bn==="plater"){ lsSet("profileNudge", String(Date.now()+3*864e5)); }
-  if(b.dataset.bn==="profile"){ openProfile(); setTimeout(()=>{ $(".pf-emojis")?.closest(".pf-sec")?.scrollIntoView({block:"start"}); }, 300); }
+  if(b.dataset.bn==="profile"){ openProfile(); setTimeout(()=>{ $(".pf-avtab")?.closest(".pf-sec")?.scrollIntoView({block:"start"}); }, 300); }
   if(b.dataset.bn==="mail"){ openProfile(); setTimeout(()=>{ $("#pfMail")?.scrollIntoView({block:"center"}); $("#pfMail")?.focus(); }, 300); }
   renderBanners();
 });
 
 /* ====================================================== oyuncu kartı, tahmin geçmişi, takım sayfası */
 $("#board").addEventListener("click", e=>{ const p=e.target.closest("[data-pu]"); if(p) openPlayer(p.dataset.pu); });
-document.addEventListener("click", e=>{ const t=e.target.closest("[data-tm]"); if(t) { e.stopPropagation(); openTeam(t.dataset.tm); } });
+document.addEventListener("click", e=>{ const t=e.target.closest("[data-tp]"); if(t) { e.stopPropagation(); openTeam(t.dataset.tp); } });
 function openPlayer(u){
   const p=S.players[u]||{}, recs=userRecs(u), n=recs.length, tot=seasonTotals();
   const rank=[...S.order].sort((a,b)=>(tot[b]||0)-(tot[a]||0)).indexOf(u)+1;
@@ -1587,7 +1593,7 @@ function openPlayer(u){
   const fav=p.favTeam && ALLP?.teams.find(t=>t.a===p.favTeam);
   const b=badgesOf(u).filter(x=>x.n);
   openSheet(`<div class="pc-head">${avatar(u,"lg")}<div><h3 id="shTitle" style="margin:0;color:${col(u)}">${esc(pname(u))}</h3>
-      <small class="muted">${rank}. sırada · ${tot[u]||0} puan${p.favTeam?` · <span data-tm="${p.favTeam}" class="linkish" style="font-size:13px">${esc(fav?.n||p.favTeam)}</span> taraftarı`:""}</small></div></div>
+      <small class="muted">${rank}. sırada · ${tot[u]||0} puan${p.favTeam?` · <span data-tp="${p.favTeam}" class="linkish" style="font-size:13px">${esc(fav?.n||p.favTeam)}</span> taraftarı`:""}</small></div></div>
     <div class="cards2" style="margin-top:12px">
       <div class="kpi"><b>${won}</b><small>Kazandığı gece</small></div>
       <div class="kpi"><b>${pct(recs.filter(x=>x.r.w>0).length,n)}</b><small>Kazananı bilme (${n} maç)</small></div>
@@ -1595,7 +1601,7 @@ function openPlayer(u){
       <div class="kpi"><b>${cOk}/${conf.length}</b><small>Tutan banko</small></div></div>
     ${last?`<div class="sec-title"><h2 style="font-size:20px">Son geceler</h2></div><div class="pc-nights">${last}</div>`:""}
     ${b.length?`<div class="sec-title"><h2 style="font-size:20px">Rozetler</h2></div>${badgeHTML(b,true)}`:""}
-    ${best.length?`<div class="sec-title"><h2 style="font-size:20px">En iyi bildiği takımlar</h2></div><div class="pc-teams">${best.map(([k,v])=>`<button class="pc-t" data-tm="${k}"><img src="${LOGO_SMALL(k)}" alt=""><b>%${Math.round(v.ok/v.n*100)}</b><small>${v.ok}/${v.n}</small></button>`).join("")}</div>`:""}
+    ${best.length?`<div class="sec-title"><h2 style="font-size:20px">En iyi bildiği takımlar</h2></div><div class="pc-teams">${best.map(([k,v])=>`<button class="pc-t" data-tp="${k}"><img src="${LOGO_SMALL(k)}" alt=""><b>%${Math.round(v.ok/v.n*100)}</b><small>${v.ok}/${v.n}</small></button>`).join("")}</div>`:""}
     <button class="btn" id="pcStats" style="margin-top:14px;width:100%">Tüm istatistiklerine bak</button>`);
   $("#pcStats").onclick=()=>{ S.statFor=u; closeSheet(); if(location.hash==="#istatistik") { renderStats(); scrollTo({top:0}); } else location.hash="#istatistik"; };
 }
@@ -1956,6 +1962,7 @@ function showResetWait(){
   };
   poll();
 }
+let avTab = "emo";
 const EMOJIS = ["🏀","🔥","🐐","👑","🦅","🐺","🦁","🐻","🐍","🦈","⚡","🌪️","🎯","💎","🚀","🧊","☄️","🌙","⭐","🍀","🎲","🛡️","🥷","🤖"];
 $("#me").onclick=()=>openProfile();
 async function saveProfile(patch){
@@ -1972,6 +1979,7 @@ function paintMail(){
   $("#pfOtp").classList.toggle("hide", ver || !S.otpSentTo || S.otpSentTo!==email);
 }
 function openProfile(){
+  const av=S.players[S.uid]?.av||""; avTab = av.startsWith("p:") ? "oyu" : av.startsWith("t:") ? "tak" : "emo";
   openSheet(`<div id="prof"></div>`); paintProfile();
 }
 function paintProfile(){
@@ -1983,12 +1991,18 @@ function paintProfile(){
     <div class="pf-sec"><h4>Rozetlerin</h4>${(()=>{ const b=badgesOf(S.uid).filter(x=>x.n); return b.length ? badgeHTML(b,true) : '<small class="muted" style="margin:0">Henüz rozetin yok. Neler kazanabileceğini İstatistik sekmesinde görebilirsin.</small>'; })()}</div>
     <div class="pf-sec"><h4>Rengin</h4><div class="pf-colors">${PKEYS.map(c=>{ const u=usedBy(c); return `<button class="pf-col" data-col="${c}" style="--c:var(--${c})" aria-pressed="${col(S.uid)===`var(--${c})`}" title="${u.length?esc(u.join(", "))+" de kullanıyor":""}">${u.length?"<i></i>":""}</button>`; }).join("")}</div>
       <small class="muted">Noktalı renkleri başka oyuncular da kullanıyor.</small></div>
-    <div class="pf-sec"><h4>Avatar</h4><div class="pf-emojis"><button class="pf-emo ini" data-emo="" aria-pressed="${!me.emoji}">${esc(initials(pname(S.uid)))}</button>${EMOJIS.map(e=>`<button class="pf-emo" data-emo="${e}" aria-pressed="${me.emoji===e}">${e}</button>`).join("")}</div></div>
+    <div class="pf-sec"><h4>Avatar</h4>
+      <div class="seg2 pf-avtab">${[["emo","Emoji"],["tak","Takım"],["oyu","Oyuncu"]].map(([k,l])=>`<button data-avtab="${k}" aria-pressed="${avTab===k}">${l}</button>`).join("")}</div>
+      ${avTab==="emo" ? `<div class="pf-emojis"><button class="pf-emo ini" data-emo="" aria-pressed="${!me.emoji && !me.av}">${esc(initials(pname(S.uid)))}</button>${EMOJIS.map(e=>`<button class="pf-emo" data-emo="${e}" aria-pressed="${me.emoji===e && !me.av}">${e}</button>`).join("")}</div>`
+      : avTab==="tak" ? `<div class="pf-avs">${teams.map(t=>`<button class="pf-av logo" data-av="t:${t.a}" aria-pressed="${me.av===`t:${t.a}`}" title="${esc(t.n)}"><img src="${LOGO_SMALL(t.a)}" alt="${esc(t.n)}"></button>`).join("")}</div>`
+      : `<div class="pf-avs">${STARS.map(([id,n])=>`<button class="pf-av" data-av="p:${id}" aria-pressed="${me.av===`p:${id}`}" title="${esc(n)}"><img src="${HEADSHOT(id)}" alt="" loading="lazy"><small>${esc(n.split(" ").slice(-1)[0])}</small></button>`).join("")}</div>
+        <small class="muted">CBS Sports'un 2026-27 sezonu ilk 50 oyuncu sıralaması.</small>`}
+      ${me.av?`<button class="linkish" data-emo="" style="font-size:13px">Görseli kaldır</button>`:""}</div>
     <div class="pf-sec"><h4>Favori takım</h4><small class="muted">Avatarında logosu görünür. Güvenlik sorusundan bağımsızdır.</small>
       <div class="pf-teams"><button class="pf-tm none" data-tm="" aria-pressed="${!me.favTeam}">Yok</button>${teams.map(t=>`<button class="pf-tm" data-tm="${t.a}" aria-pressed="${me.favTeam===t.a}" title="${esc(t.n)}"><img src="${LOGO_SMALL(t.a)}" alt="${esc(t.n)}"></button>`).join("")}</div></div>
     <div class="pf-sec"><h4>Site renkleri</h4><div class="seg2 pf-theme"><button data-th="default" aria-pressed="${me.theme!=="team"}">Varsayılan</button><button data-th="team" aria-pressed="${me.theme==="team"}" ${me.favTeam?"":"disabled"}>Favori takımım</button></div>
       <small class="muted">${me.favTeam?"Üst alan ve vurgu renkleri takımının renklerine geçer. Yalnızca sende görünür.":"Önce bir favori takım seç."}</small></div>
-    <div class="pf-sec"><h4>Hatırlatma maili</h4><small class="muted" style="margin:0 0 8px">Tahminin eksikse ilk maçtan 2 saat önce, seçtiğin oyuncu sakatlanırsa hemen mail gelir. Mail gelmesi için adresini bir kez onaylaman gerekir. Adresini yalnızca sen görürsün.</small>
+    <div class="pf-sec"><h4>Hatırlatma maili</h4><small class="muted" style="margin:0 0 8px">Tahminin eksikse her akşam 21.00'de (ilk maç daha erkense maçtan 1 saat önce), seçtiğin oyuncu sakatlanırsa hemen mail gelir. Mail gelmesi için adresini bir kez onaylaman gerekir. Adresini yalnızca sen görürsün.</small>
       <div class="pf-mail"><input id="pfMail" type="email" inputmode="email" autocomplete="email" placeholder="ornek@gmail.com" value="${esc(S.contact?.email||"")}"><span class="mail-st" id="pfMailSt"></span></div>
       <div id="pfOtp" class="pf-otp hide"><small class="muted" id="pfOtpMsg"></small>
         <div class="adm-row"><input id="pfCode" class="adm-in otp-in" inputmode="numeric" maxlength="6" placeholder="6 haneli kod" autocomplete="one-time-code"><button class="btn" id="pfCodeOk" type="button">Onayla</button></div>
@@ -2003,7 +2017,9 @@ function paintProfile(){
   if(!ALLP) allPlayers().then(()=>paintProfile()).catch(()=>{});
   box.onclick = e => {
     const c=e.target.closest("[data-col]"); if(c) return saveProfile({color:c.dataset.col});
-    const m=e.target.closest("[data-emo]"); if(m) return saveProfile({emoji:m.dataset.emo});
+    const at=e.target.closest("[data-avtab]"); if(at){ avTab=at.dataset.avtab; return paintProfile(); }
+    const av=e.target.closest("[data-av]"); if(av) return saveProfile({av:av.dataset.av, emoji:""});
+    const m=e.target.closest("[data-emo]"); if(m) return saveProfile({emoji:m.dataset.emo, av:""});
     const t=e.target.closest("[data-tm]"); if(t) return saveProfile(t.dataset.tm ? {favTeam:t.dataset.tm} : {favTeam:"", theme:"default"});
     const h=e.target.closest("[data-th]"); if(h && !h.disabled) return saveProfile({theme:h.dataset.th});
   };

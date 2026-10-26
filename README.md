@@ -23,7 +23,7 @@ Her gecenin NBA maçlarına tahmin oyunu: kazanan, fark ve maçın en skoreri.
 - `.github/workflows/worker.yml`: arka plan görevi. ~5,5 saat açık kalır, 20 saniyede bir onay kodlarını (`verify.py`) ve "Şifremi unuttum" isteklerini (`reset.py`), 10 dakikada bir hatırlatma maillerini (`remind.py`) işler; süresi dolunca kendini yeniden başlatır. Durursa Actions → "Arka plan görevleri" → Run workflow ile elle başlatılır. `reset.yml` ve `remind.yml` artık yalnızca elle çalıştırmak için.
 
 ## Hatırlatma maili
-- Oyuncu profilinden e-posta adresini yazıp "Hatırlat"ı açarsa, gecenin ilk maçına 2 saat kala eksik tahmini varsa bir kez mail gelir; seçtiği skorer ya da günün oyuncusu ESPN'de "Out" görünürse kilitten önce uyarı maili gelir.
+- Oyuncu profilinden e-posta adresini yazıp "Hatırlat"ı açarsa, eksik tahmini varsa her akşam 21.00'de (gecenin ilk maçı daha erkense maçtan 1 saat önce) bir kez mail gelir; seçtiği skorer ya da günün oyuncusu ESPN'de "Out" görünürse kilitten önce uyarı maili gelir.
 - "Pazartesi haftalık özet" açıksa her pazartesi 10:00'dan sonra geçen haftanın özeti gelir.
 - Mailler yalnızca **onaylanmış** adreslere gider. Profilde "Onay kodu gönder" → `verifyReq/{uid}`; `scripts/verify.py` (arka plan göreviyle, genelde 1 dakika içinde) 6 haneli kodu mailler ve özetini `otp/{uid}`'ye yazar. Kod 30 dakika geçerli; doğruluğunu Firebase kuralı kontrol eder (`contacts.verified`).
 - Adres `contacts/{uid}` belgesinde durur; yalnızca sahibi okuyabilir. Gönderilenler `reminders/` koleksiyonunda tutulur (aynı gece ikinci mail gitmez).

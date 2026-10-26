@@ -818,7 +818,7 @@ button.cc:hover{transform:scale(1.2)}
 .pc-t{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px;display:flex;flex-direction:column;align-items:center;gap:2px;color:inherit;cursor:pointer}
 .pc-t img{width:30px;height:30px}
 .pc-t b{font-size:17px} .pc-t small{color:var(--muted);font-size:12px}
-.tcell[data-tm]{cursor:pointer}
+.tcell[data-tp]{cursor:pointer}
 .hs-list{display:flex;flex-direction:column;gap:6px;margin-top:12px}
 .hs{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px 10px}
 .hs-h{display:flex;gap:8px;align-items:center;margin-bottom:6px}
@@ -882,3 +882,19 @@ footer .ver{display:inline-block;margin-top:6px;opacity:.7;font-variant-numeric:
 @keyframes spShadow{0%,100%{transform:scale(.55);opacity:.35}50%{transform:scale(1.05);opacity:.8}}
 @keyframes spSpin{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion: reduce){ .sp-ball,.sp-ball svg,.sp-shadow{animation-duration:2.4s} }
+
+/* ---------- Görselli avatar (oyuncu / takım) ---------- */
+.av.has-img{overflow:visible;background:color-mix(in srgb,var(--pc) 22%,var(--board-2,#1e2935))}
+.av .av-img{position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover;object-position:50% 12%;background:color-mix(in srgb,var(--pc) 30%,#1e2935)}
+.av .av-img.logo{object-fit:contain;padding:14%;background:#fff}
+.av .av-ini{opacity:0}
+.av:not(.has-img) .av-ini{opacity:1}
+.av.has-img .av-team,.av.has-img .av-crown,.av.has-img .av-star{z-index:1}
+.pf-avtab{margin:0 0 10px}
+.pf-avs{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:8px;max-height:300px;overflow:auto;padding:2px}
+.pf-av{display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 2px;border-radius:12px;border:1px solid var(--line);background:var(--panel);cursor:pointer;color:inherit}
+.pf-av img{width:48px;height:48px;border-radius:50%;object-fit:cover;object-position:50% 12%;background:var(--panel-2)}
+.pf-av.logo img{object-fit:contain;padding:6px;background:#fff}
+.pf-av small{font-size:11px;color:var(--muted);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pf-av[aria-pressed="true"]{border-color:var(--amber);box-shadow:0 0 0 2px var(--amber)}
+.pf-avtab{grid-template-columns:repeat(3,1fr)}

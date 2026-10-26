@@ -1,6 +1,7 @@
 """Mailler (GitHub Actions, 10 dakikada bir):
 
-1. Hatırlatma: gecenin ilk maçından (kilit) yaklaşık 2 saat önce, eksik tahmini olanlara bir kez.
+1. Hatırlatma: her akşam 21.00'de (Türkiye) eksik tahmini olanlara bir kez. Gecenin ilk maçı
+   21.00'den önceyse maçtan 1 saat önce.
 2. Sakatlık uyarısı: skorer ya da günün oyuncusu olarak seçilen oyuncu ESPN'de "Out" görünürse, kilitten önce.
 3. Haftalık özet: pazartesi 10:00'dan (Türkiye) sonra, geçen haftanın sonuçları (data/scores.json).
 
@@ -16,14 +17,14 @@ Yazılan:
 
 Gizli değişkenler: FIREBASE_SA, GMAIL_USER, GMAIL_APP_PASSWORD
 Deneme: python scripts/remind.py --dry   (mail atmaz, ne atacağını yazar)
-        python scripts/remind.py --now   (2 saat penceresini beklemeden çalışır)
+        python scripts/remind.py --now   (hatırlatma saatini beklemeden çalışır)
 """
 import json
 import os
 import smtplib
 import ssl
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, time, timedelta, timezone
 from email.message import EmailMessage
 from email.utils import formataddr, formatdate, make_msgid
 from html import escape
@@ -36,7 +37,18 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from sync import CONFIG, ESPN, espn_today, get, load, scoreboard, week_key  # noqa: E402
 
 TR = ZoneInfo("Europe/Istanbul")
-BEFORE = timedelta(minutes=int(CONFIG.get("remindBeforeMinutes", 120)))
+REMIND_AT = CONFIG.get("remindAt", "21:00")                       # her akşam bu saatte (Türkiye)
+EARLY = timedelta(minutes=int(CONFIG.get("remindEarlyMinutes", 60)))  # ilk maç bundan önceyse maçtan bu kadar önce
+
+
+def remind_time(lock):
+    """Hatırlatma anı: gecenin ilk maçı 21.00'den sonraysa o akşam 21.00, önceyse maçtan 1 saat önce."""
+    lock_tr = lock.astimezone(TR)
+    # gece yarısından sonraki maçlar (ör. 02.30) bir önceki akşama aittir
+    evening = (lock_tr - timedelta(hours=10)).date()
+    hh, mm = (int(x) for x in REMIND_AT.split(":"))
+    at = datetime.combine(evening, time(hh, mm), TR)
+    return lock - EARLY if lock_tr <= at else at
 SITE = CONFIG.get("siteUrl", "")
 
 
@@ -164,8 +176,9 @@ def once(db, key):
 def reminders(db, mail, day, games, force):
     lock = games[0]["start"]
     now = datetime.now(timezone.utc)
-    if not force and not (lock - BEFORE <= now < lock):
-        print(f"hatırlatma: kilit {lock:%H:%MZ}, pencere dışında ({(lock - now).total_seconds() / 60:.0f} dk var)")
+    when = remind_time(lock)
+    if not force and not (when <= now < lock):
+        print(f"hatırlatma: {when.astimezone(TR):%d.%m %H:%M}'de gidecek (kilit {lock.astimezone(TR):%H:%M}), şimdi değil")
         return
     lock_tr = lock.astimezone(TR).strftime("%H:%M")
     for uid, name, email in people(db, "remind"):
@@ -190,11 +203,11 @@ def reminders(db, mail, day, games, force):
             continue
         rows = "".join(f"<li>{escape(g['away'])} – {escape(g['home'])}</li>" for g in missing[:15])
         inner = (f'<p style="margin:0 0 10px">Selam {escape(name)}, {escape(", ".join(parts))}.</p>'
-                 f'<p style="margin:0 0 12px;color:#5f6b78;font-size:14px">Bütün tahminler gecenin ilk maçı başlayınca, Türkiye saatiyle {lock_tr}\'de kilitlenir.</p>'
+                 f'<p style="margin:0 0 12px;color:#5f6b78;font-size:14px">Bütün tahminler gecenin ilk maçı başlayınca kilitlenir (Türkiye saatiyle {lock_tr}).</p>'
                  + (f'<ul style="margin:0 0 14px;padding-left:20px;font-size:14px">{rows}</ul>' if rows else ""))
-        text = (f"Selam {name}, {', '.join(parts)}.\nBütün tahminler gecenin ilk maçı başlayınca, Türkiye saatiyle {lock_tr}'de kilitlenir.\n"
+        text = (f"Selam {name}, {', '.join(parts)}.\nBütün tahminler gecenin ilk maçı başlayınca kilitlenir (Türkiye saatiyle {lock_tr}).\n"
                 + ("\nEksik maçlar:\n" + "\n".join(f"- {g['away']} – {g['home']}" for g in missing[:15]) if missing else ""))
-        msg = build(email, f"🏀 Kilit {lock_tr}'de: {', '.join(parts)}", text, card(f"Kilit {lock_tr}'de", nice(day), inner, "Tahmin yap"))
+        msg = build(email, f"🏀 Tahminlerin eksik: {', '.join(parts)} (kilit {lock_tr})", text, card(f"Kilit saati: {lock_tr}", nice(day), inner, "Tahmin yap"))
         if mail.send(msg) and not mail.dry:
             ref.set({"at": firestore.SERVER_TIMESTAMP, "missing": len(missing)})
 

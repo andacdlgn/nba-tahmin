@@ -30,5 +30,6 @@
     ]
   ],
   "siteUrl": "https://andacdlgn.github.io/nba-tahmin/",
-  "remindBeforeMinutes": 120
+  "remindAt": "21:00",
+  "remindEarlyMinutes": 60
 }
