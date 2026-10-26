@@ -33,7 +33,10 @@ service cloud.firestore {
         && (!('favTeam' in d) || (d.favTeam is string && d.favTeam.size() <= 5))
         && (!('theme' in d) || d.theme in ['default', 'team'])
         // av: avatar görseli. '' ya da 't:LAL' (takım logosu) ya da 'p:1234567' (oyuncu fotoğrafı)
-        && (!('av' in d) || (d.av is string && d.av.matches('^(t:[A-Z]{2,4}|p:[0-9]{3,10})?$')));
+        && (!('av' in d) || (d.av is string && d.av.matches('^(t:[A-Z]{2,4}|p:[0-9]{3,10})?$')))
+        // bio: profildeki "Hakkında" satırı (en fazla 60 karakter, bariz küfürler engellenir; ayrıntılı kontrol sitede)
+        && (!('bio' in d) || (d.bio is string && d.bio.size() <= 60
+            && !d.bio.lower().matches('.*(orospu|siktir|sikerim|sikeyim|yarrak|am[iı]nak|amc[iı]k|ibne|pezevenk|kahpe|[sş]erefsiz|fuck|bitch|nigg|faggot).*')));
     }
 
     match /config/{doc} {
@@ -76,7 +79,7 @@ service cloud.firestore {
         && request.resource.data.joined == request.time;
       // Profil: ad, renk, emoji, favori takım ve tema değiştirilebilir (listeden seçilir)
       allow update: if signedIn() && request.auth.uid == uid
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'color', 'emoji', 'favTeam', 'theme', 'av'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'color', 'emoji', 'favTeam', 'theme', 'av', 'bio'])
         && (!('name' in request.resource.data.diff(resource.data).affectedKeys()) || validName(request.resource.data.name))
         && profileOk(request.resource.data);
       allow delete: if isAdmin();

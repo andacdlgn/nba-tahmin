@@ -337,7 +337,7 @@ footer{color:var(--muted);font-size:12px;text-align:center;margin:28px 0 8px}
 
 /* ---------- Alt sekme çubuğu ---------- */
 .nav{position:fixed;left:0;right:0;bottom:0;z-index:30;background:color-mix(in srgb,var(--panel) 92%,transparent);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
-.nav .in{max-width:600px;margin:0 auto;height:var(--nav-h);display:grid;grid-template-columns:repeat(5,1fr)}
+.nav .in{max-width:600px;margin:0 auto;height:var(--nav-h);display:grid;grid-auto-flow:column;grid-auto-columns:1fr}
 .nav a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:var(--muted);text-decoration:none;font-size:11.5px;font-weight:600;position:relative}
 .nav a svg{width:23px;height:23px}
 .nav a[aria-current="page"]{color:var(--ink)}
@@ -1148,3 +1148,54 @@ button,a,[data-act],.plr,.pf-av,.pf-emo{touch-action:manipulation;-webkit-tap-hi
   .qcard .tx > small{display:none}
   .qbtns button{padding:7px}
 }
+
+/* =================== v16: profil sayfası =================== */
+.prof-tabs{margin:12px 0 4px;position:sticky;top:-8px;z-index:2;box-shadow:0 -8px 0 var(--bg)}
+.prof-tabs button{padding:8px 4px;font-size:14px}
+.prof-body{padding-top:4px}
+.pf-bio{font-size:14px;font-style:italic;margin:2px 0 3px;color:var(--ink);opacity:.9;overflow-wrap:anywhere}
+.pf-kpis{margin-top:8px}
+@media (min-width:480px){ .pf-kpis{grid-template-columns:repeat(3,1fr)} }
+/* form grafiği */
+.formchart{display:flex;align-items:flex-end;gap:6px;height:110px;padding:6px 4px 0;background:var(--panel);border:1px solid var(--line);border-radius:14px;margin-bottom:4px}
+.fc-c{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:3px;height:100%;padding-bottom:4px;min-width:0}
+.fc-c i{width:100%;max-width:26px;border-radius:6px 6px 2px 2px;background:color-mix(in srgb,var(--pc) 40%,var(--panel-2))}
+.fc-c i.win{background:var(--pc);box-shadow:0 0 12px color-mix(in srgb,var(--pc) 60%,transparent)}
+.fc-v{font-size:12px;font-weight:700}
+.fc-c small{font-size:10.5px;color:var(--muted)}
+/* bu gecenin tahminleri */
+.pt-list{padding:4px 10px}
+.pt-row{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--line);font-size:13px}
+.pt-row:last-child{border-bottom:0}
+.pt-g{display:flex;align-items:center;gap:5px;min-width:96px;font-weight:700}
+.pt-g img{width:20px;height:20px;object-fit:contain}
+.pt-row .pk{display:flex;gap:4px;flex-wrap:wrap;flex:1}
+.pt-p{font-family:"Barlow Condensed";font-size:18px}
+.pt-p.pos{color:var(--win)} .pt-p.neg{color:var(--lose)}
+/* sen ve o */
+.cmp{padding:10px 12px}
+.cmp-h{display:flex;justify-content:space-between;margin-bottom:6px}
+.cmp-h span{display:flex;align-items:center;gap:6px}
+.cmp-r{display:grid;grid-template-columns:70px 1fr 70px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line);font-size:13.5px;text-align:center}
+.cmp-r b{font-family:"Barlow Condensed";font-size:20px;color:var(--muted)}
+.cmp-r b.win{font-size:22px}
+.cmp-r b:first-child{text-align:left} .cmp-r b:last-child{text-align:right}
+.cmp-r span{color:var(--muted)}
+.cmp-f{font-size:13.5px;margin-top:8px}
+/* rekorlar */
+.recs{display:grid;gap:6px}
+@media (min-width:480px){ .recs{grid-template-columns:1fr 1fr} }
+.rec-i{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px 10px}
+.rec-ico{font-size:22px;width:34px;height:34px;display:grid;place-items:center;background:var(--amber-soft);border-radius:50%;flex:none;font-family:system-ui,"Apple Color Emoji",sans-serif}
+.rec-i small{display:block;color:var(--muted);font-size:12px}
+.rec-i b{font-size:14.5px}
+/* rozet ızgarası */
+.bgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+@media (min-width:480px){ .bgrid{grid-template-columns:repeat(3,1fr)} }
+.bdg2{display:flex;flex-direction:column;align-items:center;text-align:center;gap:3px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 8px;filter:grayscale(1);opacity:.6}
+.bdg2.on{filter:none;opacity:1;border-color:color-mix(in srgb,var(--amber) 55%,var(--line));background:linear-gradient(180deg,var(--amber-soft),var(--panel) 70%)}
+.bdg2 .bi{font-size:34px;line-height:1;font-family:system-ui,"Apple Color Emoji",sans-serif}
+.bdg2 b{font-size:14px}
+.bdg2 small{font-size:11.5px;color:var(--muted);line-height:1.3}
+.bdg2 em{font-style:normal;font-size:11.5px;font-weight:700;color:var(--amber-ink)}
+.bdg2 em.pr{color:var(--muted)}
