@@ -39,7 +39,7 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "v13";
+const VERSION = "v14";
 const LOGO_SMALL = a => `logos/${String(a).toLowerCase()}.png`;
 const LOGO_FULL  = a => `https://a.espncdn.com/i/teamlogos/nba/500/${String(a).toLowerCase()}.png`;
 document.addEventListener("error", e => {
@@ -495,6 +495,13 @@ function renderBoard(){
 }
 
 /* ====================================================== TAHMİN sekmesi */
+// "3 saat sonra" gibi; 1 saatten az kaldıysa turuncu
+function startsIn(g){
+  const ms=g.start-Date.now(); if(ms<=0) return "";
+  const m=Math.round(ms/6e4), h=Math.floor(m/60);
+  const t = m<60 ? `${m} dk sonra` : h<24 ? `${h} saat sonra` : `${Math.floor(h/24)} gün sonra`;
+  return ` <span class="starts ${m<60?"soon":""}">${t}</span>`;
+}
 function gameStatusTR(g){
   if(g.state==="pre") return timeTR(g.start);
   if(g.state==="post") return g.period>4 ? "Bitti (uzatma)" : "Bitti";
@@ -540,7 +547,9 @@ function renderStatus(){
 }
 function renderDayLabel(){
   const rel = S.day===S.today ? "Bugün" : S.day===shiftDay(S.today,-1) ? "Dün" : S.day===shiftDay(S.today,1) ? "Yarın" : "";
-  $("#dayLabel").innerHTML = rel ? `${rel}<small>${dayNice(S.day)} (ABD)</small>` : `${dayNice(S.day)}<small>ABD tarihi</small>`;
+  $("#dayLabel").innerHTML = (rel ? `${rel}<small>${dayNice(S.day)} (ABD)</small>` : `${dayNice(S.day)}<small>ABD tarihi</small>`)
+    + (S.day!==S.today ? `<button class="today-chip" id="toToday" type="button">Bugüne dön</button>` : "");
+  $("#toToday")?.addEventListener("click", e=>{ e.stopPropagation(); S.day=S.today; showDay?.(); render(); });
 }
 function renderDayPlayer(){
   const D = S.days[S.day]; if(!D?.games.length){ $("#dayPlayer").innerHTML=""; return; }
@@ -610,8 +619,10 @@ function renderPickBar(D){
   const mine=D.games.filter(g=>D.picks[g.id]?.[S.uid]).length, dl=D.daily[S.uid]||{};
   const it=(ok,t)=>`<span class="${ok?"ok":"no"}">${ok?"✓":"✗"} ${t}</span>`;
   const ms=D.games[0].lock-Date.now(), h=Math.floor(ms/36e5), m=Math.floor(ms%36e5/6e4);
-  el.innerHTML=`<div class="wrap pb-in"><b>${mine}/${D.games.length}</b><span class="pb-prog"><i style="width:${Math.round(mine/D.games.length*100)}%"></i></span>${it(dl.confGame,"Banko")}${it(dl.dayPlayerId,"Oyuncu")}${it(dl.q,"Soru")}<span class="pb-t">${ms>0?`${h?h+" sa ":""}${m} dk`:""}</span></div>`;
+  el.innerHTML=`<div class="wrap pb-in" title="Dokun: ilk eksik maça git"><b>${mine}/${D.games.length}</b><span class="pb-prog"><i style="width:${Math.round(mine/D.games.length*100)}%"></i></span>${it(dl.confGame,"Banko")}${it(dl.dayPlayerId,"Oyuncu")}${it(dl.q,"Soru")}<span class="pb-t">${ms>0?`${h?h+" sa ":""}${m} dk`:""}</span></div>`;
   el.classList.toggle("show", !!S.pbShow);
+  el.onclick = () => { const g=open.find(x=>!D.picks[x.id]?.[S.uid]); const c=g && $(`#games [data-gid="${g.id}"]`);
+    if(c){ scrollTo({top: c.getBoundingClientRect().top + scrollY - 110, behavior:"smooth"}); c.classList.add("ping"); setTimeout(()=>c.classList.remove("ping"),1200); } };
 }
 // Kaydedilmiş, değiştirilmemiş tahmin: tek satır (dokununca düzenlemek için açılır)
 S.edit = new Set();
@@ -706,9 +717,11 @@ function gameCard(g){
     const per = /half/i.test(g.typeName+g.detail) ? "Devre" : /end/i.test(g.typeName) ? (g.period<=4?`${g.period}. Ç sonu`:"UZ sonu") : g.period<=4 ? `${g.period}. Ç` : "UZ";
     const clk = /half|end/i.test(g.typeName+g.detail) ? "" : g.clock;
     stt = `<span class="badge-live">Canlı</span><span class="live-clock">${per}${clk?` <b>${clk}</b>`:""}</span>`;
-  } else if(g.state==="pre") stt = `${gameStatusTR(g)}${!lock ? ringHTML(g) : ' <span class="muted" style="font-weight:600">· Kilitli</span>'}`;
+  } else if(g.state==="pre") stt = `${gameStatusTR(g)}${startsIn(g)}${!lock ? ringHTML(g) : ' <span class="muted" style="font-weight:600">· Kilitli</span>'}`;
   else stt = gameStatusTR(g);
-  return `<article class="game ${g.state==="in"?"is-live":""}${missingCls}" style="--ca:${pairCols(g.away.abbr,g.home.abbr)[0]};--ch:${pairCols(g.away.abbr,g.home.abbr)[1]}" data-gid="${g.id}">
+  const selAbbr = lock ? myPick?.winner : draftFor(g).winner;
+  const glow = selAbbr ? `;--sel:${tcol(selAbbr)}` : "";
+  return `<article class="game tex ${g.state==="in"?"is-live":""}${missingCls}${selAbbr?" has-sel":""}" style="--ca:${pairCols(g.away.abbr,g.home.abbr)[0]};--ch:${pairCols(g.away.abbr,g.home.abbr)[1]}${glow}" data-gid="${g.id}">
     <div class="g-head"><span class="stt">${stt}</span><span class="g-hr">${badge}${conf}</span></div>${body}</article>`;
 }
 // Maç önü kutusu: ESPN kazanma olasılığı + son 5 maç + sakat sayısı (özet yüklendiyse)
@@ -1191,9 +1204,14 @@ async function openBox(g){
   };
   $("#shBody").innerHTML = `<h3 id="shTitle">${esc(g.away.name)} ${g.away.score??""} – ${g.home.score??""} ${esc(g.home.name)}</h3><p class="muted" style="margin-top:-6px">${gameStatusTR(g)} · SA: isabet-deneme, 3S: üçlük, SB: serbest atış</p>${table("away")}${table("home")}`;
 }
-function openSheet(html){ $("#shBody").innerHTML=html; $("#sheet").classList.remove("hide"); $$("#sheet, #sheet *").forEach(el=>{ if(el.scrollTop) el.scrollTop=0; }); document.body.style.overflow="hidden"; $("#shClose").focus(); }
-function closeSheet(){ if(S.sheetLocked) return; $("#sheet").classList.add("hide"); document.body.style.overflow=""; }
-$("#shClose").onclick = closeSheet;
+function openSheet(html){ if($("#sheet").classList.contains("hide")){ try{ history.pushState({sheet:1}, ""); }catch(e){} }
+  $("#shBody").innerHTML=html; $("#sheet").classList.remove("hide"); $$("#sheet, #sheet *").forEach(el=>{ if(el.scrollTop) el.scrollTop=0; }); document.body.style.overflow="hidden"; $("#shClose").focus(); }
+function closeSheet(fromPop){ if(S.sheetLocked){ if(fromPop) try{ history.pushState({sheet:1}, ""); }catch(e){} return; }
+  if($("#sheet").classList.contains("hide")) return;
+  $("#sheet").classList.add("hide"); document.body.style.overflow="";
+  if(!fromPop && history.state?.sheet){ S.popSkip=true; history.back(); } }
+addEventListener("popstate", ()=>{ if(S.popSkip){ S.popSkip=false; return; } if(!$("#sheet").classList.contains("hide")) closeSheet(true); });
+$("#shClose").onclick = ()=>closeSheet();
 $("#sheet").addEventListener("click", e => { if(e.target.id==="sheet") closeSheet(); });
 document.addEventListener("keydown", e => { if(e.key==="Escape") closeSheet(); });
 
@@ -1783,7 +1801,12 @@ function openPlayer(u){
   const best=Object.entries(tm).filter(([,v])=>v.n>=2).sort((a,b)=>b[1].ok/b[1].n-a[1].ok/a[1].n||b[1].n-a[1].n).slice(0,3);
   const fav=p.favTeam && ALLP?.teams.find(t=>t.a===p.favTeam);
   const b=badgesOf(u).filter(x=>x.n);
-  openSheet(`<div class="pc-head">${avatar(u,"lg")}<div><h3 id="shTitle" style="margin:0;color:${col(u)}">${esc(pname(u))}</h3>
+  const m=/^(t|p):(\w+)$/.exec(p.av||"");
+  const cover = m?.[1]==="p" ? `<div class="pc-cover photo" style="--pc:${col(u)};--cv:url('https://a.espncdn.com/combiner/i?img=/i/headshots/nba/players/full/${m[2]}.png&w=600&h=438&scale=crop&cquality=75')"></div>`
+    : m?.[1]==="t" ? `<div class="pc-cover team" style="--tc:${tcol(m[2])}"><img src="${LOGO_SMALL(m[2])}" alt=""></div>`
+    : p.favTeam ? `<div class="pc-cover team soft" style="--tc:${tcol(p.favTeam)}"><img src="${LOGO_SMALL(p.favTeam)}" alt=""></div>`
+    : `<div class="pc-cover plain" style="--pc:${col(u)}"><span>${p.emoji||esc(initials(pname(u)))}</span></div>`;
+  openSheet(`${cover}<div class="pc-head on-cover">${avatar(u,"lg")}<div><h3 id="shTitle" style="margin:0;color:${col(u)}">${esc(pname(u))}</h3>
       <small class="muted">${rank}. sırada · ${tot[u]||0} puan${p.favTeam?` · <span data-tp="${p.favTeam}" class="linkish" style="font-size:13px">${esc(fav?.n||p.favTeam)}</span> taraftarı`:""}</small></div></div>
     <div class="cards2" style="margin-top:12px">
       <div class="kpi"><b>${won}</b><small>Kazandığı gece</small></div>
@@ -1794,7 +1817,7 @@ function openPlayer(u){
     ${b.length?`<div class="sec-title"><h2 style="font-size:20px">Rozetler</h2></div>${badgeHTML(b,true)}`:""}
     ${best.length?`<div class="sec-title"><h2 style="font-size:20px">En iyi bildiği takımlar</h2></div><div class="pc-teams">${best.map(([k,v])=>`<button class="pc-t" data-tp="${k}"><img src="${LOGO_SMALL(k)}" alt=""><b>%${Math.round(v.ok/v.n*100)}</b><small>${v.ok}/${v.n}</small></button>`).join("")}</div>`:""}
     <button class="btn" id="pcStats" style="margin-top:14px;width:100%">Tüm istatistiklerine bak</button>`);
-  $("#pcStats").onclick=()=>{ S.statFor=u; closeSheet(); if(location.hash==="#istatistik") { renderStats(); scrollTo({top:0}); } else location.hash="#istatistik"; };
+  $("#pcStats").onclick=()=>{ S.statFor=u; closeSheet(); setTimeout(()=>{ if(location.hash==="#istatistik") { renderStats(); scrollTo({top:0}); } else location.hash="#istatistik"; }, 80); };
 }
 // Tahmin geçmişi (yalnızca kendi tahminlerin) + CSV
 function openHistory(){
@@ -1887,6 +1910,22 @@ setInterval(()=>{ if(S.uid) { renderAlert(); if(S.tab==="tahmin" && S.sub==="mac
   $$("[data-ring]").forEach(el=>{ const g=S.days[S.day]?.games.find(x=>x.id===el.dataset.ring); if(g) el.outerHTML=ringHTML(g); }); } }, 30e3);
 
 /* ====================================================== gezinme ve yenileme */
+// Yeni kazanılan rozeti bir kez kutla (sayılar telefonda saklanır; ilk açılışta sessizce kaydedilir)
+function checkNewBadges(){
+  if(!S.uid || checkNewBadges.busy) return;
+  const cur=Object.fromEntries(badgesOf(S.uid).map(b=>[b.id,b.n]));
+  const key="badges:"+S.uid; let old=null; try{ old=JSON.parse(localStorage.getItem(key)||"null"); }catch(e){}
+  try{ localStorage.setItem(key, JSON.stringify(cur)); }catch(e){}
+  if(!old) return;
+  const fresh=BADGES.filter(b=>(cur[b.id]||0)>(old[b.id]||0));
+  if(!fresh.length) return;
+  const b=fresh[0]; checkNewBadges.busy=true;
+  const el=document.createElement("div"); el.className="badge-pop"; el.setAttribute("role","status");
+  el.innerHTML=`<div class="bp-card"><div class="bp-ico">${b.ico}</div><b>Yeni rozet!</b><span>${esc(b.name)}</span><small>${esc(b.desc)}</small></div>`;
+  document.body.append(el); confetti?.();
+  const close=()=>{ el.classList.add("out"); setTimeout(()=>{ el.remove(); checkNewBadges.busy=false; },350); };
+  el.onclick=close; setTimeout(close, 4200);
+}
 function render(){
   if(!S.uid) return;
   renderBoard();
@@ -1894,6 +1933,7 @@ function render(){
   renderBanners();
   renderAlert();
   maybeConfetti();
+  if(!render.bt || Date.now()-render.bt>20e3){ render.bt=Date.now(); setTimeout(checkNewBadges, 1500); }
   const nLive = [S.today, shiftDay(S.today,-1)].reduce((n,d)=>n+(S.days[d]?.games.filter(g=>g.state==="in").length||0),0);
   $("#navLive").classList.toggle("hide", !nLive); $("#navLive").textContent = nLive || "";
   if(S.tab==="tahmin"){ renderDayLabel(); renderStatus(); if(S.sub==="maclar"){ renderDayPlayer(); renderGames(); } else renderDayView(); }
@@ -1911,7 +1951,10 @@ function route(){
   if(S.tab!=="tahmin"){ $("#pickBar").innerHTML=""; $("#pickBar").classList.remove("show"); }
   render();
 }
-window.addEventListener("hashchange", ()=>{ route(); scrollTo({top:0}); });
+S.scrollY = {};
+window.addEventListener("hashchange", ()=>{ route(); scrollTo({top:S.scrollY[S.tab]||0}); });
+addEventListener("scroll", ()=>{ if(S.tab) S.scrollY[S.tab]=scrollY; }, {passive:true});
+document.addEventListener("click", e=>{ const a=e.target.closest(".nav a[data-tab]"); if(a && a.dataset.tab===S.tab){ e.preventDefault(); scrollTo({top:0, behavior:"smooth"}); } });
 function movePill(){
   const a=$(`.nav a[data-tab="${S.tab}"]`), pill=$("#navPill"); if(!a||!pill) return;
   pill.style.width=a.offsetWidth+"px"; pill.style.transform=`translateX(${a.offsetLeft}px)`;
