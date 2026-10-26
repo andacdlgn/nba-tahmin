@@ -39,7 +39,7 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "v19";
+const VERSION = "v20";
 const LOGO_SMALL = a => `logos/${String(a).toLowerCase()}.png`;
 const LOGO_FULL  = a => `https://a.espncdn.com/i/teamlogos/nba/500/${String(a).toLowerCase()}.png`;
 document.addEventListener("error", e => {
@@ -607,7 +607,7 @@ function compactCard(g){
   const r = my ? scorePick(g, my, conf) : null;
   const side = k => { const t=g[k], o=k==="home"?g.away:g.home, lose=(t.score??0)<(o.score??0);
     return `<span class="cm-t ${lose?"lose":"win"}" style="--tc:${tcol(t.abbr)}"><img src="${t.logo||""}" alt=""><b>${esc(t.abbr)}</b><span class="sc">${t.score??""}</span></span>`; };
-  const dots = r ? `<span class="cm-dots" title="Kazanan · fark · en skorer"><i class="${r.w>0?"ok":"no"}"></i><i class="${r.m>0?"ok":"no"}"></i><i class="${r.s>0?"ok":"no"}"></i></span>` : `<span class="muted cm-none">tahmin yapmadın</span>`;
+  const dots = r ? `<span class="cm-dots" title="Kazanan · Fark · En skorer"><i class="${r.w>0?"ok":"no"}"></i><i class="${r.m>0?"ok":"no"}"></i><i class="${r.s>0?"ok":"no"}"></i></span>` : `<span class="muted cm-none">tahmin yapmadın</span>`;
   const badge = r ? `<span class="pt-badge ${r.pts>0?"pos":r.pts<0?"neg":"zero"}">${r.pts>0?"+":""}${r.pts}</span>` : "";
   return `<article class="game compact${r && r.pts<=0 ? " miss" : ""}" style="--ca:${pairCols(g.away.abbr,g.home.abbr)[0]};--ch:${pairCols(g.away.abbr,g.home.abbr)[1]}" data-gid="${g.id}">
     <button class="cm" data-act="expand" data-g="${g.id}" aria-expanded="false">${side("away")}<span class="cm-sep">–</span>${side("home")}<span class="cm-r">${conf?'<span class="star">★</span>':""}${dots}${badge}<svg class="chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span></button></article>`;
@@ -1845,7 +1845,7 @@ function paintProf(){
   else body=`<div id="prof"></div>`;
   box.innerHTML = profCover(u) + `<div class="pc-head on-cover">${avatar(u,"lg")}<div style="min-width:0"><h3 id="shTitle" style="margin:0;color:${col(u)}">${esc(pname(u))}</h3>
       ${p.bio?`<div class="pf-bio">“${esc(p.bio)}”</div>`:""}
-      <small class="muted">${st.rank}. sırada · ${st.tot} puan${p.favTeam?` · <span data-tp="${p.favTeam}" class="linkish" style="font-size:13px">${esc(fav?.n||p.favTeam)}</span> taraftarı`:""} · ligde ${daysIn}. günü</small></div></div>
+      <small class="muted">${st.rank}. sırada · ${st.tot} puan${p.favTeam?` · <span data-tp="${p.favTeam}" class="linkish" style="font-size:13px">${esc(fav?.n||p.favTeam)}</span> taraftarı`:""} · Ligde ${daysIn}. günü</small></div></div>
     <div class="seg2 prof-tabs" style="grid-template-columns:repeat(${tabs.length},1fr)">${tabs.map(([k,l])=>`<button data-ptab="${k}" aria-pressed="${tab===k}">${l}</button>`).join("")}</div>
     <div class="prof-body">${body}</div>`;
   box.querySelector(".prof-tabs").onclick = e => { const b=e.target.closest("[data-ptab]"); if(!b) return; S.prof.tab=b.dataset.ptab; paintProf(); };
@@ -1994,9 +1994,9 @@ function renderAlert(){
   const parts=[];
   if(inj.length) parts.push(`<b>${inj.map(esc).join(", ")} oynamayacak</b>`);
   if(missing.length) parts.push(`<b>${missing.length} maç eksik</b>`);
-  if(noBanko) parts.push("banko seçilmedi");
-  if(noDp) parts.push("günün oyuncusu seçilmedi");
-  if(noQ) parts.push("soru cevaplanmadı");
+  if(noBanko) parts.push("Banko seçilmedi");
+  if(noDp) parts.push("Günün oyuncusu seçilmedi");
+  if(noQ) parts.push("Gecenin sorusu cevaplanmadı");
   const urgent = ms < 60*60e3;
   el.classList.toggle("sticky", urgent);   // son 1 saatte ekranın üstüne yapışır
   el.innerHTML = `<button class="alert ${urgent?"urgent":""}" id="alertBtn"><span class="al-dot"></span><span class="al-tx"><span>${when}</span><span>${parts.join(" · ")}</span></span><span class="al-go">Tamamla ›</span></button>`;
@@ -2033,7 +2033,7 @@ const DIV_TR={Atlantic:"Atlantik",Central:"Merkez",Southeast:"Güneydoğu",North
 function teamStatsHTML(abbr){
   const all=(S.standings||[]).flatMap(c=>c.entries.map(e=>({e,c}))); const me=all.find(x=>x.e.team.abbreviation===abbr); if(!me) return "";
   const rank=(n,desc=true)=>{ const v=all.map(x=>+stOf(x.e,n)); const mine=+stOf(me.e,n); return 1+v.filter(x=> desc? x>mine : x<mine).length; };
-  const k=(v,l,r)=>`<div class="kpi"><b>${v}</b><small>${l}${r?` · ligde ${r}.`:""}</small></div>`;
+  const k=(v,l,r)=>`<div class="kpi"><b>${v}</b><small>${l}${r?` · Ligde ${r}.`:""}</small></div>`;
   return `<div class="cards2 tm-kpis">${k(wlOf(me.e)||"–","Galibiyet-mağlubiyet")}${k(`${stOf(me.e,"playoffSeed")}.`,`${me.c.abbr==="East"?"Doğu":"Batı"} sırası`)}
     ${k(stOf(me.e,"avgPointsFor"),"Attığı sayı (ort.)",rank("avgPointsFor"))}${k(stOf(me.e,"avgPointsAgainst"),"Yediği sayı (ort.)",rank("avgPointsAgainst",false))}
     ${k(stOf(me.e,"Home")||"–","İç saha")}${k(stOf(me.e,"Road")||"–","Dış saha")}${k(stOf(me.e,"Last Ten Games")||"–","Son 10 maç")}${k(streakTR(stOf(me.e,"streak")),"Seri")}</div>`;
@@ -2140,7 +2140,7 @@ async function openAthlete(id, hint={}){
     const lab=ov.statistics?.labels||[], sp=ov.statistics?.splits||[];
     const reg=sp.find(x=>/regular/i.test(x.displayName))||sp[0], car=sp.find(x=>/career/i.test(x.displayName));
     const pick=["PTS","REB","AST","FG%","3P%","STL","BLK","MIN","GP"];
-    const kp = reg ? `<div class="cards2 ath-k">${pick.filter(k=>lab.includes(k)).map(k=>`<div class="kpi"><b>${reg.stats[lab.indexOf(k)]}</b><small>${L[k]||k}${car?` · kariyer ${car.stats[lab.indexOf(k)]}`:""}</small></div>`).join("")}</div>` : `<div class="note">Bu sezon henüz maçı yok.</div>`;
+    const kp = reg ? `<div class="cards2 ath-k">${pick.filter(k=>lab.includes(k)).map(k=>`<div class="kpi"><b>${reg.stats[lab.indexOf(k)]}</b><small>${L[k]||k}${car?` · Kariyer ${car.stats[lab.indexOf(k)]}`:""}</small></div>`).join("")}</div>` : `<div class="note">Bu sezon henüz maçı yok.</div>`;
     let last="";
     if(gl){ const evs=(gl.seasonTypes?.[0]?.categories||[]).flatMap(c=>c.events||[]).slice(0,5); const nm=gl.names||[];
       const ix=k=>nm.indexOf(k);
@@ -2686,7 +2686,7 @@ if("serviceWorker" in navigator && location.protocol==="https:") navigator.servi
     $("#auth").classList.add("hide"); $("#app").classList.remove("hide");
     $("#me").classList.remove("hide"); paintMe(); applyTheme();
     S.statFor=S.uid;
-    $("#foot").innerHTML=`Kazanan +1 · fark +1 · en skorer +1 · banko +2 / -1 · günün oyuncusu +2 · gecenin sorusu +1<br>Veriler ESPN'den alınır. Maç varken 30 saniyede bir yenilenir.<br><span class="ver">${VERSION}</span>`;
+    $("#foot").innerHTML=`Kazanan +1 · Fark +1 · En skorer +1 · Banko +2 / -1 · Günün oyuncusu +2 · Gecenin sorusu +1<br>Veriler ESPN'den alınır. Maç varken 30 saniyede bir yenilenir.<br><span class="ver">${VERSION}</span>`;
     route(); showDay(); Promise.resolve(refresh()).catch(()=>{}).finally(()=>dispatchEvent(new Event("app-ready")));
     checkRecovery();
     getDoc(doc(S.db,"config","secret")).then(r=>{ S.isAdmin=true; S.invite=r.data()?.invite||""; }).catch(()=>{ S.isAdmin=false; });
