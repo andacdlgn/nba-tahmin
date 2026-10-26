@@ -39,7 +39,7 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "v11";
+const VERSION = "v12";
 const LOGO_SMALL = a => `logos/${String(a).toLowerCase()}.png`;
 const LOGO_FULL  = a => `https://a.espncdn.com/i/teamlogos/nba/500/${String(a).toLowerCase()}.png`;
 document.addEventListener("error", e => {
@@ -1174,8 +1174,15 @@ function openRules(){
 $("#rulesBtn").onclick = openRules;
 
 /* ====================================================== SONUÇLAR */
+// Sonuçlar sekmesi açılınca: bu gecenin maçları başladıysa bugün, başlamadıysa oynanmış son gece (dün)
+function resDay(){
+  if(S.rday) return S.rday;
+  if(S.day!==S.today) return S.day;
+  const D=S.days[S.today];
+  return D?.games.some(g=>g.state!=="pre") ? S.today : shiftDay(S.today,-1);
+}
 async function renderResults(){
-  const day = S.rday || S.day;
+  const day = resDay();
   const rel = day===S.today ? "Bugün" : day===shiftDay(S.today,-1) ? "Dün" : day===shiftDay(S.today,1) ? "Yarın" : "";
   $("#rdLabel").innerHTML = rel ? `${rel}<small>${dayNice(day)} (ABD)</small>` : `${dayNice(day)}<small>ABD tarihi</small>`;
   const D = S.days[day];
@@ -1200,16 +1207,16 @@ async function renderResults(){
   }).join("")}</div>`;
   // biten maçların oyuncu istatistiklerini arka planda getir
   const need = games.filter(g=>g.state==="post" && !S.sums[g.id]);
-  if(need.length) Promise.all(need.slice(0,15).map(g=>loadSummary(g).catch(()=>null))).then(()=>{ if(S.tab==="sonuclar" && (S.rday||S.day)===day) renderResults(); });
+  if(need.length) Promise.all(need.slice(0,15).map(g=>loadSummary(g).catch(()=>null))).then(()=>{ if(S.tab==="sonuclar" && (resDay())===day) renderResults(); });
 }
 $("#results").addEventListener("click", e => {
   const b=e.target.closest(".rg"); if(!b) return;
-  const D=S.days[S.rday||S.day]; const g=D?.games.find(x=>x.id===b.dataset.g); if(!g) return;
+  const D=S.days[resDay()]; const g=D?.games.find(x=>x.id===b.dataset.g); if(!g) return;
   if(g.state==="pre") return openInfo(g);
   openBox(g);
 });
-$("#rdPrev").onclick=()=>{ S.rday=shiftDay(S.rday||S.day,-1); renderResults(); };
-$("#rdNext").onclick=()=>{ S.rday=shiftDay(S.rday||S.day,1); renderResults(); };
+$("#rdPrev").onclick=()=>{ S.rday=shiftDay(resDay(),-1); renderResults(); };
+$("#rdNext").onclick=()=>{ S.rday=shiftDay(resDay(),1); renderResults(); };
 
 /* ====================================================== AYRIŞMA */
 function renderAyrisma(){
