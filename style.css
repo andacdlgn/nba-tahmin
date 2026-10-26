@@ -1304,3 +1304,12 @@ button,a,[data-act],.plr,.pf-av,.pf-emo{touch-action:manipulation;-webkit-tap-hi
 .nav a svg{width:22px;height:22px;margin-top:2px}
 .nav a[aria-current="page"]{color:var(--ink);font-weight:800}
 .nav a[aria-current="page"] svg{color:var(--amber-ink)}
+
+/* v19: kapak fotoğrafları — yüzü kesmeden, omuzlarıyla birlikte sağ altta dursun */
+.pc-cover{height:170px}
+.pc-cover.photo{background:
+    var(--cv) right 8% bottom 0/auto 96% no-repeat,
+    radial-gradient(120% 140% at 85% 100%,color-mix(in srgb,var(--pc) 70%,#fff 0%) 0,transparent 60%),
+    linear-gradient(135deg,color-mix(in srgb,var(--pc) 85%,#000) 0,color-mix(in srgb,var(--pc) 35%,#000) 100%)}
+.pc-cover.photo::after{background:linear-gradient(180deg,transparent 70%,var(--bg) 100%)}
+@media (max-width:480px){ .pc-cover.photo{background-position:right -10px bottom 0,0 0,0 0;background-size:auto 92%,auto,auto} }

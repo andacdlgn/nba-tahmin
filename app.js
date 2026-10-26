@@ -39,7 +39,7 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "v18";
+const VERSION = "v19";
 const LOGO_SMALL = a => `logos/${String(a).toLowerCase()}.png`;
 const LOGO_FULL  = a => `https://a.espncdn.com/i/teamlogos/nba/500/${String(a).toLowerCase()}.png`;
 document.addEventListener("error", e => {
@@ -2085,9 +2085,9 @@ async function leadersHTML(){
   const chips=`<div class="chips nba-cats">${CATS.map(x=>`<button class="chip" data-ncat="${x[0]}" aria-pressed="${x[0]===c[0]}">${x[1]}</button>`).join("")}</div>`;
   if(!list.length) return chips+`<div class="note">Henüz yeterli maç oynanmadı.</div>`;
   const [f,...rest]=list, fa=f.athlete;
-  const top=`<button class="ld-top" data-ath="${fa.id}" style="--tc:${tcol(fa.teamShortName)}"><img class="ld-face" src="https://a.espncdn.com/combiner/i?img=/i/headshots/nba/players/full/${fa.id}.png&w=300&h=219&scale=crop&cquality=75" alt=""><span class="ld-info"><small>1. ${c[1]} lideri</small><b>${esc(fa.displayName)}</b><span><img src="${LOGO_SMALL(fa.teamShortName)}" alt="">${esc(fa.teamShortName||"")}</span></span><em class="tnum">${val(f)}</em><span class="ld-spark" id="ldSpark"></span></button>`;
+  const top=`<button class="ld-top" data-ath="${fa.id}" data-athn="${esc(fa.displayName)}" data-atht="${esc(fa.teamShortName||"")}" style="--tc:${tcol(fa.teamShortName)}"><img class="ld-face" src="https://a.espncdn.com/combiner/i?img=/i/headshots/nba/players/full/${fa.id}.png&w=300&h=219&scale=crop&cquality=75" alt=""><span class="ld-info"><small>1. ${c[1]} lideri</small><b>${esc(fa.displayName)}</b><span><img src="${LOGO_SMALL(fa.teamShortName)}" alt="">${esc(fa.teamShortName||"")}</span></span><em class="tnum">${val(f)}</em><span class="ld-spark" id="ldSpark"></span></button>`;
   setTimeout(()=>sparkFor(fa.id, c[0]), 0);
-  return chips + top + `<div class="ld-list">${rest.map((x,i)=>`<button class="ld-r" data-ath="${x.athlete.id}"><span class="ld-n">${i+2}</span><img src="${FACE(x.athlete.id)}" alt="" loading="lazy"><span class="ld-nm"><b>${esc(x.athlete.displayName)}</b><small><img src="${LOGO_SMALL(x.athlete.teamShortName)}" alt="">${esc(x.athlete.teamShortName||"")} · ${esc(x.athlete.position?.abbreviation||"")}</small></span><em class="tnum">${val(x)}</em></button>`).join("")}</div><small class="muted">Kaynak: ESPN, maç başına ortalama (yeterli maçı olan oyuncular).</small>`;
+  return chips + top + `<div class="ld-list">${rest.map((x,i)=>`<button class="ld-r" data-ath="${x.athlete.id}" data-athn="${esc(x.athlete.displayName)}" data-atht="${esc(x.athlete.teamShortName||"")}"><span class="ld-n">${i+2}</span><img src="${FACE(x.athlete.id)}" alt="" loading="lazy"><span class="ld-nm"><b>${esc(x.athlete.displayName)}</b><small><img src="${LOGO_SMALL(x.athlete.teamShortName)}" alt="">${esc(x.athlete.teamShortName||"")} · ${esc(x.athlete.position?.abbreviation||"")}</small></span><em class="tnum">${val(x)}</em></button>`).join("")}</div><small class="muted">Kaynak: ESPN, maç başına ortalama (yeterli maçı olan oyuncular).</small>`;
 }
 // Liderin son maçlarındaki gidişatı (küçük çizgi grafik)
 async function sparkFor(id, cat){
@@ -2129,8 +2129,9 @@ function bindPlayerSearch(){
   paint();
 }
 // Oyuncu kartı: sezon ortalamaları, son 5 maç, sıradaki maç
-async function openAthlete(id){
-  const p=(ALLP?.players||[]).find(x=>x.id===id);
+async function openAthlete(id, hint={}){
+  await allPlayers().catch(()=>{});
+  const f=(ALLP?.players||[]).find(x=>x.id===id); const p = f || (hint.n ? {n:hint.n, t:hint.t||""} : null);
   openSheet(`<div class="pc-cover photo" style="--pc:${tcol(p?.t||"")};--cv:url('https://a.espncdn.com/combiner/i?img=/i/headshots/nba/players/full/${id}.png&w=600&h=438&scale=crop&cquality=75')"></div><div class="pc-head on-cover"><div><h3 id="shTitle" style="margin:0">${esc(p?.n||"Oyuncu")}</h3><small class="muted">${esc(p?.t||"")}</small></div></div><div id="athBody"><p class="muted">Yükleniyor…</p></div>`);
   try{
     const [ov, gl]=await Promise.all([cached("ov_"+id, `${WEB}/common/v3/sports/basketball/nba/athletes/${id}/overview`, 30*60e3), gamelogOf(id).catch(()=>null)]);
@@ -2151,7 +2152,7 @@ async function openAthlete(id){
     $("#athBody").innerHTML = `<div class="sec-title"><h2 style="font-size:20px">Bu sezon</h2><span class="aside">maç başına ortalama</span></div>${kp}${last}${next}<small class="muted">Kaynak: ESPN.</small>`;
   }catch(e){ if($("#athBody")) $("#athBody").innerHTML=`<div class="note">Bilgilere şu an ulaşılamıyor.</div>`; }
 }
-document.addEventListener("click", e=>{ const a=e.target.closest("[data-ath]"); if(a){ e.stopPropagation(); openAthlete(a.dataset.ath); } });
+document.addEventListener("click", e=>{ const a=e.target.closest("[data-ath]"); if(a){ e.stopPropagation(); openAthlete(a.dataset.ath, {n:a.dataset.athn, t:a.dataset.atht}); } });
 $("#nba")?.addEventListener("click", e=>{
   const s1=e.target.closest("[data-nsub]"); if(s1){ S.nba.sub=s1.dataset.nsub; return renderNBA(); }
   const v=e.target.closest("[data-nview]"); if(v){ S.nba.view=v.dataset.nview; return renderNBA(); }
