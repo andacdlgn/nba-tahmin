@@ -39,7 +39,7 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "v16";
+const VERSION = "v17";
 const LOGO_SMALL = a => `logos/${String(a).toLowerCase()}.png`;
 const LOGO_FULL  = a => `https://a.espncdn.com/i/teamlogos/nba/500/${String(a).toLowerCase()}.png`;
 document.addEventListener("error", e => {
@@ -1939,7 +1939,8 @@ async function openTeam(abbr){
   await allPlayers().catch(()=>{});
   const t=ALLP?.teams.find(x=>x.a===abbr) || {a:abbr,n:abbr};
   const id=t.id || Object.values(S.days).flatMap(D=>D.games).flatMap(g=>[g.home,g.away]).find(x=>x.abbr===abbr)?.id;
-  openSheet(`<div class="pc-head"><img src="${LOGO_SMALL(abbr)}" alt="" width="56" height="56"><div><h3 id="shTitle" style="margin:0">${esc(t.n)}</h3><small class="muted" id="tmRec">Yükleniyor…</small></div></div><div id="tmBody"></div>`);
+  openSheet(`<div class="pc-cover team" style="--tc:${tcol(abbr)}"><img src="${LOGO_SMALL(abbr)}" alt=""></div><div class="pc-head on-cover"><div><h3 id="shTitle" style="margin:0">${esc(t.n)}</h3><small class="muted" id="tmRec">Yükleniyor…</small></div></div><div id="tmTop"></div><div id="tmBody"></div>`);
+  nbaStandings().then(()=>{ const el=$("#tmTop"); if(el) el.innerHTML=teamStatsHTML(abbr); }).catch(()=>{});
   let sch=null;
   if(id){ const c=S.sched[id]; if(c && Date.now()-c.at<10*60e3) sch=c.data; else { try{ sch=await espn(`/teams/${id}/schedule`); S.sched[id]={at:Date.now(), data:sch}; }catch(e){} } }
   const evs=(sch?.events||[]).filter(e=>e.seasonType?.type!==1 && e.season?.type!==1);
@@ -1963,6 +1964,9 @@ async function openTeam(abbr){
     <div class="sec-title"><h2 style="font-size:20px">Senin karnen</h2></div>
     ${my.length?`<div class="box"><b style="font-size:20px">%${Math.round(ok/my.length*100)}</b> <span class="muted">bu takımın ${my.length} maçında kazananı bildin</span>
       <div class="pk" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px">${my.slice(-6).reverse().map(x=>`<span class="rc ${x.r.w>0?"ok":"no"}"><i>${x.r.w>0?"✓":"✗"}</i>${esc(x.away.abbr)}–${esc(x.home.abbr)}</span>`).join("")}</div></div>`:'<div class="note">Bu takımın maçlarına tahmin yaptıkça karnen burada oluşacak.</div>'}`;
+  // kadro: sayı ortalamasına göre
+  if(roster.length){ roster.forEach(p=>p.ppg=ppg(p.id)); const rs=[...roster].sort((a,b)=>(b.ppg??-1)-(a.ppg??-1));
+    $("#tmBody").insertAdjacentHTML("beforeend", `<div class="sec-title"><h2 style="font-size:20px">Kadro</h2><span class="aside">sayı ortalamasına göre</span></div><div class="roster">${rs.map(p=>`<button class="ro-p" data-ath="${p.id}"><img src="${FACE(p.id)}" alt="" loading="lazy"><span><b>${esc(p.name)}</b><small>${esc(p.pos||"")}${p.jersey?" · #"+p.jersey:""}${p.inj?` · <span class="inj ${/out/i.test(p.inj)?"":"q"}">${/out/i.test(p.inj)?"Oynamıyor":"Belirsiz"}</span>`:""}</small></span><em>${p.ppg!=null?p.ppg.toFixed(1):"–"}</em></button>`).join("")}</div>`); }
 }
 
 /* ====================================================== Eksik tahmin uyarısı */
@@ -2007,6 +2011,152 @@ function renderAlert(){
 setInterval(()=>{ if(S.uid) { renderAlert(); if(S.tab==="tahmin" && S.sub==="maclar") $$(".lock-note").forEach(el=>{ const g=S.days[S.day]?.games.find(x=>x.id===el.closest(".game")?.dataset.gid); if(g) el.textContent=lockLeft(g); });
   $$("[data-ring]").forEach(el=>{ const g=S.days[S.day]?.games.find(x=>x.id===el.dataset.ring); if(g) el.outerHTML=ringHTML(g); }); } }, 30e3);
 
+/* ====================================================== NBA sekmesi: puan durumu, liderler, takımlar, oyuncular */
+const WEB = "https://site.web.api.espn.com/apis";
+S.nba = { sub:"puan", view:"conf", cat:"pts", q:"", tonight:false };
+S.nbaC = {};
+async function cached(key, url, ttl=10*60e3){
+  const c=S.nbaC[key]; if(c && Date.now()-c.at<ttl) return c.data;
+  const data=await getJSON(url); S.nbaC[key]={at:Date.now(), data}; return data;
+}
+const stOf = (e, n) => { const x=e.stats.find(s=>s.name===n || s.type===n || s.abbreviation===n); return x ? (x.displayValue ?? x.value) : ""; };
+async function nbaStandings(){
+  const d=await cached("st", `${WEB}/v2/sports/basketball/nba/standings?level=3`);
+  const confs=(d.children||[]).map(c=>{ const divs=(c.children||[]).map(dv=>({name:dv.name, entries:dv.standings?.entries||[]}));
+    const entries=divs.flatMap(x=>x.entries).sort((a,b)=>(+stOf(a,"playoffSeed")||99)-(+stOf(b,"playoffSeed")||99));
+    return {name:c.name, abbr:c.abbreviation, divs, entries}; });
+  S.standings=confs; return confs;
+}
+const DIV_TR={Atlantic:"Atlantik",Central:"Merkez",Southeast:"Güneydoğu",Northwest:"Kuzeybatı",Pacific:"Pasifik",Southwest:"Güneybatı"};
+function teamStatsHTML(abbr){
+  const all=(S.standings||[]).flatMap(c=>c.entries.map(e=>({e,c}))); const me=all.find(x=>x.e.team.abbreviation===abbr); if(!me) return "";
+  const rank=(n,desc=true)=>{ const v=all.map(x=>+stOf(x.e,n)); const mine=+stOf(me.e,n); return 1+v.filter(x=> desc? x>mine : x<mine).length; };
+  const k=(v,l,r)=>`<div class="kpi"><b>${v}</b><small>${l}${r?` · ligde ${r}.`:""}</small></div>`;
+  return `<div class="cards2 tm-kpis">${k(stOf(me.e,"overall")||"–","Galibiyet-mağlubiyet")}${k(`${stOf(me.e,"playoffSeed")}.`,`${me.c.abbr==="East"?"Doğu":"Batı"} sırası`)}
+    ${k(stOf(me.e,"avgPointsFor"),"Attığı sayı (ort.)",rank("avgPointsFor"))}${k(stOf(me.e,"avgPointsAgainst"),"Yediği sayı (ort.)",rank("avgPointsAgainst",false))}
+    ${k(stOf(me.e,"Home")||"–","İç saha")}${k(stOf(me.e,"Road")||"–","Dış saha")}${k(stOf(me.e,"Last Ten Games")||"–","Son 10 maç")}${k(stOf(me.e,"streak")||"–","Seri")}</div>`;
+}
+function renderNBA(){
+  const box=$("#nba"); if(!box) return;
+  const subs=[["puan","Puan durumu"],["lider","Liderler"],["takim","Takımlar"],["oyuncu","Oyuncular"]];
+  const head=`<div class="nba-subs">${subs.map(([k,l])=>`<button data-nsub="${k}" aria-pressed="${S.nba.sub===k}">${l}</button>`).join("")}</div><div id="nbaBody">${skeletonCards(1)}</div>`;
+  if(!box.querySelector(".nba-subs")) box.innerHTML=head; else box.querySelectorAll("[data-nsub]").forEach(b=>b.setAttribute("aria-pressed", b.dataset.nsub===S.nba.sub));
+  const body=$("#nbaBody");
+  const fail=()=>{ body.innerHTML=`<div class="note">ESPN'e şu an ulaşılamıyor. Biraz sonra tekrar dene.</div>`; };
+  if(S.nba.sub==="puan") nbaStandings().then(c=>{ if(S.nba.sub==="puan") body.innerHTML=standingsHTML(c); }).catch(fail);
+  if(S.nba.sub==="lider") leadersHTML().then(h=>{ if(S.nba.sub==="lider") body.innerHTML=h; }).catch(fail);
+  if(S.nba.sub==="takim") nbaStandings().catch(()=>null).then(()=>allPlayers().catch(()=>{})).then(()=>{ if(S.nba.sub==="takim") body.innerHTML=teamsGridHTML(); });
+  if(S.nba.sub==="oyuncu") allPlayers().catch(()=>{}).then(()=>{ if(S.nba.sub==="oyuncu"){ body.innerHTML=playersHTML(); bindPlayerSearch(); } });
+}
+function standingsHTML(confs){
+  const fav=S.players[S.uid]?.favTeam;
+  const row=(e,i,mode)=>{ const t=e.team, a=t.abbreviation, l10=stOf(e,"Last Ten Games")||"0-0", [w10,lo10]=l10.split("-").map(Number), seed=+stOf(e,"playoffSeed");
+    const cls = mode==="conf" ? (seed<=6?"po":seed<=10?"pi":"") : "";
+    return `<button class="st-r ${cls} ${a===fav?"fav":""}" data-tp="${a}" style="--tc:${tcol(a)}"><span class="st-n">${mode==="conf"?seed:i+1}</span><img src="${LOGO_SMALL(a)}" alt=""><span class="st-t"><b>${esc(t.shortDisplayName||a)}</b><small>${esc(a)}</small></span>
+      <span class="st-wl tnum">${stOf(e,"overall")}</span><span class="st-pct tnum">${stOf(e,"winPercent")}</span><span class="st-gb tnum">${stOf(e,"gamesBehind")}</span>
+      <span class="st-l10"><i style="width:${(w10+lo10)?w10/(w10+lo10)*100:0}%"></i><small class="tnum">${l10}</small></span><span class="st-sk ${/^W/.test(stOf(e,"streak"))?"w":"l"} tnum">${(stOf(e,"streak")||"").replace(/^W/,"G").replace(/^L/,"M")}</span></button>`; };
+  const hdr=`<div class="st-h"><span>#</span><span></span><span>Takım</span><span>G-M</span><span>%</span><span>Geri</span><span>Son 10</span><span>Seri</span></div>`;
+  const tog=`<div class="chips nba-view"><button class="chip" data-nview="conf" aria-pressed="${S.nba.view==="conf"}">Konferans</button><button class="chip" data-nview="div" aria-pressed="${S.nba.view==="div"}">Grup</button></div>`;
+  const conf=c=>`<div class="sec-title"><h2 style="font-size:20px">${c.abbr==="East"?"Doğu Konferansı":"Batı Konferansı"}</h2></div>`
+    + (S.nba.view==="conf" ? `<div class="st-tbl">${hdr}${c.entries.map((e,i)=>row(e,i,"conf")).join("")}</div>`
+      : c.divs.map(d=>`<div class="st-div">${esc(DIV_TR[d.name.replace(/ Division$/,"")]||d.name)}</div><div class="st-tbl">${hdr}${[...d.entries].sort((a,b)=>(+stOf(b,"winPercent"))-(+stOf(a,"winPercent"))).map((e,i)=>row(e,i,"div")).join("")}</div>`).join(""));
+  return tog + confs.map(conf).join("") + `<small class="muted st-key"><i class="po"></i>İlk 6: doğrudan play-off <i class="pi"></i>7-10: play-in</small>` + pickedVsReal();
+}
+// Ligin en çok seçtiği takımlar ve gerçek durumları
+function pickedVsReal(){
+  const cnt={}, ok={};
+  for(const [gid,row] of Object.entries(S.arch.scores.games||{})){ const g=S.arch.games[gid]; if(!g) continue;
+    for(const [u,r] of Object.entries(row)){ if(!S.order.includes(u) || !r.pick?.w) continue; cnt[r.pick.w]=(cnt[r.pick.w]||0)+1; if(r.w>0) ok[r.pick.w]=(ok[r.pick.w]||0)+1; } }
+  const top=Object.entries(cnt).sort((a,b)=>b[1]-a[1]).slice(0,8); if(!top.length) return "";
+  const all=(S.standings||[]).flatMap(c=>c.entries);
+  return `<div class="sec-title"><h2 style="font-size:20px">Ligin inandığı takımlar</h2><span class="aside">en çok seçilen ve gerçek durumu</span></div><div class="pvr">${top.map(([a,n])=>{
+    const e=all.find(x=>x.team.abbreviation===a); const rec=e?stOf(e,"overall"):"–", pct=Math.round((ok[a]||0)/n*100);
+    return `<button class="pvr-r" data-tp="${a}" style="--tc:${tcol(a)}"><img src="${LOGO_SMALL(a)}" alt=""><b>${esc(a)}</b><span>${n} kez seçildi</span><span class="muted">tutma %${pct}</span><em class="tnum">${rec}</em></button>`; }).join("")}</div>`;
+}
+const CATS=[["pts","Sayı","offensive.avgPoints","offensive",0],["reb","Ribaund","general.avgRebounds","general",11],["ast","Asist","offensive.avgAssists","offensive",10],
+  ["stl","Top çalma","defensive.avgSteals","defensive",0],["blk","Blok","defensive.avgBlocks","defensive",1],["3pm","Üçlük","offensive.avgThreePointFieldGoalsMade","offensive",4],["fg","İsabet %","offensive.fieldGoalPct","offensive",3]];
+async function leadersHTML(){
+  const c=CATS.find(x=>x[0]===S.nba.cat)||CATS[0];
+  const d=await cached("ld_"+c[0], `${WEB}/common/v3/sports/basketball/nba/statistics/byathlete?region=us&lang=en&contentorigin=espn&isqualified=true&page=1&limit=10&sort=${c[2]}:desc`);
+  const val=a=>{ const cat=a.categories.find(x=>x.name===c[3]); const v=+cat?.values?.[c[4]]; return isFinite(v)?(c[0]==="fg"?v.toFixed(1):v.toFixed(1)):"–"; };
+  const list=(d.athletes||[]).slice(0,10);
+  const chips=`<div class="chips nba-cats">${CATS.map(x=>`<button class="chip" data-ncat="${x[0]}" aria-pressed="${x[0]===c[0]}">${x[1]}</button>`).join("")}</div>`;
+  if(!list.length) return chips+`<div class="note">Henüz yeterli maç oynanmadı.</div>`;
+  const [f,...rest]=list, fa=f.athlete;
+  const top=`<button class="ld-top" data-ath="${fa.id}" style="--tc:${tcol(fa.teamShortName)}"><img class="ld-face" src="https://a.espncdn.com/combiner/i?img=/i/headshots/nba/players/full/${fa.id}.png&w=300&h=219&scale=crop&cquality=75" alt=""><span class="ld-info"><small>1. ${c[1]} lideri</small><b>${esc(fa.displayName)}</b><span><img src="${LOGO_SMALL(fa.teamShortName)}" alt="">${esc(fa.teamShortName||"")}</span></span><em class="tnum">${val(f)}</em><span class="ld-spark" id="ldSpark"></span></button>`;
+  setTimeout(()=>sparkFor(fa.id, c[0]), 0);
+  return chips + top + `<div class="ld-list">${rest.map((x,i)=>`<button class="ld-r" data-ath="${x.athlete.id}"><span class="ld-n">${i+2}</span><img src="${FACE(x.athlete.id)}" alt="" loading="lazy"><span class="ld-nm"><b>${esc(x.athlete.displayName)}</b><small><img src="${LOGO_SMALL(x.athlete.teamShortName)}" alt="">${esc(x.athlete.teamShortName||"")} · ${esc(x.athlete.position?.abbreviation||"")}</small></span><em class="tnum">${val(x)}</em></button>`).join("")}</div><small class="muted">Kaynak: ESPN, maç başına ortalama (yeterli maçı olan oyuncular).</small>`;
+}
+// Liderin son maçlarındaki gidişatı (küçük çizgi grafik)
+async function sparkFor(id, cat){
+  const el=$("#ldSpark"); if(!el) return;
+  try{
+    const g=await gamelogOf(id); const idx={pts:"points",reb:"totalRebounds",ast:"assists",stl:"steals",blk:"blocks","3pm":"threePointFieldGoalsMade-threePointFieldGoalsAttempted",fg:"fieldGoalPct"}[cat];
+    const k=g.names.indexOf(idx); const evs=(g.seasonTypes?.[0]?.categories||[]).flatMap(c=>c.events||[]).slice(0,10).reverse();
+    const vals=evs.map(e=>parseFloat(String(e.stats[k]).split("-")[0])).filter(v=>isFinite(v)); if(vals.length<2 || !$("#ldSpark")) return;
+    const mx=Math.max(...vals), mn=Math.min(...vals), W=120, H=36, X=i=>(i/(vals.length-1)*W).toFixed(1), Y=v=>(H-3-(v-mn)/((mx-mn)||1)*(H-6)).toFixed(1);
+    $("#ldSpark").innerHTML=`<svg viewBox="0 0 ${W} ${H}"><polyline fill="none" stroke="currentColor" stroke-width="2" points="${vals.map((v,i)=>X(i)+","+Y(v)).join(" ")}"/><circle cx="${X(vals.length-1)}" cy="${Y(vals.at(-1))}" r="3" fill="currentColor"/></svg><small>son ${vals.length} maç</small>`;
+  }catch(e){}
+}
+const gamelogOf = id => cached("gl_"+id, `${WEB}/common/v3/sports/basketball/nba/athletes/${id}/gamelog`, 30*60e3);
+function teamsGridHTML(){
+  const teams=(ALLP?.teams||[]).slice().sort((a,b)=>a.n.localeCompare(b.n,"tr"));
+  const all=(S.standings||[]).flatMap(c=>c.entries);
+  return `<div class="tm-grid">${teams.map(t=>{ const e=all.find(x=>x.team.abbreviation===t.a);
+    return `<button class="tg" data-tp="${t.a}" style="--tc:${tcol(t.a)}"><span class="tg-l"><img src="${LOGO_SMALL(t.a)}" alt=""></span><b>${esc(t.n.split(" ").slice(-1)[0])}</b><small class="tnum">${e?stOf(e,"overall"):""}</small></button>`; }).join("")}</div>`;
+}
+function playersHTML(){
+  const D=S.days[S.today], tonight=D?.games.length ? new Set(D.games.flatMap(g=>[g.home.abbr,g.away.abbr])) : new Set();
+  // formda olanlar: son 5 maç ortalaması sezon ortalamasından en çok yüksek olanlar (bu gece oynayanlar arasında)
+  const ps=Object.entries(S.pstats||{}).filter(([,p])=>p.gp>=3 && p.l5?.length>=3);
+  const form=ps.map(([id,p])=>({id,p,avg:p.pts/p.gp,l5:p.l5.reduce((a,b)=>a+b,0)/p.l5.length})).map(x=>({...x,d:x.l5-x.avg}))
+    .filter(x=>!tonight.size || tonight.has(x.p.t)).filter(x=>x.l5>=12).sort((a,b)=>b.d-a.d).slice(0,6);
+  const formHTML = form.length ? `<div class="sec-title"><h2 style="font-size:20px">Formda olanlar</h2><span class="aside">${tonight.size?"bu gece oynayanlar":"son 5 maç"}</span></div><div class="form-list">${form.map(x=>`<button class="fm" data-ath="${x.id}"><img src="${FACE(x.id)}" alt="" loading="lazy"><b>${esc(x.p.n.split(" ").slice(-1)[0])}</b><small>${esc(x.p.t)}</small><em class="tnum">${x.l5.toFixed(1)}</em><span class="fm-d">▲ ${x.d.toFixed(1)}</span></button>`).join("")}</div><small class="muted">Son 5 maçtaki sayı ortalaması; ▲ sezon ortalamasından ne kadar yüksek olduğu.</small>` : "";
+  return `${formHTML}<div class="sec-title"><h2 style="font-size:20px">Oyuncu ara</h2></div>
+    <div class="chips"><button class="chip" data-ntonight="0" aria-pressed="${!S.nba.tonight}">Bütün oyuncular</button><button class="chip" data-ntonight="1" aria-pressed="${S.nba.tonight}" ${tonight.size?"":"disabled"}>Bu gece oynayanlar</button></div>
+    <input class="search" id="nbaSearch" placeholder="Oyuncu adı yaz (ör. Curry)" autocomplete="off" value="${esc(S.nba.q)}"><div id="nbaPl" class="pl-list"></div>`;
+}
+function bindPlayerSearch(){
+  const D=S.days[S.today], tonight=new Set((D?.games||[]).flatMap(g=>[g.home.abbr,g.away.abbr]));
+  const paint=()=>{ const q=slug(S.nba.q||""); let list=(ALLP?.players||[]).map(p=>({...p, ppg:ppg(p.id)}));
+    if(S.nba.tonight) list=list.filter(p=>tonight.has(p.t));
+    if(q) list=list.filter(p=>slug(p.n).includes(q));
+    list.sort((a,b)=>(b.ppg??-1)-(a.ppg??-1)); list=list.slice(0, q?40:25);
+    $("#nbaPl").innerHTML = list.length ? list.map(p=>`<button class="plr" data-ath="${p.id}"><img src="${FACE(p.id)}" alt="" loading="lazy"><span class="pi"><b>${esc(p.n)}</b><small>${esc(p.t)}</small></span><span class="ppg">${p.ppg!=null?p.ppg.toFixed(1):"–"}<small>sayı ort.</small></span></button>`).join("") : `<p class="muted">Oyuncu bulunamadı.</p>`; };
+  $("#nbaSearch").oninput=e=>{ S.nba.q=e.target.value; paint(); };
+  paint();
+}
+// Oyuncu kartı: sezon ortalamaları, son 5 maç, sıradaki maç
+async function openAthlete(id){
+  const p=(ALLP?.players||[]).find(x=>x.id===id);
+  openSheet(`<div class="pc-cover photo" style="--pc:${tcol(p?.t||"")};--cv:url('https://a.espncdn.com/combiner/i?img=/i/headshots/nba/players/full/${id}.png&w=600&h=438&scale=crop&cquality=75')"></div><div class="pc-head on-cover"><div><h3 id="shTitle" style="margin:0">${esc(p?.n||"Oyuncu")}</h3><small class="muted">${esc(p?.t||"")}</small></div></div><div id="athBody"><p class="muted">Yükleniyor…</p></div>`);
+  try{
+    const [ov, gl]=await Promise.all([cached("ov_"+id, `${WEB}/common/v3/sports/basketball/nba/athletes/${id}/overview`, 30*60e3), gamelogOf(id).catch(()=>null)]);
+    if(!$("#athBody")) return;
+    const L={GP:"Maç",MIN:"Dk",PTS:"Sayı",REB:"Rib",AST:"Ast",STL:"Top çalma",BLK:"Blok","FG%":"İsabet %","3P%":"Üçlük %","FT%":"Serbest %",TO:"Top kaybı",PF:"Faul"};
+    const lab=ov.statistics?.labels||[], sp=ov.statistics?.splits||[];
+    const reg=sp.find(x=>/regular/i.test(x.displayName))||sp[0], car=sp.find(x=>/career/i.test(x.displayName));
+    const pick=["PTS","REB","AST","FG%","3P%","STL","BLK","MIN","GP"];
+    const kp = reg ? `<div class="cards2 ath-k">${pick.filter(k=>lab.includes(k)).map(k=>`<div class="kpi"><b>${reg.stats[lab.indexOf(k)]}</b><small>${L[k]||k}${car?` · kariyer ${car.stats[lab.indexOf(k)]}`:""}</small></div>`).join("")}</div>` : `<div class="note">Bu sezon henüz maçı yok.</div>`;
+    let last="";
+    if(gl){ const evs=(gl.seasonTypes?.[0]?.categories||[]).flatMap(c=>c.events||[]).slice(0,5); const nm=gl.names||[];
+      const ix=k=>nm.indexOf(k);
+      last = evs.length ? `<div class="sec-title"><h2 style="font-size:20px">Son ${evs.length} maç</h2></div><div class="ath-gl"><div class="agl-h"><span>Rakip</span><span>Skor</span><span>Sayı</span><span>Rib</span><span>Ast</span><span>Dk</span></div>${evs.map(e=>{ const m=gl.events?.[e.eventId]||{};
+        return `<div class="agl-r"><span>${esc(m.atVs||"")} <img src="${LOGO_SMALL(m.opponent?.abbreviation||"")}" alt="">${esc(m.opponent?.abbreviation||"")}</span><span class="${m.gameResult==="W"?"w":"l"}">${m.gameResult==="W"?"G":"M"} ${esc(m.score||"")}</span><b>${e.stats[ix("points")]}</b><span>${e.stats[ix("totalRebounds")]}</span><span>${e.stats[ix("assists")]}</span><span>${e.stats[ix("minutes")]}</span></div>`; }).join("")}</div>` : "";
+    }
+    const ng=ov.nextGame?.events?.[0] || ov.nextGame;
+    const next = ng?.date ? `<div class="note">Sıradaki maç: ${new Date(ng.date).toLocaleString("tr-TR",{timeZone:TZ,weekday:"long",day:"numeric",month:"long",hour:"2-digit",minute:"2-digit"})}</div>` : "";
+    $("#athBody").innerHTML = `<div class="sec-title"><h2 style="font-size:20px">Bu sezon</h2><span class="aside">maç başına ortalama</span></div>${kp}${last}${next}<small class="muted">Kaynak: ESPN.</small>`;
+  }catch(e){ if($("#athBody")) $("#athBody").innerHTML=`<div class="note">Bilgilere şu an ulaşılamıyor.</div>`; }
+}
+document.addEventListener("click", e=>{ const a=e.target.closest("[data-ath]"); if(a){ e.stopPropagation(); openAthlete(a.dataset.ath); } });
+$("#nba")?.addEventListener("click", e=>{
+  const s1=e.target.closest("[data-nsub]"); if(s1){ S.nba.sub=s1.dataset.nsub; return renderNBA(); }
+  const v=e.target.closest("[data-nview]"); if(v){ S.nba.view=v.dataset.nview; return renderNBA(); }
+  const c=e.target.closest("[data-ncat]"); if(c){ S.nba.cat=c.dataset.ncat; return renderNBA(); }
+  const t=e.target.closest("[data-ntonight]"); if(t && !t.disabled){ S.nba.tonight=t.dataset.ntonight==="1"; return renderNBA(); }
+});
+
 /* ====================================================== gezinme ve yenileme */
 // Yeni kazanılan rozeti bir kez kutla (sayılar telefonda saklanır; ilk açılışta sessizce kaydedilir)
 function checkNewBadges(){
@@ -2038,12 +2188,14 @@ function render(){
   if(S.tab==="sonuclar") renderResults();
   if(S.tab==="ayrisma") renderAyrisma();
   if(S.tab==="puan") renderPuan();
+  if(S.tab==="nba" && !render.nbaAt) { render.nbaAt=1; renderNBA(); }
   if(S.tab==="istatistik") renderStats();
 }
 function route(){
   const t=(location.hash||"#tahmin").slice(1);
   if(t==="istatistik"){ history.replaceState(null,"","#tahmin"); setTimeout(()=>S.uid && openProf(S.statFor||S.uid,"ist"),50); }
-  S.tab=["tahmin","sonuclar","ayrisma","puan"].includes(t)?t:"tahmin";
+  S.tab=["tahmin","sonuclar","ayrisma","puan","nba"].includes(t)?t:"tahmin";
+  render.nbaAt=0;
   $$("[data-view]").forEach(v=>v.classList.toggle("hide", v.id!=="view-"+S.tab));
   $$(".nav a").forEach(a=>a.dataset.tab===S.tab?a.setAttribute("aria-current","page"):a.removeAttribute("aria-current"));
   movePill();

@@ -321,6 +321,7 @@ def main(full=False):
                     s = pstats["p"].setdefault(p["id"], {"n": p["name"], "t": p["team"], "gp": 0, "pts": 0, "reb": 0, "ast": 0})
                     s["n"], s["t"] = p["name"], p["team"]
                     s["gp"] += 1; s["pts"] += p["pts"]; s["reb"] += p["reb"]; s["ast"] += p["ast"]
+                    s["l5"] = (s.get("l5", []) + [p["pts"]])[-5:]   # son 5 maçın sayıları (formda olanlar listesi için)
                 counted.add(g["id"])
         d += timedelta(days=1)
     pstats["counted"] = sorted(counted)

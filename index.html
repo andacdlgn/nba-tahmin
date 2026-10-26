@@ -31,7 +31,7 @@
 <script>
 // Açılış ekranı + sürüm kontrolü. Her güncellemede BUILD, version.json, app.js'deki VERSION ve
 // aşağıdaki ?v= numaraları birlikte artırılır (scripts/surum.py hepsini birden yapar).
-window.BUILD = "v16";
+window.BUILD = "v17";
 (function(){
   var t0 = Date.now(), MIN = 1000, MAX = 8000, ready = false, done = false;
   function hide(){ if(done) return; done = true; var s = document.getElementById("splash"); if(!s) return; s.classList.add("out"); setTimeout(function(){ s.remove(); }, 450); }
@@ -49,7 +49,7 @@ window.BUILD = "v16";
   }).catch(function(){});
 })();
 </script>
-<link rel="stylesheet" href="style.css?v=v16">
+<link rel="stylesheet" href="style.css?v=v17">
 </head>
 <body>
 
@@ -162,6 +162,9 @@ window.BUILD = "v16";
       </section>
 
       <!-- İSTATİSTİK -->
+      <section id="view-nba" data-view class="hide">
+        <div id="nba"></div>
+      </section>
       <section id="view-istatistik" data-view class="hide">
         <div id="istatistik"></div>
       </section>
@@ -177,6 +180,7 @@ window.BUILD = "v16";
       <a href="#sonuclar" data-tab="sonuclar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M12 5v14M7 10v4M17 10v4"/></svg>Sonuçlar</a>
       <a href="#ayrisma" data-tab="ayrisma"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v6M12 9l-6 6v6M12 9l6 6v6"/></svg>Kafa kafaya</a>
       <a href="#puan" data-tab="puan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v4a5 5 0 0 1-10 0z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/></svg>Puan</a>
+      <a href="#nba" data-tab="nba"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3v18M5.6 5.6c3 2.6 3 10.2 0 12.8M18.4 5.6c-3 2.6-3 10.2 0 12.8"/></svg>NBA</a>
     </div>
   </nav>
 </div>
@@ -189,6 +193,6 @@ window.BUILD = "v16";
 
 <div class="toast hide" id="toast" role="status" aria-live="polite"></div>
 
-<script type="module" src="app.js?v=v16"></script>
+<script type="module" src="app.js?v=v17"></script>
 </body>
 </html>
