@@ -39,7 +39,7 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "v14";
+const VERSION = "v15";
 const LOGO_SMALL = a => `logos/${String(a).toLowerCase()}.png`;
 const LOGO_FULL  = a => `https://a.espncdn.com/i/teamlogos/nba/500/${String(a).toLowerCase()}.png`;
 document.addEventListener("error", e => {
@@ -498,6 +498,7 @@ function renderBoard(){
 // "3 saat sonra" gibi; 1 saatten az kaldıysa turuncu
 function startsIn(g){
   const ms=g.start-Date.now(); if(ms<=0) return "";
+  if(!started(g) && Math.abs(g.start-g.lock)<30*6e4) return "";   // gecenin ilk maçı: kilit halkası zaten aynı süreyi gösteriyor
   const m=Math.round(ms/6e4), h=Math.floor(m/60);
   const t = m<60 ? `${m} dk sonra` : h<24 ? `${h} saat sonra` : `${Math.floor(h/24)} gün sonra`;
   return ` <span class="starts ${m<60?"soon":""}">${t}</span>`;

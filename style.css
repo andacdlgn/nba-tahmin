@@ -1092,3 +1092,59 @@ footer .ver{display:inline-block;margin-top:6px;opacity:.7;font-variant-numeric:
 .game.ping{animation:ping 1.1s ease}
 @keyframes ping{0%,100%{box-shadow:none}30%{box-shadow:0 0 0 4px var(--amber)}}
 @media (prefers-reduced-motion: reduce){ .bp-ico,.game.ping{animation:none} }
+
+/* =================== v15: telefon için düzenleme =================== */
+/* dokunma: çift dokunma yakınlaştırması gecikmesin, gri vurgu çıkmasın */
+button,a,[data-act],.plr,.pf-av,.pf-emo{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+/* iPhone, 16 pikselden küçük yazı kutularında sayfayı yakınlaştırıyor */
+.search{font-size:16px;color:var(--ink)}
+@media (max-width:700px){ input,select,textarea{font-size:16px!important} }
+/* yeterince büyük dokunma alanı */
+.conf-btn{min-height:34px;padding:6px 12px}
+.banner .linkish{padding:8px 4px;min-height:36px}
+.today-chip{padding:6px 12px}
+.sheet{max-height:88dvh}
+@media (min-width:700px){ .sheet{max-height:84dvh} }
+
+@media (max-width:520px){
+  /* puan tablosu: daha sıkı satırlar */
+  .lb{gap:5px}
+  .lb-row{padding:5px 9px;gap:8px}
+  .lb-row .av.sm{width:30px;height:30px}
+  .lb-row .tn{font-size:22px}
+  .lb-row .tn .delta small{display:none}
+  .board-foot{margin-top:8px;padding-top:8px;font-size:13px}
+  .ticker{margin:8px 0 6px;font-size:13px}
+  .tk-row{padding:8px 0}
+  /* bantlar: tek satır başlık, açıklama gizli */
+  .banner.nudge{align-items:center;padding:8px 10px}
+  .banner.nudge .bn-t{font-size:0}
+  .banner.nudge .bn-t b{font-size:14px;display:inline}
+  .banner.nudge .bn-acts{display:flex;flex-direction:row;align-items:center;gap:4px}
+  /* durum kutusu */
+  .status{gap:4px 10px;padding:9px 11px;font-size:13.5px}
+  /* maç kartı: daha kısa */
+  .game{padding:10px}
+  .tbtn{padding:8px;gap:7px}
+  .tlogo{width:38px;height:38px}
+  .tbtn .tlogo img{width:28px;height:28px}
+  .tbtn .tt b{font-size:15px;white-space:normal;line-height:1.1;overflow-wrap:anywhere}
+  .vs-mini{font-size:11px}
+  .info-box{padding:8px 10px;margin-top:8px}
+  .ib-l5,.ib-side small{display:none}
+  .row-lbl{margin-top:8px}
+  .mbtn{padding:9px 4px}
+  .lock-note{display:none}
+  .g-foot{margin-top:8px}
+  .game.tex::after{font-size:90px;padding-top:56px}
+  /* üst bölüm: maçlara daha çabuk ulaşmak için sıkıştır */
+  #dayStatus .warn{display:none}
+  .status .quick-btn{flex:1;justify-content:center;padding:8px 6px;font-size:13.5px}
+  .dp{padding:8px 10px;gap:10px;margin-top:8px}
+  .dp .ico,.qcard .ico{width:34px;height:34px}
+  button.dp .tx small{display:none}
+  .qcard{padding:10px;gap:10px;margin-top:8px}
+  .qcard .qt{font-size:14px}
+  .qcard .tx > small{display:none}
+  .qbtns button{padding:7px}
+}
