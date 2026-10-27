@@ -1,0 +1,59 @@
+name: Arka plan görevleri (onay kodu, şifre sıfırlama, hatırlatma)
+
+# GitHub'ın zamanlanmış görevleri 5-10 dakikalık aralıklarda çok gecikiyor, hatta hiç çalışmıyor.
+# Bu yüzden tek bir görev ~5,5 saat açık kalıp her 20 saniyede bir bakar:
+#   - e-posta onay kodları ve şifre sıfırlama istekleri (20 sn'de bir)
+#   - tahmin hatırlatma / sakatlık / haftalık özet mailleri (10 dakikada bir)
+# Süresi dolunca kendini yeniden başlatır. Saatlik zamanlama da yedek olarak durur;
+# görev zaten çalışıyorsa sıraya girer, öbürü bitince devralır.
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: worker
+  cancel-in-progress: false
+
+jobs:
+  worker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: scripts/requirements-reset.txt
+
+      - run: pip install -r scripts/requirements-reset.txt
+
+      - name: Döngü
+        env:
+          FIREBASE_SA: ${{ secrets.FIREBASE_SA }}
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+        run: |
+          end=$(( $(date +%s) + 330*60 ))
+          last_remind=0
+          while [ "$(date +%s)" -lt "$end" ]; do
+            python scripts/verify.py || true
+            python scripts/reset.py || true
+            if [ $(( $(date +%s) - last_remind )) -ge 600 ]; then
+              python scripts/remind.py || true
+              last_remind=$(date +%s)
+            fi
+            sleep 20
+          done
+
+      - name: Kendini yeniden başlat
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run worker.yml --ref main -R ${{ github.repository }} || true
