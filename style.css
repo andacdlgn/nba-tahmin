@@ -1323,3 +1323,31 @@ button,a,[data-act],.plr,.pf-av,.pf-emo{touch-action:manipulation;-webkit-tap-hi
 .games{display:block}
 .games > .best{margin-bottom:12px}
 @media (min-width:900px){ .g-big,.g-small{grid-template-columns:1fr 1fr;align-items:start} .g-big{gap:12px} }
+
+/* v22 — uzun vade */
+.lt-card{background:var(--panel);border:1px solid var(--line);border-radius:16px;overflow:hidden;margin-bottom:18px}
+.lt-r{display:flex;align-items:center;gap:10px;width:100%;padding:12px 14px;background:none;border:0;border-top:1px solid var(--line);color:inherit;text-align:left;font:inherit;cursor:pointer}
+.lt-r:first-child{border-top:0}
+.lt-r.open{background:linear-gradient(90deg,color-mix(in srgb,var(--amber) 10%,transparent),transparent 70%)}
+.lt-t{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.lt-t b{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lt-t small{color:var(--muted);font-size:12px}
+.lt-n,.lt-p{font-weight:800;font-variant-numeric:tabular-nums;font-size:13px;padding:3px 9px;border-radius:99px;background:color-mix(in srgb,var(--muted) 18%,transparent)}
+.lt-n.ok,.lt-p.pos{background:color-mix(in srgb,var(--win) 22%,transparent);color:var(--win)}
+.lt-go{opacity:.5;display:flex}.lt-go svg{width:16px;height:16px}
+.lt-cats{display:grid;gap:8px;margin-top:12px}
+@media(min-width:600px){.lt-cats{grid-template-columns:1fr 1fr}}
+.lt-c{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:var(--panel);color:inherit;font:inherit;text-align:left;cursor:pointer;min-height:58px}
+.lt-cl{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.lt-cl small{color:var(--muted);font-size:11.5px}
+.lt-cl b{font-size:14.5px}
+.lt-img{width:46px;height:34px;object-fit:cover;border-radius:8px;background:color-mix(in srgb,var(--muted) 15%,transparent)}
+.lt-img.logo{object-fit:contain;width:34px;background:none}
+.lt-sec{margin-top:14px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.lt-sh{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:9px 12px;background:color-mix(in srgb,var(--muted) 10%,transparent)}
+.lt-sh small{color:var(--muted)}
+.lt-win{margin-left:auto;font-size:12.5px;font-weight:700;color:var(--win)}
+.lt-u{display:grid;grid-template-columns:minmax(70px,auto) 1fr auto;gap:10px;align-items:center;padding:8px 12px;border-top:1px solid var(--line);font-size:13.5px}
+.lt-u b.ok{color:var(--win)}.lt-u b.no{color:var(--muted)}
+.lt-swap{display:flex;gap:10px;align-items:center;padding:10px 12px;border-top:1px solid var(--line);background:color-mix(in srgb,var(--amber) 12%,transparent);font-size:12.5px}
+.lt-swap span{flex:1}

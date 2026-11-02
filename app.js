@@ -39,7 +39,7 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "v21";
+const VERSION = "v22";
 const LOGO_SMALL = a => `logos/${String(a).toLowerCase()}.png`;
 const LOGO_FULL  = a => `https://a.espncdn.com/i/teamlogos/nba/500/${String(a).toLowerCase()}.png`;
 document.addEventListener("error", e => {
@@ -433,7 +433,7 @@ const digitsHTML = (u, v) => `<div class="digits tnum" data-u="${u}" data-v="${v
 function seasonBreakdown(){
   const days = new Set(Object.keys(S.arch.scores.days||{}));
   for(const d of [S.today, shiftDay(S.today,-1)]) if(S.days[d] && inLeague(d)) days.add(d);
-  const b = {}; for(const u of S.order) b[u] = {pts:0, w:0, m:0, s:0, dp:0, q:0, sr:0};
+  const b = {}; for(const u of S.order){ const lt=S.lt?.loaded ? ltPoints(u) : 0; b[u] = {pts:lt, w:0, m:0, s:0, dp:0, q:0, sr:0, lt}; }
   for(const d of days){
     const dp = dayPoints(d);
     for(const u of S.order){ const p=dp[u]; if(!p) continue; b[u].pts+=p.pts; b[u].w+=p.w; b[u].m+=p.m; b[u].s+=p.s; b[u].dp+=p.dp; b[u].q+=p.q||0; b[u].sr+=p.sr||0; }
@@ -1516,15 +1516,15 @@ function renderPuan(){
   const rk=[...S.order].sort((a,b)=>tot[b]-tot[a]);
   const pod = rk.length>=2 && tot[rk[0]]>0 ? `<div class="podium">${[1,0,2].filter(i=>rk[i]).map(i=>{ const u=rk[i];
     return `<div class="pd pd${i+1}" data-pu="${u}" style="--pc:${col(u)}">${avatar(u, i===0?"lg":"")}<b style="color:${col(u)}">${esc(pname(u))}</b><span class="pd-pts tnum">${tot[u]}</span><div class="pd-step"><span>${i+1}</span></div></div>`; }).join("")}</div>` : "";
-  let html = pod + `<div class="sec-title"><h2>Puan tablosu</h2><span class="aside">${S.league?.start ? dayNice(leagueStart(),{day:"numeric",month:"long"})+" gecesinden beri" : "sezon"}</span></div>
+  let html = pod + (S.uid ? ltCardHTML() : "") + `<div class="sec-title"><h2>Puan tablosu</h2><span class="aside">${S.league?.start ? dayNice(leagueStart(),{day:"numeric",month:"long"})+" gecesinden beri" : "sezon"}</span></div>
     <div class="tbl"><div class="tr th t-lb"><span>#</span><span>Oyuncu</span><span class="r">Puan</span><span class="c">Gece</span><span class="c">Hafta</span></div>
     ${ranked.map((u,i)=>`<div class="tr t-lb"><span class="muted">${i+1}</span><span class="pn"><i style="background:${col(u)}"></i><span>${esc(pname(u))}</span></span><span class="r big tnum">${tot[u]}</span><span class="c tnum">${wins[u]}</span><span class="c tnum">${wks[u]}</span></div>`).join("")}</div>
     <p class="muted" style="font-size:13px;margin:6px 2px">Gece: tek başına en çok puan aldığın geceler. Hafta: kazandığın haftalar (pazartesi–pazar).</p>`;
   const brk = seasonBreakdown();
   html += `<div class="sec-title"><h2>Puanlar nereden geldi</h2></div>
     <div class="tbl"><div class="tr th t-br"><span>Oyuncu</span><span class="c">Kazanan</span><span class="c">Fark</span><span class="c">Skorer</span><span class="c">Diğer</span></div>
-    ${ranked.map(u=>`<div class="tr t-br"><span class="pn"><i style="background:${col(u)}"></i><span>${esc(pname(u))}</span></span><span class="c tnum">${brk[u].w}</span><span class="c tnum">${brk[u].m}</span><span class="c tnum">${brk[u].s}</span><span class="c tnum">${brk[u].dp+brk[u].q+brk[u].sr}</span></div>`).join("")}</div>
-    <p class="muted" style="font-size:13px;margin:6px 2px">Kazanan sütununa banko dahil. Diğer: günün oyuncusu, gecenin sorusu ve playoff serileri.</p>`;
+    ${ranked.map(u=>`<div class="tr t-br"><span class="pn"><i style="background:${col(u)}"></i><span>${esc(pname(u))}</span></span><span class="c tnum">${brk[u].w}</span><span class="c tnum">${brk[u].m}</span><span class="c tnum">${brk[u].s}</span><span class="c tnum">${brk[u].dp+brk[u].q+brk[u].sr+brk[u].lt}</span></div>`).join("")}</div>
+    <p class="muted" style="font-size:13px;margin:6px 2px">Kazanan sütununa banko dahil. Diğer: günün oyuncusu, gecenin sorusu, playoff serileri ve uzun vade tahminleri.</p>`;
   // aylık şampiyonlar duvarı
   const mt=monthTable(), curM=monthKey(S.today), mks=Object.keys(mt).sort().reverse();
   if(mks.length){
@@ -2171,6 +2171,175 @@ $("#nba")?.addEventListener("click", e=>{
   const t=e.target.closest("[data-ntonight]"); if(t && !t.disabled){ S.nba.tonight=t.dataset.ntonight==="1"; return renderNBA(); }
 });
 
+/* ====================================================== Uzun vadeli tahminler (haftanın, ayın oyuncusu, sezon ödülleri) */
+// Kilitler kurallarla aynı: hafta = pazartesi + 71 saat (çarşamba 23.00 UTC, TR 02.00), ay = ayın 15'i 17.00 UTC (TR 20.00), sezon = 15 Kasım 17.00 UTC.
+const EAST = new Set(["ATL","BOS","BKN","CHA","CHI","CLE","DET","IND","MIA","MIL","NY","ORL","PHI","TOR","WSH"]);
+const LT_CATS = {
+  w: [["e","Haftanın oyuncusu · Doğu",2,"E"],["w","Haftanın oyuncusu · Batı",2,"W"]],
+  m: [["pe","Ayın oyuncusu · Doğu",4,"E"],["pw","Ayın oyuncusu · Batı",4,"W"],["re","Ayın çaylağı · Doğu",3,"E"],["rw","Ayın çaylağı · Batı",3,"W"],["de","Ayın savunmacısı · Doğu",3,"E"],["dw","Ayın savunmacısı · Batı",3,"W"]],
+  s: [["mvp","MVP",12,""],["roy","Yılın çaylağı",8,""],["dpoy","Yılın savunmacısı",8,""],["mip","En çok gelişen",8,""],["smoy","Yılın 6. adamı",8,""],["coy","Yılın koçu (takımı seç)",8,"T"]],
+};
+const LT_SWAP_END = Date.UTC(2027,2,1);
+const ltType = k => k[0];
+function ltLock(k){
+  if(k[0]==="w") return Date.UTC(+k.slice(2,6), +k.slice(6,8)-1, +k.slice(8,10)) + 71*36e5;
+  if(k[0]==="m") return Date.UTC(+k.slice(2,6), +k.slice(6,8)-1, 15) + 17*36e5;
+  return Date.UTC(2026,10,15) + 17*36e5;
+}
+const MONTHS_TR=["Ocak","Şubat","Mart","Nisan","Mayıs","Haziran","Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"];
+function ltTitle(k){
+  if(k[0]==="w"){ const a=k.slice(2), b=shiftDay(a,6); return `Haftanın oyuncusu · ${dayNice(a,{day:"numeric",month:"short"})}–${dayNice(b,{day:"numeric",month:"short"})}`; }
+  if(k[0]==="m"){ const m=+k.slice(6,8); return `Ayın ödülleri · ${m===11 && k.startsWith("m_2026")?"Ekim-Kasım":MONTHS_TR[m-1]}`; }
+  return "Sezon ödülleri 2026-27";
+}
+// Gösterilecek turlar: bu hafta, geçen hafta, bu ay, geçen ay, sezon
+function ltRounds(){
+  const wk=weekKey(S.today), now=new Date();
+  const mk=(y,m)=> (y===2026 && (m===10||m===11)) ? "m_202611" : `m_${y}${String(m).padStart(2,"0")}`;
+  const y=+S.today.slice(0,4), m=+S.today.slice(4,6), pm=m===1?[y-1,12]:[y,m-1];
+  const keys=["w_"+wk, "w_"+shiftDay(wk,-7), mk(y,m), mk(...pm), "s_2027"];
+  return [...new Set(keys)].filter(k=>k>="w_20261026" || k[0]!=="w").filter(k=>k!=="m_202610");
+}
+S.lt = {mine:{}, all:{}, res:{}, loaded:false};
+const ltRef = (k,u) => doc(S.db,"lt",`${k}_${u}`);
+async function loadLT(){
+  try{ const snap=await getDocs(collection(S.db,"ltResults")); S.lt.res={}; snap.forEach(x=>{ S.lt.res[x.id]=x.data(); }); }catch(e){}
+  const keys=[...new Set([...ltRounds(), ...Object.keys(S.lt.res)])];
+  const jobs=[];
+  for(const k of keys) for(const u of S.order){
+    if(u!==S.uid && Date.now()<ltLock(k)) continue;
+    jobs.push(getDoc(ltRef(k,u)).then(x=>{ (S.lt.all[k] ||= {})[u] = x.exists() ? x.data() : null; }).catch(()=>{}));
+  }
+  await Promise.all(jobs); S.lt.loaded=true;
+  render();
+}
+// Bir oyuncunun uzun vadeden puanı (sonuçlanmış turlar)
+function ltPoints(u){
+  let t=0;
+  for(const [k,r] of Object.entries(S.lt.res)){
+    const d=S.lt.all[k]?.[u]; if(!d?.picks) continue;
+    for(const [c,,p] of LT_CATS[ltType(k)]||[]){
+      if(!r[c]) continue;
+      const sw=d.swaps?.[c]; const mine = sw ? sw.to : d.picks[c];
+      if(mine && String(mine)===String(r[c])) t += sw ? Math.floor(p/2) : p;
+    }
+  }
+  return t;
+}
+function ltStatus(k){
+  const lock=ltLock(k), res=S.lt.res[k], open=Date.now()<lock;
+  if(open){ const ms=lock-Date.now(), d=Math.floor(ms/864e5), h=Math.floor(ms%864e5/36e5); return {open, txt:`Kilide ${d?d+" gün ":""}${h} sa`}; }
+  if(res && LT_CATS[ltType(k)].every(([c])=>res[c])) return {open, done:true, txt:"Sonuçlandı"};
+  return {open, txt: res ? "Kısmen sonuçlandı" : "Kilitlendi · sonuç bekleniyor"};
+}
+function ltCardHTML(){
+  const rows=ltRounds().map(k=>{
+    const st=ltStatus(k), d=S.lt.all[k]?.[S.uid], cats=LT_CATS[ltType(k)], n=cats.filter(([c])=>d?.picks?.[c]).length;
+    let right = st.open ? `<span class="lt-n ${n===cats.length?"ok":""}">${n}/${cats.length}</span>` : "";
+    if(!st.open && S.lt.res[k]){ let p=0; const r=S.lt.res[k]; for(const [c,,pt] of cats){ const sw=d?.swaps?.[c]; const mine=sw?sw.to:d?.picks?.[c]; if(r[c] && mine && String(mine)===String(r[c])) p+=sw?Math.floor(pt/2):pt; } right=`<span class="lt-p ${p?"pos":""}">+${p}</span>`; }
+    return `<button class="lt-r ${st.open?"open":""}" data-lt="${k}"><span class="lt-t"><b>${ltTitle(k)}</b><small>${st.txt}</small></span>${right}<span class="lt-go">${ICON.chev}</span></button>`; }).join("");
+  return `<div class="sec-title"><h2>Uzun vade</h2><span class="aside">puanlar sıralamaya eklenir</span></div><div class="lt-card">${rows}</div>`;
+}
+const confOf = abbr => EAST.has(abbr) ? "E" : "W";
+function ltName(d, c){ return d?.names?.[c] || ""; }
+S.ltDraft = {};
+function openLT(k){ S.ltKey=k; S.ltDraft={...(S.lt.all[k]?.[S.uid]?.picks||{})}; S.ltNames={...(S.lt.all[k]?.[S.uid]?.names||{})}; S.ltCat=null; openSheet(`<div id="ltBox"></div>`); paintLT(); }
+function paintLT(){
+  const box=$("#ltBox"); if(!box) return;
+  const k=S.ltKey, st=ltStatus(k), cats=LT_CATS[ltType(k)], res=S.lt.res[k]||{}, mine=S.lt.all[k]?.[S.uid];
+  let h=`<h3 id="shTitle">${ltTitle(k)}</h3><p class="muted">${st.open?`Kilit: ${new Date(ltLock(k)).toLocaleString("tr-TR",{timeZone:TZ,day:"numeric",month:"long",weekday:"long",hour:"2-digit",minute:"2-digit"})}. O zamana kadar değiştirebilirsin; seçimler kilitten sonra herkese açılır.`:st.txt}</p>`;
+  if(st.open){
+    if(S.ltCat){ h += ltPicker(k, S.ltCat); box.innerHTML=h; bindLTPicker(); return; }
+    h += `<div class="lt-cats">${cats.map(([c,l,p,cf])=>{ const v=S.ltDraft[c], nm=S.ltNames[c];
+      return `<button class="lt-c" data-ltc="${c}"><span class="lt-cl"><small>${l} · +${p}</small><b>${v?esc(nm||v):'<span class="muted">Seç</span>'}</b></span>${v?(cf==="T"?`<img class="lt-img logo" src="${LOGO_SMALL(v)}" alt="">`:`<img class="lt-img" src="${FACE(v)}" alt="">`):""}</button>`; }).join("")}</div>
+      <button class="btn-primary" id="ltSave" type="button" style="margin-top:12px">Kaydet</button><small class="muted" id="ltMsg"></small>`;
+    box.innerHTML=h;
+    box.querySelector(".lt-cats").onclick=e=>{ const b=e.target.closest("[data-ltc]"); if(b){ S.ltCat=b.dataset.ltc; paintLT(); } };
+    $("#ltSave").onclick=saveLT;
+    return;
+  }
+  // kilitli: herkesin seçimleri
+  const swapOk = ltType(k)==="s" && Date.now()<LT_SWAP_END;
+  h += cats.map(([c,l,p,cf])=>{
+    const rows=S.order.map(u=>{ const d=S.lt.all[k]?.[u]; const sw=d?.swaps?.[c]; const v=sw?sw.to:d?.picks?.[c]; const nm=sw?sw.toName:ltName(d,c);
+      const ok = res[c] && v && String(v)===String(res[c]);
+      return `<div class="lt-u"><span style="color:${col(u)};font-weight:700">${esc(pname(u))}</span><span>${v?esc(nm||v):'<span class="muted">seçmedi</span>'}${sw?' <small class="muted">(değiştirdi)</small>':""}</span>${res[c]?`<b class="${ok?"ok":"no"}">${ok?"+"+(sw?Math.floor(p/2):p):"0"}</b>`:""}</div>`; }).join("");
+    const myv=mine?.picks?.[c], canSwap = swapOk && c!=="coy" && myv && !mine?.swaps?.[c] && (S.ltInelig?.[myv] || S.lt.res.s_2027?.inelig?.[myv]);
+    return `<div class="lt-sec"><div class="lt-sh"><b>${l}</b><small>+${p}</small>${res[c]?`<span class="lt-win">Kazanan: ${esc(res.names?.[c]||res[c])}</span>`:""}</div>${rows}
+      ${canSwap?`<div class="lt-swap"><span>Seçtiğin oyuncu 65 maç kuralı yüzünden aday olamıyor. Bir kerelik tercihini değiştirebilirsin (puanın yarısı).</span><button class="btn sm" data-swap="${c}">Değiştir</button></div>`:""}</div>`; }).join("");
+  box.innerHTML=h;
+  box.onclick=e=>{ const b=e.target.closest("[data-swap]"); if(b){ S.ltCat=b.dataset.swap; S.ltSwap=true; box.innerHTML=`<h3 id="shTitle">Tercihini değiştir</h3>`+ltPicker(k,S.ltCat); bindLTPicker(); } };
+  if(ltType(k)==="s") checkInelig(k);
+}
+function ltPicker(k, c){
+  const [ ,l, ,cf]=LT_CATS[ltType(k)].find(x=>x[0]===c);
+  if(cf==="T"){ const teams=(ALLP?.teams||[]).slice().sort((a,b)=>a.n.localeCompare(b.n,"tr"));
+    return `<p><b>${l}</b></p><div class="tm-grid">${teams.map(t=>`<button class="tg" data-ltp="${t.a}" data-ltn="${esc(t.n)}" style="--tc:${tcol(t.a)}"><span class="tg-l"><img src="${LOGO_SMALL(t.a)}" alt=""></span><b>${esc(t.n.split(" ").slice(-1)[0])}</b></button>`).join("")}</div><button class="linkish" id="ltBack" type="button">‹ Geri</button>`; }
+  return `<p><b>${l}</b>${cf?` <small class="muted">(yalnızca ${cf==="E"?"Doğu":"Batı"} takımlarının oyuncuları)</small>`:""}</p>
+    <input class="search" id="ltSearch" placeholder="Oyuncu adı yaz" autocomplete="off"><div id="ltList" class="pl-list"></div><button class="linkish" id="ltBack" type="button">‹ Geri</button>`;
+}
+function bindLTPicker(){
+  const k=S.ltKey, c=S.ltCat, cf=LT_CATS[ltType(k)].find(x=>x[0]===c)[3];
+  const choose=(id,name)=>{
+    if(S.ltSwap){ S.ltSwap=false; return saveSwap(c,id,name); }
+    S.ltDraft[c]=id; S.ltNames[c]=name; S.ltCat=null; paintLT(); };
+  $("#ltBack").onclick=()=>{ S.ltCat=null; S.ltSwap=false; paintLT(); };
+  if(cf==="T"){ $("#ltBox").querySelector(".tm-grid").onclick=e=>{ const b=e.target.closest("[data-ltp]"); if(b) choose(b.dataset.ltp, b.dataset.ltn); }; return; }
+  const paint=()=>{ const q=slug($("#ltSearch").value||""); let list=(ALLP?.players||[]).filter(p=>!cf || confOf(p.t)===cf).map(p=>({...p, ppg:ppg(p.id)}));
+    if(q) list=list.filter(p=>slug(p.n).includes(q)); list.sort((a,b)=>(b.ppg??-1)-(a.ppg??-1)); list=list.slice(0,40);
+    $("#ltList").innerHTML=list.map(p=>`<button class="plr" data-ltp="${p.id}" data-ltn="${esc(p.n)}"><img src="${FACE(p.id)}" alt="" loading="lazy"><span class="pi"><b>${esc(p.n)}</b><small>${esc(p.t)}</small></span><span class="ppg">${p.ppg!=null?p.ppg.toFixed(1):"–"}<small>sayı ort.</small></span></button>`).join("") || `<p class="muted">Oyuncu bulunamadı.</p>`; };
+  $("#ltSearch").oninput=paint; $("#ltList").onclick=e=>{ const b=e.target.closest("[data-ltp]"); if(b) choose(b.dataset.ltp, b.dataset.ltn); };
+  paint(); $("#ltSearch").focus();
+}
+async function saveLT(){
+  const k=S.ltKey; if(Date.now()>=ltLock(k)) return toast("Bu tur kilitlendi.");
+  const data={uid:S.uid, key:k, picks:{...S.ltDraft}, names:{...S.ltNames}, updatedAt:serverTimestamp()};
+  try{ await setDoc(ltRef(k,S.uid), data); (S.lt.all[k] ||= {})[S.uid]={...data}; toast("Uzun vade tahminin kaydedildi."); closeSheet(); if(S.tab==="puan") renderPuan(); }
+  catch(e){ $("#ltMsg").textContent="Kaydedilemedi, tekrar dene."; }
+}
+async function saveSwap(c, id, name){
+  const k=S.ltKey, cur=S.lt.all[k]?.[S.uid]; if(!cur) return;
+  const swaps={...(cur.swaps||{}), [c]:{from:cur.picks[c], to:id, toName:name}};
+  try{ await setDoc(ltRef(k,S.uid), {...cur, swaps, updatedAt:serverTimestamp()}); cur.swaps=swaps; toast("Tercihin değişti."); paintLT(); }
+  catch(e){ toast("Değiştirilemedi."); paintLT(); }
+}
+// 65 maç kuralı: takımın oynadığı maç - oyuncunun oynadığı maç > 17 ise aday olamaz
+S.ltInelig = {};
+async function checkInelig(k){
+  const d=S.lt.all[k]?.[S.uid]; if(!d?.picks || checkInelig.busy) return; checkInelig.busy=true;
+  try{ await nbaStandings(); const all=(S.standings||[]).flatMap(c=>c.entries);
+    for(const [c,v] of Object.entries(d.picks)){ if(c==="coy" || S.ltInelig[v]!=null) continue;
+      const p=(ALLP?.players||[]).find(x=>x.id===v); const e=all.find(x=>x.team.abbreviation===p?.t); if(!e) continue;
+      const ov=await cached("ov_"+v, `${WEB}/common/v3/sports/basketball/nba/athletes/${v}/overview`, 60*60e3).catch(()=>null);
+      const lab=ov?.statistics?.labels||[], reg=(ov?.statistics?.splits||[]).find(x=>/regular/i.test(x.displayName));
+      const gp=reg ? +reg.stats[lab.indexOf("GP")] : 0, tgp=(+stOf(e,"wins")||0)+(+stOf(e,"losses")||0);
+      S.ltInelig[v] = (tgp-gp) > 17; }
+  }catch(e){}
+  checkInelig.busy=false; if($("#ltBox") && S.ltKey===k && !S.ltCat) paintLT();
+}
+// Yönetim: sonuç girme
+function openLTAdmin(){
+  const keys=[...new Set([...ltRounds(), ...Object.keys(S.lt.res)])].filter(k=>Date.now()>=ltLock(k) || k[0]==="s").sort().reverse();
+  S.ltAdmKey = S.ltAdmKey && keys.includes(S.ltAdmKey) ? S.ltAdmKey : keys[0];
+  const k=S.ltAdmKey, r=S.lt.res[k]||{};
+  const opts=(ALLP?.players||[]).map(p=>`<option value="${esc(p.n)} · ${p.t} · ${p.id}">`).join("");
+  const topts=(ALLP?.teams||[]).map(t=>`<option value="${esc(t.n)} · ${t.a}">`).join("");
+  openSheet(`<h3 id="shTitle">Uzun vade sonuçları</h3><p class="muted">Kazananlar açıklanınca buradan gir; puanlar herkese otomatik dağılır.</p>
+    <select id="ltAdmK" class="adm-in">${keys.map(x=>`<option value="${x}" ${x===k?"selected":""}>${ltTitle(x)}</option>`).join("")}</select>
+    <datalist id="ltPl">${opts}</datalist><datalist id="ltTm">${topts}</datalist>
+    ${LT_CATS[ltType(k)].map(([c,l,,cf])=>`<label class="fld"><span>${l}</span><input class="adm-in" data-ltr="${c}" list="${cf==="T"?"ltTm":"ltPl"}" value="${r[c]?esc((r.names?.[c]||"")+(cf==="T"?" · "+r[c]:" ·  · "+r[c])):""}" placeholder="Yazmaya başla, listeden seç"></label>`).join("")}
+    ${k[0]==="s"?`<label class="fld"><span>65 maç kuralına takılanlar (oyuncu, virgülle)</span><input class="adm-in" id="ltInel" list="ltPl" value="${esc(Object.keys(r.inelig||{}).join(", "))}" placeholder="oyuncu kimlikleri"></label>`:""}
+    <button class="btn-primary" id="ltAdmSave" type="button">Kaydet</button><small class="muted" id="ltAdmMsg"></small>`);
+  $("#ltAdmK").onchange=e=>{ S.ltAdmKey=e.target.value; openLTAdmin(); };
+  $("#ltAdmSave").onclick=async()=>{
+    const out={names:{}};
+    for(const el of $$("[data-ltr]")){ const v=el.value.trim(); if(!v) continue; const parts=v.split("·").map(x=>x.trim()); const id=parts.at(-1); out[el.dataset.ltr]=id; out.names[el.dataset.ltr]=parts[0]; }
+    if($("#ltInel")){ out.inelig={}; for(const x of $("#ltInel").value.split(",").map(s=>s.trim().split("·").pop().trim()).filter(Boolean)) out.inelig[x]=true; }
+    try{ await setDoc(doc(S.db,"ltResults",k), out); S.lt.res[k]=out; $("#ltAdmMsg").textContent="Kaydedildi."; loadLT(); }catch(e){ $("#ltAdmMsg").textContent="Kaydedilemedi."; }
+  };
+}
+document.addEventListener("click", e=>{ const b=e.target.closest("[data-lt]"); if(b){ e.stopPropagation(); allPlayers().catch(()=>{}).then(()=>openLT(b.dataset.lt)); } });
+
 /* ====================================================== gezinme ve yenileme */
 // Yeni kazanılan rozeti bir kez kutla (sayılar telefonda saklanır; ilk açılışta sessizce kaydedilir)
 function checkNewBadges(){
@@ -2632,10 +2801,12 @@ async function openAdmin(){
     <div class="pf-sec"><h4>Davet kodu</h4><div class="adm-row"><input id="admInv" class="adm-in" value="${esc(S.invite||"")}" maxlength="40"><button class="btn" id="admInvSave" type="button">Kaydet</button></div>
       <small class="muted" id="admInvMsg">Yeni oyuncular bu kodla katılır. Kodu değiştirince eski kod ve eski link çalışmaz.</small>
       <button class="btn" id="admLink" type="button" style="margin-top:8px">${ICON.link}Davet linkini paylaş</button></div>
+    <div class="pf-sec"><h4>Uzun vade</h4><button class="btn" id="admLT" type="button">${ICON.medal}Sonuçları gir</button></div>
     <div class="pf-sec"><h4>Duyuru</h4><small class="muted" style="margin:0 0 8px">Sitenin üstünde herkese görünür. Kapatan bir daha görmez; yeni duyuru yine çıkar.</small>
       <textarea id="admNotice" class="adm-in" rows="2" maxlength="200" placeholder="ör. Yeni oyuncu: Zeki 👋">${esc(S.notice?.text||"")}</textarea>
       <div class="adm-row" style="margin-top:8px"><button class="btn" id="admNoticeSave" type="button">Yayınla</button>${S.notice?.text?'<button class="btn danger" id="admNoticeDel" type="button">Kaldır</button>':""}</div>
       <small class="muted" id="admNoticeMsg"></small></div>`;
+  $("#admLT")?.addEventListener("click", ()=>allPlayers().catch(()=>{}).then(openLTAdmin));
   $("#admStart").onchange=()=>$("#admDate").classList.toggle("hide", $("#admStart").value!=="custom");
   $("#admReset").onclick=e=>confirmBtn(e.currentTarget,"Emin misin? Tekrar dokun",async()=>{
     let ns=$("#admStart").value; if(ns==="custom"){ const v=$("#admDate").value; if(!v){ $("#admResetMsg").textContent="Bir tarih seç."; return; } ns=v.replaceAll("-",""); }
@@ -2700,6 +2871,7 @@ if("serviceWorker" in navigator && location.protocol==="https:") navigator.servi
     $("#foot").innerHTML=`Kazanan +1 · Fark +1 · En skorer +1 · Banko +2 / -1 · Günün oyuncusu +2 · Gecenin sorusu +1<br>Veriler ESPN'den alınır. Maç varken 30 saniyede bir yenilenir.<br><span class="ver">${VERSION}</span>`;
     route(); showDay(); Promise.resolve(refresh()).catch(()=>{}).finally(()=>dispatchEvent(new Event("app-ready")));
     checkRecovery();
+    loadLT();
     getDoc(doc(S.db,"config","secret")).then(r=>{ S.isAdmin=true; S.invite=r.data()?.invite||""; }).catch(()=>{ S.isAdmin=false; });
     getDoc(doc(S.db,"contacts",S.uid)).then(r=>{ S.contact = r.exists() ? r.data() : {email:"",remind:false}; }).catch(()=>{}).finally(()=>{ S.contactLoaded=true; renderBanners(); });
   });

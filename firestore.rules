@@ -39,6 +39,36 @@ service cloud.firestore {
             && !d.bio.lower().matches('.*(orospu|siktir|sikerim|sikeyim|yarrak|am[iı]nak|amc[iı]k|ibne|pezevenk|kahpe|[sş]erefsiz|fuck|bitch|nigg|faggot).*')));
     }
 
+    // Uzun vadeli tahminler: lt/{tur}_{uid}. Kilit tur anahtarından hesaplanır; kilitten sonra herkes görür.
+    function ltLock(k) {
+      return k.matches('^w_[0-9]{8}$') ? timestamp.date(int(k[2:6]), int(k[6:8]), int(k[8:10])) + duration.value(71, 'h')
+        : k.matches('^m_[0-9]{6}$') ? timestamp.date(int(k[2:6]), int(k[6:8]), 15) + duration.value(17, 'h')
+        : timestamp.date(2026, 11, 15) + duration.value(17, 'h');
+    }
+    match /lt/{id} {
+      allow read: if resource == null
+        || (signedIn() && resource.data.uid == request.auth.uid)
+        || (signedIn() && request.time >= ltLock(resource.data.key));
+      allow create, update: if isPlayer()
+        && id == request.resource.data.key + '_' + request.auth.uid
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.key.matches('^(w_[0-9]{8}|m_[0-9]{6}|s_2027)$')
+        && request.resource.data.keys().hasOnly(['uid', 'key', 'picks', 'names', 'swaps', 'updatedAt'])
+        && request.resource.data.picks is map && request.resource.data.picks.size() <= 6
+        && request.resource.data.updatedAt == request.time
+        && (request.time < ltLock(request.resource.data.key)
+          || (resource != null && request.resource.data.key == 's_2027'
+              && request.time < timestamp.date(2027, 3, 1)
+              && request.resource.data.picks == resource.data.picks
+              && request.resource.data.get('names', {}) == resource.data.get('names', {})
+              && request.resource.data.swaps.size() == resource.data.get('swaps', {}).size() + 1));
+    }
+    // Uzun vade sonuçları: herkes okur, yönetici yazar.
+    match /ltResults/{k} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
     match /config/{doc} {
       allow read, write: if false;
     }
