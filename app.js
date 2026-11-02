@@ -39,7 +39,7 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "v22";
+const VERSION = "v24";
 const LOGO_SMALL = a => `logos/${String(a).toLowerCase()}.png`;
 const LOGO_FULL  = a => `https://a.espncdn.com/i/teamlogos/nba/500/${String(a).toLowerCase()}.png`;
 document.addEventListener("error", e => {
@@ -1516,7 +1516,7 @@ function renderPuan(){
   const rk=[...S.order].sort((a,b)=>tot[b]-tot[a]);
   const pod = rk.length>=2 && tot[rk[0]]>0 ? `<div class="podium">${[1,0,2].filter(i=>rk[i]).map(i=>{ const u=rk[i];
     return `<div class="pd pd${i+1}" data-pu="${u}" style="--pc:${col(u)}">${avatar(u, i===0?"lg":"")}<b style="color:${col(u)}">${esc(pname(u))}</b><span class="pd-pts tnum">${tot[u]}</span><div class="pd-step"><span>${i+1}</span></div></div>`; }).join("")}</div>` : "";
-  let html = pod + (S.uid ? ltCardHTML() : "") + `<div class="sec-title"><h2>Puan tablosu</h2><span class="aside">${S.league?.start ? dayNice(leagueStart(),{day:"numeric",month:"long"})+" gecesinden beri" : "sezon"}</span></div>
+  let html = pod + `<div class="sec-title"><h2>Puan tablosu</h2><span class="aside">${S.league?.start ? dayNice(leagueStart(),{day:"numeric",month:"long"})+" gecesinden beri" : "sezon"}</span></div>
     <div class="tbl"><div class="tr th t-lb"><span>#</span><span>Oyuncu</span><span class="r">Puan</span><span class="c">Gece</span><span class="c">Hafta</span></div>
     ${ranked.map((u,i)=>`<div class="tr t-lb"><span class="muted">${i+1}</span><span class="pn"><i style="background:${col(u)}"></i><span>${esc(pname(u))}</span></span><span class="r big tnum">${tot[u]}</span><span class="c tnum">${wins[u]}</span><span class="c tnum">${wks[u]}</span></div>`).join("")}</div>
     <p class="muted" style="font-size:13px;margin:6px 2px">Gece: tek başına en çok puan aldığın geceler. Hafta: kazandığın haftalar (pazartesi–pazar).</p>`;
@@ -2198,7 +2198,7 @@ function ltRounds(){
   const mk=(y,m)=> (y===2026 && (m===10||m===11)) ? "m_202611" : `m_${y}${String(m).padStart(2,"0")}`;
   const y=+S.today.slice(0,4), m=+S.today.slice(4,6), pm=m===1?[y-1,12]:[y,m-1];
   const keys=["w_"+wk, "w_"+shiftDay(wk,-7), mk(y,m), mk(...pm), "s_2027"];
-  return [...new Set(keys)].filter(k=>k>="w_20261026" || k[0]!=="w").filter(k=>k!=="m_202610");
+  return [...new Set(keys)].filter(k=>k>="w_20261102" || k[0]!=="w").filter(k=>k!=="m_202610");
 }
 S.lt = {mine:{}, all:{}, res:{}, loaded:false};
 const ltRef = (k,u) => doc(S.db,"lt",`${k}_${u}`);
@@ -2238,7 +2238,22 @@ function ltCardHTML(){
     let right = st.open ? `<span class="lt-n ${n===cats.length?"ok":""}">${n}/${cats.length}</span>` : "";
     if(!st.open && S.lt.res[k]){ let p=0; const r=S.lt.res[k]; for(const [c,,pt] of cats){ const sw=d?.swaps?.[c]; const mine=sw?sw.to:d?.picks?.[c]; if(r[c] && mine && String(mine)===String(r[c])) p+=sw?Math.floor(pt/2):pt; } right=`<span class="lt-p ${p?"pos":""}">+${p}</span>`; }
     return `<button class="lt-r ${st.open?"open":""}" data-lt="${k}"><span class="lt-t"><b>${ltTitle(k)}</b><small>${st.txt}</small></span>${right}<span class="lt-go">${ICON.chev}</span></button>`; }).join("");
-  return `<div class="sec-title"><h2>Uzun vade</h2><span class="aside">puanlar sıralamaya eklenir</span></div><div class="lt-card">${rows}</div>`;
+  return `<div class="lt-card">${rows}</div>`;
+}
+function renderUzun(){
+  const el=$("#uzun"); if(!el) return;
+  if(!S.uid){ el.innerHTML=`<div class="note">Uzun vade tahminleri için giriş yap.</div>`; return; }
+  const tot=S.order.map(u=>[u, S.lt.loaded?ltPoints(u):0]).sort((a,b)=>b[1]-a[1]);
+  el.innerHTML = `<div class="sec-title"><h2>Uzun vade</h2><span class="aside">puanlar sıralamaya eklenir</span></div>
+    ${S.lt.loaded ? ltCardHTML() : `<div class="note">Yükleniyor…</div>`}
+    <div class="sec-title"><h2>Uzun vade puanları</h2></div>
+    <div class="lt-card">${tot.map(([u,p])=>`<div class="lt-r" style="cursor:default"><span class="lt-t"><b style="color:${col(u)}">${esc(pname(u))}</b></span><span class="lt-p ${p?"pos":""}">${p}</span></div>`).join("")}</div>
+    <div class="note" style="margin-top:14px"><b>Nasıl oynanır?</b><br>
+    · Haftanın oyuncusu (Doğu ve Batı): çarşamba gecesi kilitlenir, doğru tahmin +2.<br>
+    · Ayın oyuncusu +4, ayın çaylağı +3, ayın savunmacısı +3 (Doğu ve Batı ayrı): her ayın 15'inde 20.00'de kilitlenir. İlk tur Ekim-Kasım.<br>
+    · Sezon ödülleri: MVP +12; yılın çaylağı, savunmacısı, en çok gelişen, 6. adam ve koçu +8. 15 Kasım 20.00'de kilitlenir.<br>
+    · Seçtiğin oyuncu 65 maç kuralına takılırsa 1 Mart'a kadar bir kere değiştirebilirsin; değişen seçim puanın yarısını alır.<br>
+    · Seçimler kilitten sonra herkese açılır.</div>`;
 }
 const confOf = abbr => EAST.has(abbr) ? "E" : "W";
 function ltName(d, c){ return d?.names?.[c] || ""; }
@@ -2294,7 +2309,7 @@ function bindLTPicker(){
 async function saveLT(){
   const k=S.ltKey; if(Date.now()>=ltLock(k)) return toast("Bu tur kilitlendi.");
   const data={uid:S.uid, key:k, picks:{...S.ltDraft}, names:{...S.ltNames}, updatedAt:serverTimestamp()};
-  try{ await setDoc(ltRef(k,S.uid), data); (S.lt.all[k] ||= {})[S.uid]={...data}; toast("Uzun vade tahminin kaydedildi."); closeSheet(); if(S.tab==="puan") renderPuan(); }
+  try{ await setDoc(ltRef(k,S.uid), data); (S.lt.all[k] ||= {})[S.uid]={...data}; toast("Uzun vade tahminin kaydedildi."); closeSheet(); render(); }
   catch(e){ $("#ltMsg").textContent="Kaydedilemedi, tekrar dene."; }
 }
 async function saveSwap(c, id, name){
@@ -2371,13 +2386,14 @@ function render(){
   if(S.tab==="sonuclar") renderResults();
   if(S.tab==="ayrisma") renderAyrisma();
   if(S.tab==="puan") renderPuan();
+  if(S.tab==="uzun") renderUzun();
   if(S.tab==="nba" && !render.nbaAt) { render.nbaAt=1; renderNBA(); }
   if(S.tab==="istatistik") renderStats();
 }
 function route(){
   const t=(location.hash||"#tahmin").slice(1);
   if(t==="istatistik"){ history.replaceState(null,"","#tahmin"); setTimeout(()=>S.uid && openProf(S.statFor||S.uid,"ist"),50); }
-  S.tab=["tahmin","sonuclar","ayrisma","puan","nba"].includes(t)?t:"tahmin";
+  S.tab=["tahmin","sonuclar","ayrisma","puan","uzun","nba"].includes(t)?t:"tahmin";
   render.nbaAt=0;
   $$("[data-view]").forEach(v=>v.classList.toggle("hide", v.id!=="view-"+S.tab));
   $$(".nav a").forEach(a=>a.dataset.tab===S.tab?a.setAttribute("aria-current","page"):a.removeAttribute("aria-current"));

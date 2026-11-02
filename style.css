@@ -1351,3 +1351,4 @@ button,a,[data-act],.plr,.pf-av,.pf-emo{touch-action:manipulation;-webkit-tap-hi
 .lt-u b.ok{color:var(--win)}.lt-u b.no{color:var(--muted)}
 .lt-swap{display:flex;gap:10px;align-items:center;padding:10px 12px;border-top:1px solid var(--line);background:color-mix(in srgb,var(--amber) 12%,transparent);font-size:12.5px}
 .lt-swap span{flex:1}
+@media (max-width:420px){ .nav a{font-size:10.5px;letter-spacing:0} .nav a svg{width:21px;height:21px} }
