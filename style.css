@@ -1025,9 +1025,9 @@ footer .ver{display:inline-block;margin-top:6px;opacity:.7;font-variant-numeric:
 
 /* 5) bilgisayar düzeni: ortada, maç kartları iki sütun */
 @media (min-width:1000px){
-  #games{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start}
-  #games > .best{grid-column:1/-1}
-  #games .game{margin:0}
+  .g-big{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start}
+  .g-small{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:start}
+  .g-big .game,.g-small .game{margin:0}
 }
 
 /* 9) podyum */
@@ -1313,3 +1313,13 @@ button,a,[data-act],.plr,.pf-av,.pf-emo{touch-action:manipulation;-webkit-tap-hi
     linear-gradient(135deg,color-mix(in srgb,var(--pc) 85%,#000) 0,color-mix(in srgb,var(--pc) 35%,#000) 100%)}
 .pc-cover.photo::after{background:linear-gradient(180deg,transparent 70%,var(--bg) 100%)}
 @media (max-width:480px){ .pc-cover.photo{background-position:right -10px bottom 0,0 0,0 0;background-size:auto 92%,auto,auto} }
+
+/* v21: küçük satırlar ve büyük kartlar ayrı gruplar */
+.g-small,.g-big{display:grid;gap:10px}
+.g-small{gap:8px}
+.g-small + .g-big,.g-big + .g-small{margin-top:12px}
+.g-small .game,.g-big .game{margin:0}
+@media (min-width:1000px){ .g-big,.g-small{grid-template-columns:1fr 1fr;align-items:start} .g-big{gap:12px} }
+.games{display:block}
+.games > .best{margin-bottom:12px}
+@media (min-width:900px){ .g-big,.g-small{grid-template-columns:1fr 1fr;align-items:start} .g-big{gap:12px} }

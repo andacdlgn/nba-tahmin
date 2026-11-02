@@ -39,7 +39,7 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "v20";
+const VERSION = "v21";
 const LOGO_SMALL = a => `logos/${String(a).toLowerCase()}.png`;
 const LOGO_FULL  = a => `https://a.espncdn.com/i/teamlogos/nba/500/${String(a).toLowerCase()}.png`;
 document.addEventListener("error", e => {
@@ -754,7 +754,18 @@ function prefetchInfo(D){
 function renderGames(){
   const D = S.days[S.day];
   if(!D){ $("#games").innerHTML = skeletonCards(); return; }
-  $("#games").innerHTML = bestPickCard(D) + D.games.map(g => g.state==="post" && !S.open.has(g.id) ? compactCard(g) : isDone(g, D) ? pickedCard(g) : gameCard(g)).join("");
+  // Küçük satırlar (tahmini yapılmış ya da bitmiş maçlar) ve büyük kartlar ayrı gruplarda:
+  // böylece iki sütunlu ekranda küçük satırların yanında boşluk kalmaz.
+  // Kilitten önce tahmini yapılanlar üstte; maçlar başladıktan sonra süren maçlar üstte, bitenler altta.
+  const small=[], big=[];
+  for(const g of D.games){
+    if(g.state==="post" && !S.open.has(g.id)) small.push(compactCard(g));
+    else if(isDone(g, D)) small.push(pickedCard(g));
+    else big.push(gameCard(g));
+  }
+  const sm = small.length ? `<div class="g-small">${small.join("")}</div>` : "", bg = big.length ? `<div class="g-big">${big.join("")}</div>` : "";
+  const locked = D.games.some(started);
+  $("#games").innerHTML = bestPickCard(D) + (locked ? bg + sm : sm + bg);
   celebrate(D);
   prefetchInfo(D);
   refreshInjuries(D);
