@@ -45,10 +45,11 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.10.1";
+const VERSION = "1.10.2";
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.10.2", d:"3 Kasım 2026", items:["İngilizce arayüzde kalan Türkçe metinler çevrildi."]},
   {v:"1.10.1", d:"3 Kasım 2026", items:["Renk düzeltmelerinin herkese yüklenmesi için sürüm yenilendi; sakatlık rozetleri anlamına göre renkli."]},
   {v:"1.10.0", d:"3 Kasım 2026", items:["Mobilde aşağı kaydırınca üst çubuk ve alt menü saklanıyor, yukarı kaydırınca geri geliyor.","Puan tablosu tam haliyle Bu Gece ve Sıralama'da; diğer sekmelerde tek satırlık şerit, dokununca açılıyor.","İngilizce çeviriler ayrı dosyada; Türkçe kullananlar için site daha hafif.","Stil dosyası ve yazı tipleri sadeleşti.","Renk zıtlığı: takım temasının vurgu rengi ve oyuncu renkleri her temada okunur hale getirildi."]},
   {v:"1.9.3", d:"3 Kasım 2026", items:["Mobilde dokunma alanları büyüdü (gün okları, isimler, alt bilgi bağlantıları).","Günün oyuncusu ve gecenin sorusunda seçmeyenler tek satırda.","NBA sekmesinde son açtığın bölüm hatırlanıyor.","Takım logoları daha hafif, sayfa daha hızlı açılıyor."]},
@@ -232,6 +233,18 @@ EN_RX.push(
 
 
 
+const EN_MON = {Ocak:"January",Şubat:"February",Mart:"March",Nisan:"April",Mayıs:"May",Haziran:"June",Temmuz:"July",Ağustos:"August",Eylül:"September",Ekim:"October",Kasım:"November",Aralık:"December"};
+EN_RX.push(
+  [/^Tümünü göster \((\d+)\)$/, "Show all ($1)"], [/^· (\d+) puan$/, "· $1 pts"], [/^· (\d+) maç$/, "· $1 games"],
+  [/^Son 5 maçtaki (.+?) ortalaması; ▲ sezon ortalamasından ne kadar yüksek olduğu\.(.*)$/, (m,c)=>`Last-5-game average (${EN[c[0].toUpperCase()+c.slice(1)]||c}); ▲ how far above the season average.`],
+  [/^(\w+) · çaylak$/, "$1 · rookie"], [/^(.+) maçları \(ABD tarihi; G\/M sonuç\)$/, "$1 games (US date; W/L result)"],
+  [/^(Attığı|Yediği) sayı \(ort\.\)(?: · Ligde (\d+)\.)?$/, (m,k,r)=>`${k==="Attığı"?"Points scored":"Points allowed"} (avg.)${r?` · ${r}${["th","st","nd","rd"][(r%100>10&&r%100<14)?0:Math.min(r%10,4)%4]||"th"} in league`:""}`],
+  [/^(Doğu|Batı) sırası$/, (m,c)=>`${c==="Doğu"?"East":"West"} seed`],
+  [/^Haftanın oyuncusu · (.+)$/, "Player of the week · $1"], [/^Ayın ödülleri · (.+)$/, (m,x)=>"Monthly awards · "+x.split("-").map(v=>EN_MON[v]||v).join("–")],
+  [/^(Ocak|Şubat|Mart|Nisan|Mayıs|Haziran|Temmuz|Ağustos|Eylül|Ekim|Kasım|Aralık) (\d{4})$/, (m,a,y)=>EN_MON[a]+" "+y],
+  [/^(\d+)-(\d+) \(G-M\)(.*)$/, "$1-$2 (W-L)$3"],
+  [/^Seçmeyen: (.+)$/, "No pick: $1"], [/^Cevaplamayan: (.+)$/, "No answer: $1"],
+);
 EN_RX.push(
   [/^🏀 Zirvede (.+) var: (\d+) puan\. (.+) (\d+) puan geride\.$/, "🏀 $1 leads with $2 pts. $3 is $4 behind."],
   [/^🏀 Zirvede ortalık karışık: (.+) ve (.+) (\d+) puanla berabere\.?$/, "🏀 It's tight at the top: $1 and $2 tied on $3 pts."],
@@ -2482,14 +2495,14 @@ async function teamPage(abbr, root, opts={}){
   const my=userRecs(S.uid).filter(x=>x.home.abbr===abbr||x.away.abbr===abbr), ok=my.filter(x=>x.r.w>0).length;
   if(!root.isConnected) return;
   const DIV={Atlantic:"Atlantik",Central:"Merkez",Southeast:"Güneydoğu",Northwest:"Kuzeybatı",Pacific:"Pasifik",Southwest:"Güneybatı",Eastern:"Doğu",Western:"Batı"};
-  const stand=(sch?.team?.standingSummary||"").replace(/^(\d+)\w*\s+in\s+(\w+)\s+(Division|Conference)$/i,(m,n,d,k)=>`${DIV[d]||d} ${/conf/i.test(k)?"Konferansı":"Grubu"}nda ${n}.`);
+  const stand=UI_EN ? (sch?.team?.standingSummary||"") : (sch?.team?.standingSummary||"").replace(/^(\d+)\w*\s+in\s+(\w+)\s+(Division|Conference)$/i,(m,n,d,k)=>`${DIV[d]||d} ${/conf/i.test(k)?"Konferansı":"Grubu"}nda ${n}.`);
   root.querySelector(".tmRec").textContent=[sch?.team?.recordSummary?`${sch.team.recordSummary} (G-M)`:"", stand].filter(Boolean).join(" · ");
   root.querySelector(".tmBody").innerHTML=`
     <div class="sec-title"><h2 style="font-size:20px">Son maçlar</h2></div>
     ${done.length?`<div class="tm-list">${done.map(e=>{ const {me,op}=side(e); const w=me?.winner; return `<div class="tm-g"><span class="tm-r ${w?"W":"L"}">${w?"G":"M"}</span><img src="${LOGO_SMALL(op?.team?.abbreviation||"")}" alt=""><span>${me?.homeAway==="home"?"":"@ "}${esc(op?.team?.shortDisplayName||op?.team?.abbreviation||"")}</span><b>${sc(me?.score)}–${sc(op?.score)}</b><small>${new Date(e.date).toLocaleDateString(LOC,{timeZone:TZ,day:"numeric",month:"short"})}</small></div>`; }).join("")}</div>`:'<div class="note">Bu sezon henüz maçı yok.</div>'}
     ${next.length?`<div class="sec-title"><h2 style="font-size:20px">Sıradaki maçlar</h2></div><div class="tm-list">${next.map(e=>{ const {me,op}=side(e); return `<div class="tm-g"><span class="tm-r"></span><img src="${LOGO_SMALL(op?.team?.abbreviation||"")}" alt=""><span>${me?.homeAway==="home"?"":"@ "}${esc(op?.team?.shortDisplayName||"")}</span><small>${new Date(e.date).toLocaleString(LOC,{timeZone:TZ,day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}</small></div>`; }).join("")}</div>`:""}
     <div class="sec-title"><h2 style="font-size:20px">Sakatlar</h2></div>
-    ${inj.length?`<div class="tm-list">${inj.map(p=>`<button class="tm-g tm-inj" data-ath="${p.id}"><span class="tm-r ${p.o?"L":"T"}"></span><span>${esc(p.n)}${p.c?`<small class="inj-c">${esc(p.c)}</small>`:""}</span><small>${p.s}${p.y?` · ${esc((INJ_PART[p.y]||p.y).toLocaleLowerCase("tr"))}`:""}</small></button>`).join("")}</div>`:'<div class="note">Sakat oyuncu yok.</div>'}
+    ${inj.length?`<div class="tm-list">${inj.map(p=>`<button class="tm-g tm-inj" data-ath="${p.id}"><span class="tm-r ${p.o?"L":"T"}"></span><span>${esc(p.n)}${p.c?`<small class="inj-c">${esc(p.c)}</small>`:""}</span><small>${UI_EN?({Oynamıyor:"Out",Belirsiz:"Questionable",Cezalı:"Suspended"}[p.s]||p.s):p.s}${p.y?` · ${esc(UI_EN?p.y.toLowerCase():(INJ_PART[p.y]||p.y).toLocaleLowerCase("tr"))}`:""}</small></button>`).join("")}</div>`:'<div class="note">Sakat oyuncu yok.</div>'}
     <div class="sec-title"><h2 style="font-size:20px">Senin karnen</h2></div>
     ${my.length?`<div class="box"><b style="font-size:20px">%${Math.round(ok/my.length*100)}</b> <span class="muted">bu takımın ${my.length} maçında kazananı bildin</span>
       <div class="pk" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px">${my.slice(-6).reverse().map(x=>`<span class="rc ${x.r.w>0?"ok":"no"}"><i>${x.r.w>0?"✓":"✗"}</i>${esc(x.away.abbr)}–${esc(x.home.abbr)}</span>`).join("")}</div></div>`:'<div class="note">Bu takımın maçlarına tahmin yaptıkça karnen burada oluşacak.</div>'}`;
