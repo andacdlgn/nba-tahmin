@@ -45,7 +45,13 @@ jobs:
           end=$(( $(date +%s) + 330*60 ))
           last_remind=0
           last_sync=0
+          last_pull=$(date +%s)
           while [ "$(date +%s)" -lt "$end" ]; do
+            # yeni betikler ve veriler görev yeniden başlamadan da gelsin (5 dakikada bir)
+            if [ $(( $(date +%s) - last_pull )) -ge 300 ]; then
+              git pull -q --ff-only origin main || true
+              last_pull=$(date +%s)
+            fi
             python scripts/verify.py || true
             python scripts/reset.py || true
             if [ $(( $(date +%s) - last_remind )) -ge 600 ]; then
