@@ -45,10 +45,11 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.12.0";
+const VERSION = "1.13.0";
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.13.0", d:"3 Kasım 2026", items:["Fark artık kaydırıcıyla sayı olarak seçiliyor; gerçek farka 3 sayı ya da daha yakınsan +1.","Yedek tahmin (isteğe bağlı): unuttuğun gecede ESPN favorileri girer, her 2 doğru kazanan 1 puan.","Devamlılık bonusu: haftada en az 4 gece oynayana +2.","Hiç tahmin yapmamış oyunculara ilk maçta adım adım rehber.","Yönetim paneli: her oyuncunun oynadığı gece sayısı ve son girişi."]},
   {v:"1.12.0", d:"3 Kasım 2026", items:["Daha hızlı açılış: sitenin kendi dosyaları telefondaki kopyadan anında açılıyor, yeni sürüm arka planda iniyor.","Sakatlık listesi, kadrolar ve oyuncu listesi ilk ekran çizildikten sonra yükleniyor.","Fotoğraf sunucusuna ve sitenin koduna önceden bağlanılıyor."]},
   {v:"1.11.3", d:"3 Kasım 2026", items:["Görsel hizalar: kürsüde isimler aynı hizada, takım liderleri kartları eşit boyda, oyuncu arama seçicileri ekrandan taşmıyor, filtre düğmeleri alt satıra geçiyor, puan şeridi telefonda kesilmiyor, puan tablosunda takım adları iki satıra kadar görünüyor."]},
   {v:"1.11.2", d:"3 Kasım 2026", items:["Telefonda dokunuşlar düzeldi: canlı veri gelince ekran parmağının altında değişmiyor, çubuklar yanlışlıkla açılıp kapanmıyor, hızlı dokunuşlar yakınlaştırmaya dönüşmüyor.","İnce şeritte önündeki ve arkandaki rakiple puan farkı."]},
@@ -152,7 +153,8 @@ const isRules2 = g => g.day ? g.day>=RULES2_FROM : g.start>=PERGAME_FROM;
 const marginsFor = g => isRules2(g) ? MARGINS2 : MARGINS;
 const bucketOf = (g, m) => isRules2(g) ? bucket2(m) : bucket(m);
 // tahmindeki barem hangi düzendeyse onunla karşılaştır (yeni kurala geçişte eski seçimler bozulmasın)
-const marginHit = (label, m) => MARGINS2.includes(label) ? bucket2(m)===label : bucket(m)===label;
+const MARGIN_TOL = 3, MARGIN_MAX = 40;
+const marginHit = (label, m) => /^\d+$/.test(String(label)) ? (+label>=MARGIN_MAX ? m>=MARGIN_MAX-MARGIN_TOL : Math.abs(+label-m)<=MARGIN_TOL) : MARGINS2.includes(label) ? bucket2(m)===label : bucket(m)===label;
 const dpValue = day => day>=RULES2_FROM ? 3 : 2;
 const slug = s => s.toLocaleLowerCase("tr").replace(/[çğıöşü]/g, c => ({ç:"c",ğ:"g",ı:"i",ö:"o",ş:"s",ü:"u"}[c])).replace(/[^a-z0-9]/g, "");
 const weekKey = s => { const d = parseYmd(s); const w = (d.getUTCDay()+6)%7; d.setUTCDate(d.getUTCDate()-w); return ymd(d); };
@@ -407,7 +409,7 @@ function dayPoints(day){
   const out = {};
   const D = S.days[day];
   const archParts = uid => {
-    const p = {pts:arch[uid].pts+(arch[uid].sr||0), n:arch[uid].n??1, final:true, src:"arch", w:0, m:0, s:0, dp:arch[uid].dp||0, q:arch[uid].qp||0, sr:arch[uid].sr||0};
+    const p = {pts:arch[uid].pts+(arch[uid].sr||0)+(arch[uid].bon||0), n:arch[uid].n??1, final:true, src:"arch", w:0, m:0, s:0, dp:arch[uid].dp||0, q:arch[uid].qp||0, sr:arch[uid].sr||0, bon:arch[uid].bon||0, auto:arch[uid].auto||0};
     for(const [gid,row] of Object.entries(S.arch.scores.games||{})){
       const g = S.arch.games[gid]; const r = row[uid];
       if(!g || g.day!==day || !r) continue;
@@ -467,7 +469,7 @@ async function loadPlayers(){
   S.players = {};
   // katılma saati henüz sunucudan gelmediyse "en yeni" say (renk sırası kaymasın)
   snap.forEach(d => { const x=d.data({serverTimestamps:"estimate"});
-    S.players[d.id] = {name:x.name, joined:x.joined?.toMillis?.()||Date.now(), color:x.color||"", emoji:x.emoji||"", favTeam:x.favTeam||"", theme:x.theme||"default", av:x.av||"", bio:x.bio||"", ref:x.ref||"", club:x.club||"", rival:x.rival||""}; });
+    S.players[d.id] = {name:x.name, joined:x.joined?.toMillis?.()||Date.now(), color:x.color||"", emoji:x.emoji||"", favTeam:x.favTeam||"", theme:x.theme||"default", av:x.av||"", bio:x.bio||"", ref:x.ref||"", club:x.club||"", rival:x.rival||"", ...("autoPick" in x ? {autoPick:!!x.autoPick} : {}), seen:x.seen?.toMillis?.()||0}; });
   S.order = Object.keys(S.players).sort((a,b) => (S.players[a].joined-S.players[b].joined) || pname(a).localeCompare(pname(b),"tr"));
   S.colorOrder = [...S.order];
   // giriş yapan oyuncu her zaman ilk sırada (iki kişide solda)
@@ -686,9 +688,9 @@ function seasonBreakdown(){
 // Eşit puanda sıra: daha çok gece birinciliği, sonra daha çok kazanan puanı, sonra isim
 function nightWins(){
   const w={}; S.order.forEach(u=>w[u]=0);
-  for(const d of allDays()){ const p=dayPoints(d); const vals=S.order.map(u=>p[u]?.pts??null).filter(v=>v!=null);
+  for(const d of allDays()){ const p=dayPoints(d); const nv=u=>p[u] ? p[u].pts-(p[u].bon||0) : null; const vals=S.order.map(nv).filter(v=>v!=null);
     if(!vals.length || S.order.some(u=>p[u] && !p[u].final)) continue;
-    const best=Math.max(...vals), x=S.order.filter(u=>p[u]?.pts===best); if(x.length===1) w[x[0]]++; }
+    const best=Math.max(...vals), x=S.order.filter(u=>nv(u)===best); if(x.length===1) w[x[0]]++; }
   return w;
 }
 function rankOrder(tot){
@@ -986,7 +988,7 @@ function gameCard(g){
   if(!lock){
     body += infoBox(g);
     const d = draftFor(g);
-    body += `<div class="row-lbl">Fark</div><div class="margins">${marginsFor(g).map(m=>`<button class="mbtn" data-act="mar" data-g="${g.id}" data-v="${m}" aria-pressed="${d.margin===m}">${m}</button>`).join("")}</div>
+    body += `<div class="row-lbl">Fark</div>${isRules2(g) ? marginCtl(g,d,"g") : `<div class="margins">${marginsFor(g).map(m=>`<button class="mbtn" data-act="mar" data-g="${g.id}" data-v="${m}" aria-pressed="${d.margin===m}">${m}</button>`).join("")}</div>`}
       <div class="row-lbl">Maçın en skoreri</div>
       <button class="scorer-btn${d.scorerId?" has-face":""}" data-act="scorer" data-g="${g.id}">${d.scorerId ? `${faceImg(d.scorerId,"sb-face")}<b>${esc(d.scorerName)}</b><small>${ppg(d.scorerId)!=null?ppg(d.scorerId).toFixed(1)+" sayı ort.":""}</small>` : `<span class="ph">Oyuncu seç</span>`}</button>`;
     const saved = D.picks[g.id]?.[S.uid];
@@ -1060,6 +1062,16 @@ function prefetchInfo(D){
     if(S.tab==="tahmin" && S.sub==="maclar" && S.days[S.day]===D) renderGames();
   });
 }
+// Hiç tahmin yapmamış oyuncuya ilk maçta adım adım yol gösterir
+function firstPickGuide(D){
+  if(lsGet("guideDone") || userRecs(S.uid).length || Object.values(S.days).some(x=>Object.values(x.picks||{}).some(p=>p[S.uid]))) return "";
+  const g=D.games.find(x=>!started(x)); if(!g) return "";
+  const d=draftFor(g), st=[["Kazanan takıma dokun", !!d.winner],["Farkı kaydırarak seç", !!d.margin && !d.autoM],["Maçın en skorerini seç", !!d.scorerId],["\"Tahmini kaydet\"e bas", false]];
+  const i=st.findIndex(x=>!x[1]);
+  return `<div class="fp-guide"><div class="fp-h"><b>İlk tahminin: ${esc(g.away.name)} @ ${esc(g.home.name)}</b><button class="linkish" id="fpX" type="button">Geç</button></div>
+    <ol>${st.map(([t,ok],k)=>`<li class="${ok?"ok":k===i?"now":""}">${ok?"✓":k+1}. ${t}</li>`).join("")}</ol><small class="muted">Her doğru +1: kazanan, fark ve en skorer. Diğer maçları da aynı şekilde doldur.</small></div>`;
+}
+document.addEventListener("click", e=>{ if(e.target.closest("#fpX")){ lsSet("guideDone","1"); renderGames(); } });
 function renderGames(){
   const D = S.days[S.day];
   if(!D){ $("#games").innerHTML = skeletonCards(); return; }
@@ -1074,7 +1086,7 @@ function renderGames(){
   }
   const sm = small.length ? `<div class="g-small">${small.join("")}</div>` : "", bg = big.length ? `<div class="g-big">${big.join("")}</div>` : "";
   const locked = D.games.some(started);
-  $("#games").innerHTML = bestPickCard(D) + (locked ? bg + sm : sm + bg);
+  $("#games").innerHTML = firstPickGuide(D) + bestPickCard(D) + (locked ? bg + sm : sm + bg);
   celebrate(D);
   prefetchInfo(D);
   refreshInjuries(D);
@@ -1098,8 +1110,8 @@ $("#games").addEventListener("click", e => {
   if(act==="info") return openInfo(g);
   if(act==="box") return openBox(g);
   if(started(g)) return toast(lockedMsg(g));
-  if(act==="save") return savePick(g);
-  if(act==="win"){ d.winner=b.dataset.v; }
+  if(act==="save"){ lsSet("guideDone","1"); return savePick(g); }
+  if(act==="win"){ d.winner=b.dataset.v; if(isRules2(g) && !/^\d+$/.test(d.margin||"")){ d.margin=suggestMargin(g,d.winner); d.autoM=true; } }
   if(act==="mar"){ d.margin=b.dataset.v; }
   if(act==="scorer"){ S.swipeReturn=false; return openPlayerPicker({mode:"game", g}); }
   if(act==="conf"){
@@ -1192,7 +1204,7 @@ function paintSwipe(dir=0){
     <div class="sw-card ${dir>0?"in-r":dir<0?"in-l":""}" style="--ca:${pairCols(g.away.abbr,g.home.abbr)[0]};--ch:${pairCols(g.away.abbr,g.home.abbr)[1]}">
       <div class="sw-time">${timeTR(g.start)} · ${esc(g.away.abbr)} @ ${esc(g.home.abbr)}</div>
       <div class="sw-teams">${team("away")}<span class="sw-vs">VS</span>${team("home")}</div>
-      <div class="row-lbl">Fark</div><div class="margins">${marginsFor(g).map(m=>`<button class="mbtn" data-sw="mar" data-v="${m}" aria-pressed="${d.margin===m}">${m}</button>`).join("")}</div>
+      <div class="row-lbl">Fark</div>${isRules2(g) ? marginCtl(g,d,"sw") : `<div class="margins">${marginsFor(g).map(m=>`<button class="mbtn" data-sw="mar" data-v="${m}" aria-pressed="${d.margin===m}">${m}</button>`).join("")}</div>`}
       <div class="row-lbl">Maçın en skoreri</div>
       <button class="scorer-btn${d.scorerId?" has-face":""}" data-sw="scorer">${d.scorerId?`${faceImg(d.scorerId,"sb-face")}<b>${esc(d.scorerName)}</b>`:`<span class="ph">Oyuncu seç</span>`}</button>
       <div class="sw-st">${same?'<span class="saved">✓ Kaydedildi</span>':ready?'<span class="need">Kaydetmeye hazır</span>':'<span class="need">Kazanan, fark ve skoreri seç</span>'}</div>
@@ -1204,7 +1216,7 @@ function paintSwipe(dir=0){
     const b=e.target.closest("[data-sw]"); if(!b || b.disabled) return;
     const a=b.dataset.sw;
     if(started(g)){ toast("Bu maçın tahminleri kilitlendi."); return paintSwipe(); }
-    if(a==="win"){ d.winner=b.dataset.v; return paintSwipe(); }
+    if(a==="win"){ d.winner=b.dataset.v; if(isRules2(g) && !/^\d+$/.test(d.margin||"")){ d.margin=suggestMargin(g,d.winner); d.autoM=true; } return paintSwipe(); }
     if(a==="mar"){ d.margin=b.dataset.v; return paintSwipe(); }
     if(a==="scorer"){ S.swipeReturn=true; return openPlayerPicker({mode:"game", g}); }
     if(a==="prev") return swipeGo(-1);
@@ -1380,10 +1392,20 @@ async function saveSeries(g){
 
 /* ====================================================== hızlı tahmin */
 // Bütün açık maçlar tek ekranda. Takım seçince fark (ESPN olasılığına göre) ve skorer (takımın sayı lideri) önerisi dolar.
+// Fark kaydırıcısı: 1-40 (40 = 40 ve üstü)
+function marginCtl(g, d, ctx){
+  const v = /^\d+$/.test(d.margin||"") ? +d.margin : null;
+  return `<div class="mslide ${v==null?"empty":""}"><input type="range" min="1" max="${MARGIN_MAX}" step="1" value="${v??8}" data-ms="${g.id}" data-ctx="${ctx}" aria-label="Fark">
+    <output>${v==null?"Kaydır":v>=MARGIN_MAX?`${MARGIN_MAX}+ sayı`:`${v} sayı`}</output></div><small class="ms-hint">Gerçek farka ${MARGIN_TOL} sayı ya da daha yakınsan +1</small>`;
+}
+document.addEventListener("input", e=>{ const r=e.target.closest?.("[data-ms]"); if(!r) return; const v=+r.value; const o=r.parentElement.querySelector("output"); if(o) o.textContent = v>=MARGIN_MAX?`${MARGIN_MAX}+ sayı`:`${v} sayı`; r.parentElement.classList.remove("empty"); });
+document.addEventListener("change", e=>{ const r=e.target.closest?.("[data-ms]"); if(!r) return; const D=S.days[S.day]; const g=D?.games.find(x=>x.id===r.dataset.ms); if(!g) return;
+  if(started(g)){ toast(lockedMsg(g)); return; } const d=draftFor(g); d.margin=String(r.value); d.autoM=false;
+  if(r.dataset.ctx==="sw") paintSwipe(); else if(r.dataset.ctx==="qk") paintQuick(); else renderGames(); });
 function suggestMargin(g, abbr){
   const pr=S.sums[g.id]?.data?.predictor; const side = abbr===g.home.abbr ? pr?.homeTeam : pr?.awayTeam;
   const p = side?.gameProjection!=null ? +side.gameProjection : null;
-  if(isRules2(g)){ if(p==null || p<55) return "4-7"; return p<68 ? "8-12" : p<82 ? "13-19" : "20+"; }
+  if(isRules2(g)) return String(p==null||p<55 ? 5 : p<62 ? 7 : p<70 ? 10 : p<80 ? 14 : 19);
   if(p==null || p<55) return "1-5";
   return p<68 ? "6-10" : p<80 ? "11-15" : "16+";
 }
@@ -1408,7 +1430,7 @@ function paintQuick(){
     const sel = d.winner ? `<select class="qk-s" data-qs="${g.id}">${d.scorerId && !opts.some(o=>o.id===d.scorerId) ? `<option value="${d.scorerId}" selected>${esc(d.scorerName)}</option>` : ""}${opts.map(o=>`<option value="${o.id}" ${o.id===d.scorerId?"selected":""}>${esc(o.name)}${o.ppg!=null?` · ${o.ppg.toFixed(1)}`:""}</option>`).join("")}</select>` : `<span class="muted qk-hint">Önce kazananı seç</span>`;
     return `<div class="qk ${same?"saved":d.winner?"dirty":""}"><div class="qk-h"><span>${timeTR(g.start)}</span><span>${same?'<span class="ok">✓ Kaydedildi</span>':d.winner&&d.margin&&d.scorerId?'<span class="need">Kaydedilmedi</span>':""}</span></div>
       <div class="qk-teams">${team(g.away)}<span class="qk-at">@</span>${team(g.home)}</div>
-      ${d.winner?`<div class="qk-m">${marginsFor(g).map(m=>`<button data-qm="${m}" data-g="${g.id}" aria-pressed="${d.margin===m}">${m}</button>`).join("")}</div>`:""}${sel}</div>`;
+      ${d.winner?(isRules2(g) ? marginCtl(g,d,"qk") : `<div class="qk-m">${marginsFor(g).map(m=>`<button data-qm="${m}" data-g="${g.id}" aria-pressed="${d.margin===m}">${m}</button>`).join("")}</div>`):""}${sel}</div>`;
   }).join("");
   const ready=games.filter(g=>{ const d=draftFor(g), sv=D.picks[g.id]?.[S.uid]; return d.winner&&d.margin&&d.scorerId && !(sv && sv.winner===d.winner && sv.margin===d.margin && sv.scorerId===d.scorerId); }).length;
   box.innerHTML=`<h3 id="shTitle">Hızlı tahmin</h3><p class="muted">Kazananı seç; fark ESPN olasılığına göre, skorer takımın sayı liderine göre önerilir. İstersen değiştir, sonra hepsini birden kaydet.</p>
@@ -1604,14 +1626,18 @@ function openRules(){
     <p>4 Kasım'dan itibaren NBA Kupası maçları altın şeritle işaretlenir ve <b>2 kat puan</b> getirir. Tutan banko +4, yanan banko yine -1.</p>
     <h4>Playoff serileri</h4>
     <p>Playoff'ta her seri başlamadan önce seriyi kimin kaç maçta kazanacağını tahmin edersin. Kazananı bilirsen <b>+3</b>, maç sayısını da bilirsen <b>+2</b> daha. Tahminler serinin ilk maçı başlayınca kilitlenir.</p>
-    <h4>Fark aralıkları</h4>
-    <p>1-3 · 4-7 · 8-12 · 13-19 · 20+ (3 Kasım'a kadarki maçlarda 1-5 · 6-10 · 11-15 · 16+). Uzatmaya giden maçlarda da son skordaki fark geçerlidir. Fark puanını almak için kazananı da bilmen gerekir.</p>
+    <h4>Fark</h4>
+    <p>4 Kasım'dan itibaren farkı kaydırıcıyla sayı olarak seçersin (1-40+). Gerçek farka <b>3 sayı ya da daha yakın</b> tahmin +1 alır; örneğin 9 dedin, maç 6 ile 12 arasında bir farkla bittiyse tuttu. 3 Kasım'a kadarki maçlarda baremler 1-5 · 6-10 · 11-15 · 16+ idi. Uzatmaya giden maçlarda da son skordaki fark geçerlidir. Fark puanını almak için kazananı da bilmen gerekir.</p>
     <h4>Kilit ve gizlilik</h4>
     <p>Gecenin bütün tahminleri (maçlar, banko, günün oyuncusu, gecenin sorusu) kilitlenene kadar istediğin kadar değiştirebilirsin. <b>Her maçın tahmini, o maç başlamadan 10 dakika önce</b> kilitlenir; böylece geç maçlarda oyuncunun oynayıp oynamayacağı netleşir. Banko, günün oyuncusu ve gecenin sorusu <b>gecenin ilk maçından 10 dakika önce</b> kilitlenir. Kilitlenene kadar kimse başkasının seçimini göremez. Kimin kaç maçı doldurduğu ise "Günün tahminleri"nde görünür.</p>
     <h4>Eşitlikler</h4>
     <p>Birden fazla oyuncu aynı en yüksek sayıyı atarsa bunlardan birini seçen herkes bilmiş sayılır.</p>
     <h4>Gece, hafta, sezon</h4>
     <p>Gecenin en çok puanını tek başına alan, o geceyi kazanır. Toplam puanı eşit olanlarda önce daha çok gece kazanan, o da eşitse daha çok kazanan puanı olan öne geçer. Haftalar pazartesi başlar, pazar biter. Sezon puanı bütün gecelerin, uzun vade tahminlerinin ve aylık lig ödüllerinin toplamıdır. <b>Playoff'ta bütün puanlar iki katına çıkar</b> (yanan banko yine -1).</p>
+    <h4>Devamlılık bonusu</h4>
+    <p>Bir haftada (pazartesi–pazar) en az <b>4 gece</b> kendin tahmin yaparsan o hafta <b>+2</b> puan alırsın. Puan, 4. gecenin sonunda eklenir. Yedek tahminle geçen geceler sayılmaz.</p>
+    <h4>Yedek tahmin</h4>
+    <p>Profilinden açarsan, hiç tahmin yapmadığın gecelerde senin yerine ESPN favorileri seçilir; doğru çıkan her 2 kazanan 1 puan getirir.</p>
     <h4>Uzun vade</h4>
     <p>Haftanın oyuncusu, ayın ödülleri, NBA Kupası ve sezon ödülleri için önceden tahmin yaparsın; ayrıntılar Uzun Vade sekmesinde. Doğru tahminler ana sıralamaya eklenir.</p>
     <h4>Aylık lig ödülleri</h4>
@@ -1733,7 +1759,7 @@ function renderAyrisma(){
     return `<div class="faceoff ${g.state==="in"?"is-live":""}${g.cup?" cup":""}">${g.cup?`<div class="cup-band">${cupTag(g)}</div>`:""}<button class="fo-h fo-hb" data-box="${g.id}" type="button" title="Kutu skoru"><span>${esc(g.away.name)} @ ${esc(g.home.name)}${same?' <small class="fo-same">herkes aynı tarafta</small>':""}${vs}</span><small>${st} ›</small></button>
       ${shareBar(D,g)}<div class="fo-body">${sideBox(g,"away",picks)}<div class="fo-vs"><span>VS</span></div>${sideBox(g,"home",picks)}</div>
       ${g.state!=="pre"?(()=>{ const df=Math.abs((g.home.score??0)-(g.away.score??0)), b=bucketOf(g,df), lead=(g.home.score??0)>(g.away.score??0)?g.home.abbr:g.away.abbr;
-        return `<div class="fo-res"><div class="fo-ri"><small>${g.state==="post"?"Fark":"Şu anki fark"}</small><b>${df ? `${esc(lead)} +${df}` : "Eşit"}</b><span class="fo-bar">${df?`${b} baremi`:""}</span></div>
+        return `<div class="fo-res"><div class="fo-ri"><small>${g.state==="post"?"Fark":"Şu anki fark"}</small><b>${df ? `${esc(lead)} +${df}` : "Eşit"}</b><span class="fo-bar">${df && !isRules2(g)?`${b} baremi`:""}</span></div>
           <div class="fo-ri"><small>${g.state==="post"?"En skorer":"Şu an en skorer"}</small><b>${tops?tops.map(x=>esc(x.name)).join(", "):"—"}</b><span class="fo-bar">${tops?`${tops[0].pts} sayı`:""}</span></div></div>`; })():""}
       ${none.length?`<div class="fo-foot"><span class="muted">Tahmin yapmayan: ${none.map(u=>`<button class="linkish fo-hs" data-hsu="${u}" type="button">${esc(pname(u))}</button>`).join(", ")}</span></div>`:""}</div>`;
   };
@@ -1752,7 +1778,8 @@ function dayWinner(d){
   const p=dayPoints(d);
   if(!S.order.some(u=>p[u]?.n)) return null;
   if(S.order.some(u=>p[u] && !p[u].final)) return {st:"live"};
-  const best=Math.max(...S.order.map(u=>p[u]?.pts??-99)); const w=S.order.filter(u=>(p[u]?.pts??-99)===best);
+  const nv=u=>p[u] ? p[u].pts-(p[u].bon||0) : -99;   // devamlılık bonusu gece birinciliğine sayılmaz
+  const best=Math.max(...S.order.map(nv)); const w=S.order.filter(u=>nv(u)===best);
   return w.length===1 ? {st:"w", u:w[0], pts:best} : {st:"t", pts:best};
 }
 function spreadLabels(items, gap, top, bottom){
@@ -1956,9 +1983,9 @@ function renderPuan(){
   const dayRows = days.map(d => ({d, pts: dayPoints(d)}));
   const wins = {}, wks = {}; S.order.forEach(u=>{wins[u]=0; wks[u]=0;});
   for(const {pts} of dayRows){
-    const vals = S.order.map(u=>pts[u]?.pts??null).filter(v=>v!=null);
+    const nvv=u=>pts[u] ? pts[u].pts-(pts[u].bon||0) : null; const vals = S.order.map(nvv).filter(v=>v!=null);
     if(!vals.length || S.order.some(u=>pts[u] && !pts[u].final)) continue;
-    const best = Math.max(...vals); const w = S.order.filter(u=>pts[u]?.pts===best);
+    const best = Math.max(...vals); const w = S.order.filter(u=>nvv(u)===best);
     if(w.length===1) wins[w[0]]++;
   }
   const curWk = weekKey(S.today);
@@ -2225,6 +2252,18 @@ function countUp(){
 }
 // Geceyi tek başına kazanınca bir kez konfeti
 // Gece bitince kazanan bir kez sahneye çıkar (kendin kazandıysan konfeti zaten çıkıyor)
+// Yedek tahmin: bir gece hiç tahmin yapmazsan ESPN favorileri senin yerine girer; doğru bildiği her 2 kazanan 1 puan
+function maybeAskAuto(){
+  const me=S.players[S.uid]; if(!me || "autoPick" in me || S.onboard || lsGet("autoAsk")) return;
+  if(!$("#sheet").classList.contains("hide")) return;
+  lsSet("autoAsk","1");
+  openSheet(`<h3 id="shTitle">Yedek tahmin açılsın mı?</h3><p>Bir gece hiç tahmin yapmayı unutursan senin yerine her maçta ESPN'in favorisi seçilir. Doğru çıkan her <b>2 kazanan için 1 puan</b> alırsın; fark, skorer ve banko yedekte yoktur. Böylece unuttuğun gece tablodan kopmazsın, ama tahmin yapan her zaman daha çok kazanır.</p>
+    <p class="muted">İstediğin zaman profilinden değiştirebilirsin.</p><div class="pf-btns"><button class="btn" id="apNo" type="button">Hayır</button><button class="btn-primary" id="apYes" type="button">Evet, açılsın</button></div>`);
+  const set=async v=>{ try{ await updateDoc(doc(S.db,"players",S.uid), {autoPick:v}); S.players[S.uid].autoPick=v; toast(v?"Yedek tahmin açıldı.":"Yedek tahmin kapalı."); }catch(e){ toast("Kaydedilemedi."); } closeSheet(); };
+  $("#apYes").onclick=()=>set(true); $("#apNo").onclick=()=>set(false);
+}
+function markSeen(){ if(!S.uid || Date.now()-+(lsGet("seenAt")||0) < 36e5) return; lsSet("seenAt", String(Date.now()));
+  updateDoc(doc(S.db,"players",S.uid), {seen:serverTimestamp()}).catch(()=>{}); }
 function maybeNightWinner(){
   if(!S.uid || document.querySelector(".badge-pop, .nw-pop")) return;
   for(const d of [S.today, shiftDay(S.today,-1)]){
@@ -3927,6 +3966,8 @@ function paintProfile(){
         return list.map(([id,n])=>`<button class="pf-av" data-av="p:${id}" aria-pressed="${me.av===`p:${id}`}" title="${esc(n)}"><img src="${HEADSHOT(id)}" alt="" loading="lazy"><small>${esc(n.split(" ").slice(-1)[0])}</small></button>`).join(""); })()}</div>
         <small class="muted">Liste: CBS Sports'un 2026-27 sezonu ilk 50 oyuncusu. Başka bir oyuncu için yukarıdan ara.</small>
       ${avImg(me.av)?`<button class="linkish" data-emo="" style="font-size:13px">Fotoğrafı kaldır</button>`:""}</div>
+    <div class="pf-sec"><h4>Yedek tahmin</h4><small class="muted" style="margin:0 0 8px;display:block">Bir gece hiç tahmin yapmazsan ESPN favorileri senin yerine girer; doğru çıkan her 2 kazanan 1 puan.</small>
+      <div class="seg2"><button data-ap="1" aria-pressed="${!!me.autoPick}">Açık</button><button data-ap="0" aria-pressed="${!me.autoPick}">Kapalı</button></div></div>
     <div class="pf-sec"><h4>Favori takım</h4><small class="muted">Avatarının köşesinde küçük logosu görünür; site renklerini de buna göre seçebilirsin. Güvenlik sorusundan bağımsızdır.</small>
       <div class="pf-teams"><button class="pf-tm none" data-tm="" aria-pressed="${!me.favTeam}">Yok</button>${teams.map(t=>`<button class="pf-tm" data-tm="${t.a}" aria-pressed="${me.favTeam===t.a}" title="${esc(t.n)}"><img src="${LOGO_SMALL(t.a)}" alt="${esc(t.n)}"></button>`).join("")}</div></div>
     <div class="pf-sec"><h4>Site renkleri</h4><div class="seg2 pf-theme"><button data-th="default" aria-pressed="${me.theme!=="team"}">Varsayılan</button><button data-th="team" aria-pressed="${me.theme==="team"}" ${me.favTeam?"":"disabled"}>Favori takımım</button></div>
@@ -3951,6 +3992,7 @@ function paintProfile(){
     const m=e.target.closest("[data-emo]"); if(m) return saveProfile({emoji:m.dataset.emo, av:""});
     const t=e.target.closest("[data-tm]"); if(t) return saveProfile(t.dataset.tm ? {favTeam:t.dataset.tm} : {favTeam:"", theme:"default"});
     const h=e.target.closest("[data-th]"); if(h && !h.disabled) return saveProfile({theme:h.dataset.th});
+    const ap=e.target.closest("[data-ap]"); if(ap) return saveProfile({autoPick: ap.dataset.ap==="1"});
   };
   $("#pfAvQ")?.addEventListener("input", e=>{ const q=slug(e.target.value||""); const box2=$("#pfAvs"); if(!box2) return;
     const list = q.length<2 ? STARS : (ALLP?.players||[]).filter(x=>slug(x.n).includes(q)).slice(0,30).map(x=>[x.id,x.n]);
@@ -4068,7 +4110,9 @@ async function openAdmin(){
       <div class="adm-sum">${S.order.map(u=>{ const ld=lastDay(u), gap=ld?Math.round((parseYmd(S.today)-parseYmd(ld))/864e5):null, c=cts[u];
         return `<div class="adm-s"><span><b style="color:${col(u)}">${esc(pname(u))}</b><small>${esc(S.players[u].club||"takım adı yok")}</small></span>
           <span class="${gap==null||gap>3?"bad":gap>1?"warn":"ok"}">${gap==null?"hiç oynamadı":gap===0?"bu gece":gap===1?"dün":gap+" gündür yok"}</span>
-          <span class="${c?.verified?"ok":"bad"}">${c?.verified?"mail onaylı":c?.email?"mail onaysız":"mail yok"}</span></div>`; }).join("")}</div></div>
+          <span class="${c?.verified?"ok":"bad"}">${c?.verified?"mail onaylı":c?.email?"mail onaysız":"mail yok"}</span>
+          <span class="muted">${(()=>{ const nights=Object.values(S.arch.scores.days||{}).filter(r=>r[u]?.n).length, sn=S.players[u]?.seen; const ago=sn?Math.round((Date.now()-sn)/36e5):null;
+            return `${nights} gece oynadı · son giriş ${ago==null?"bilinmiyor":ago<1?"az önce":ago<24?ago+" sa önce":Math.round(ago/24)+" gün önce"}${S.players[u]?.autoPick?" · yedek açık":""}`; })()}</span></div>`; }).join("")}</div></div>
     <div class="pf-sec"><h4>Sorun bildirimleri ${reports.length?`<span class="pill-n">${reports.length}</span>`:""}</h4>${reports.length?reports.map(r=>`<div class="adm-rep"><div><b style="color:${col(r.uid)}">${esc(pname(r.uid))}</b> <small class="muted">${r.at?.toDate?r.at.toDate().toLocaleString(LOC,{timeZone:TZ,day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}):""} · ${esc(r.v||"")} · ${esc(r.tab||"")}</small></div><p>${esc(r.text||"")}</p><small class="muted">${esc(r.ua||"")}</small><button class="btn sm danger" data-repdel="${r.id}" type="button">Çözüldü, sil</button></div>`).join(""):'<small class="muted">Bildirim yok.</small>'}</div>`;
   $("#adm").innerHTML = summary + `
     <div class="pf-sec"><h4>Lig</h4>
@@ -4177,7 +4221,7 @@ if("serviceWorker" in navigator && location.protocol==="https:") navigator.servi
     route(); showDay(); Promise.resolve(refresh()).catch(()=>{}).finally(()=>dispatchEvent(new Event("app-ready")));
     if(S.onboard){ if(S.joinP) await S.joinP.catch(()=>{}); await loadPlayers().catch(()=>{}); allPlayers().catch(()=>{}).finally(()=>openOnboard(4)); }
     else checkRecovery();
-    loadLT(); setTimeout(installBanner, 6000); maybeNews(); maybeCeremony();
+    loadLT(); setTimeout(installBanner, 6000); maybeNews(); maybeCeremony(); later(markSeen, 3000); setTimeout(()=>later(maybeAskAuto, 0), 9000);
     later(()=>{ getDoc(doc(S.db,"config","admin")).then(()=>{ S.isAdmin=true; }).catch(()=>{ S.isAdmin=false; });
       getDoc(doc(S.db,"config","secret")).then(r=>{ S.invite=r.data()?.invite||""; }).catch(()=>{});
       allPlayers().catch(()=>{}); }, 2000);

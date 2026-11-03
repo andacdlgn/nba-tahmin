@@ -133,7 +133,10 @@ service cloud.firestore {
             && exists(/databases/$(database)/documents/players/$(request.resource.data.ref))));
       // Profil: ad, renk, emoji, favori takım ve tema değiştirilebilir (listeden seçilir)
       allow update: if signedIn() && request.auth.uid == uid
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'color', 'emoji', 'favTeam', 'theme', 'av', 'bio', 'club', 'rival'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'color', 'emoji', 'favTeam', 'theme', 'av', 'bio', 'club', 'rival', 'autoPick', 'seen'])
+        // autoPick: yedek tahmin tercihi; seen: son giriş (yalnızca sunucu saati)
+        && (!('autoPick' in request.resource.data) || request.resource.data.autoPick is bool)
+        && (!('seen' in request.resource.data.diff(resource.data).affectedKeys()) || request.resource.data.seen == request.time)
         && (!('name' in request.resource.data.diff(resource.data).affectedKeys()) || validName(request.resource.data.name))
         && profileOk(request.resource.data);
       allow delete: if isAdmin();
@@ -158,7 +161,9 @@ service cloud.firestore {
           && str(d.gameId, 20) && str(d.day, 8)
           && d.start is timestamp
           && str(d.winner, 6)
-          && d.margin in ['1-5', '6-10', '11-15', '16+']
+          // fark: eski baremler, 1.7.0 baremleri ya da 1.13.0'dan itibaren sayı (1-40; 40 = 40 ve üstü)
+          && (d.margin in ['1-5', '6-10', '11-15', '16+', '1-3', '4-7', '8-12', '13-19', '20+']
+              || (d.margin is string && d.margin.matches('^([1-9]|[1-3][0-9]|40)$')))
           && str(d.scorerId, 20) && str(d.scorerName, 60)
           && d.updatedAt == request.time
           && request.time < lockAt(d.start);

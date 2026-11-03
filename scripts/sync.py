@@ -79,6 +79,9 @@ def espn_today() -> date:
 RULES2_FROM = "20261104"   # 5 barem, günün oyuncusu +3, yanan banko katlanmaz, yeni soru havuzu
 MARGINS2 = [(1, 3, "1-3"), (4, 7, "4-7"), (8, 12, "8-12"), (13, 19, "13-19"), (20, 999, "20+")]
 MARGINS2_LABELS = {x[2] for x in MARGINS2}
+MARGIN_TOL, MARGIN_MAX = 3, 40
+AUTO_FROM = "20261104"    # yedek tahmin: hiç tahmin yapmayan ve tercihi açık olana ESPN favorileri; her 2 doğru kazanan 1 puan
+STREAK_NIGHTS, STREAK_BONUS = 4, 2   # devamlılık: haftada en az 4 gece kendi tahmini olana +2
 
 
 def margin_bucket2(m):
@@ -388,7 +391,7 @@ def fs_players():
     for doc in d.get("documents", []):
         uid = doc["name"].rsplit("/", 1)[1]
         f = {k: fs_value(v) for k, v in doc.get("fields", {}).items()}
-        out[uid] = {"name": f.get("name", "?"), "joined": f.get("joined")}
+        out[uid] = {"name": f.get("name", "?"), "joined": f.get("joined"), "autoPick": bool(f.get("autoPick"))}
     return out
 
 
@@ -408,8 +411,12 @@ def score_game(g, pick, conf, top_ids):
     won = pick.get("winner") == g["winner"]
     if won:
         r["w"] = 2 if conf else 1
-        lab = pick.get("margin")
-        if (margin_bucket2(g["margin"]) == lab) if lab in MARGINS2_LABELS else (lab == g["bucket"]):
+        lab = str(pick.get("margin") or "")
+        if lab.isdigit():   # 1.13.0: sayıyla fark, gerçek farka 3 sayı ya da daha yakın (40 = 40 ve üstü)
+            hit = g["margin"] >= MARGIN_MAX - MARGIN_TOL if int(lab) >= MARGIN_MAX else abs(int(lab) - g["margin"]) <= MARGIN_TOL
+        else:
+            hit = (margin_bucket2(g["margin"]) == lab) if lab in MARGINS2_LABELS else (lab == g["bucket"])
+        if hit:
             r["m"] = 1
     elif conf:
         r["w"] = -1
@@ -672,8 +679,13 @@ def main(full=False):
                 n += 1 if pick else 0
                 sc["games"].setdefault(g["id"], {})[uid] = r
                 total += r["pts"]
+            auto = 0
+            night_done = nights.get(day, {}).get("done") and nights[day]["n"] == len(dgames)
+            if n == 0 and not q and not dp_name and not conf_game and players[uid].get("autoPick") and day >= AUTO_FROM and night_done:
+                auto = sum(1 for g in dgames if g.get("fav") and g["fav"] == g["winner"]) // 2
+                total += auto
             sc["days"][day][uid] = {"pts": total, "n": n + (1 if q else 0), "dp": dp, "dpName": dp_name, "conf": conf_game,
-                                    "q": q, "qp": qp, "week": week_key(day)}
+                                    "q": q, "qp": qp, "week": week_key(day), **({"auto": auto} if auto else {})}
 
     # playoff serileri: biten her seri, son maçının gecesine puan olarak eklenir (gün satırında "sr")
     series = {}
@@ -707,23 +719,35 @@ def main(full=False):
         for uid, v in row.items():
             v["sr"] = sum(x["row"].get(uid, {}).get("pts", 0) for x in sc["series"].values() if x["day"] == day)
 
-    # toplamlar (gün puanı + o gece biten serilerin puanı)
+    # devamlılık bonusu: haftanın 4. kendi tahminli gecesine +2 (her çalışmada baştan hesaplanır)
+    seen_nights = {}
+    for day in sorted(sc["days"]):
+        for uid, v in sc["days"][day].items():
+            v.pop("bon", None)
+            if day < AUTO_FROM or not v.get("n"):
+                continue
+            k = (v.get("week") or week_key(day), uid)
+            seen_nights[k] = seen_nights.get(k, 0) + 1
+            if seen_nights[k] == STREAK_NIGHTS:
+                v["bon"] = STREAK_BONUS
+    # toplamlar (gün puanı + o gece biten serilerin puanı + devamlılık bonusu)
     for row in sc["days"].values():
         for v in row.values():
-            v["tot"] = v["pts"] + v.get("sr", 0)
+            v["tot"] = v["pts"] + v.get("sr", 0) + v.get("bon", 0)
     tot = {uid: {"pts": 0, "days": 0, "dayWins": 0, "weekWins": 0} for uid in players}
     weeks = {}
     for day, row in sc["days"].items():
         if not any(v.get("n") or v.get("dpName") for v in row.values()):
             continue  # kimsenin oynamadığı gece sayılmaz
-        best = max((v["tot"] for v in row.values()), default=None)
+        night = lambda x: x["tot"] - x.get("bon", 0)   # gece birinciliğine devamlılık bonusu sayılmaz
+        best = max((night(v) for v in row.values()), default=None)
         for uid, v in row.items():
             if uid not in tot:
                 continue
             tot[uid]["pts"] += v["tot"]
             tot[uid]["days"] += 1
-            sole_best = sum(1 for x in row.values() if x["tot"] == best) == 1
-            if v["tot"] == best and sole_best:
+            sole_best = sum(1 for x in row.values() if night(x) == best) == 1
+            if night(v) == best and sole_best:
                 tot[uid]["dayWins"] += 1
             weeks.setdefault(v["week"], {}).setdefault(uid, 0)
             weeks[v["week"]][uid] += v["tot"]

@@ -36,10 +36,11 @@ def js_const(name):
 CASES = []
 for day, st in (("20261102", 2), ("20261106", 2), ("20261030", 2), ("20270420", 3)):
     for cup in (False, True):
-        for winner, margin in (("BOS", 4), ("NY", 12), ("BOS", 18), ("BOS", 2), ("NY", 6), ("BOS", 25)):
+        for winner, margin in (("BOS", 4), ("NY", 12), ("BOS", 18), ("BOS", 2), ("NY", 6), ("BOS", 25), ("BOS", 8), ("BOS", 37), ("NY", 9)):
             for pick in ({"winner": "BOS", "margin": "1-5", "scorerId": "1"}, {"winner": "NY", "margin": "11-15", "scorerId": "2"},
                          {"winner": "BOS", "margin": "16+", "scorerId": "3"}, {"winner": "BOS", "margin": "1-3", "scorerId": "1"},
-                         {"winner": "NY", "margin": "8-12", "scorerId": "1"}, {"winner": "BOS", "margin": "13-19", "scorerId": "2"}, {"winner": "NY", "margin": "4-7", "scorerId": "2"}, None):
+                         {"winner": "NY", "margin": "8-12", "scorerId": "1"}, {"winner": "BOS", "margin": "13-19", "scorerId": "2"}, {"winner": "NY", "margin": "4-7", "scorerId": "2"},
+                         {"winner": "BOS", "margin": "5", "scorerId": "1"}, {"winner": "BOS", "margin": "15", "scorerId": "2"}, {"winner": "NY", "margin": "9", "scorerId": "1"}, {"winner": "BOS", "margin": "40", "scorerId": "1"}, None):
                 for conf in (False, True):
                     CASES.append({"day": day, "seasonType": st, "cup": cup, "winner": winner, "margin": margin, "pick": pick, "conf": conf, "tops": ["1"]})
 
@@ -53,7 +54,7 @@ def py_score(c):
 def js_scores():
     src = "\n".join([
         "const PERGAME_FROM = Date.UTC(2026,10,4,12);",
-        js_const("CUP2X_FROM"), js_const("multOf"), js_const("bucket"), js_const("MARGINS2"), js_const("bucket2"), js_const("marginHit"),
+        js_const("CUP2X_FROM"), js_const("multOf"), js_const("bucket"), js_const("MARGINS2"), js_const("bucket2"), "const MARGIN_TOL = 3, MARGIN_MAX = 40;", js_const("marginHit"),
         "const topsOf = g => g._tops; const liveTops = g => g._tops;",
         js_func("scorePick"),
         "const cases = JSON.parse(require('fs').readFileSync(process.argv[2], 'utf8'));",
