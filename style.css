@@ -1432,8 +1432,13 @@ button,a,[data-act],.plr,.pf-av,.pf-emo{touch-action:manipulation;-webkit-tap-hi
 /* v28 — takım adı */
 .pf-club{display:flex;align-items:center;gap:5px;font-size:13.5px;font-weight:700;margin-top:3px;opacity:.95}
 .pf-club svg{width:14px;height:14px;flex:none}
-.pn-club{display:block;font-size:11.5px;color:var(--muted);font-weight:500;line-height:1.2;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.pd-club{display:block;font-size:11px;color:var(--muted);max-width:110px;margin:0 auto 2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pn-club,.pn-solo{display:block;font-size:15px;font-weight:800;line-height:1.2;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pn-name{display:block;font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.25;margin-top:1px}
+.pd .pd-club{display:block;font-size:14px;max-width:120px;margin:0 auto;white-space:normal;line-height:1.15;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.pd-name{display:block;font-size:11.5px;color:var(--muted);font-weight:600;margin:1px auto 2px}
+.chart .el-s{font-size:15px}
+.chart .el-n{font-size:11px;font-weight:600}
+@media (max-width:520px){.pn-club,.pn-solo{font-size:14px;max-width:170px}.pn-name{font-size:12px}}
 /* v29 — NBA Kupası, Tahminler sekmesi, uzun vade hatırlatma */
 .game.cup,.faceoff.cup{border-color:color-mix(in srgb,#d4a52c 65%,var(--line));box-shadow:0 0 0 1px color-mix(in srgb,#d4a52c 35%,transparent),0 6px 22px color-mix(in srgb,#d4a52c 14%,transparent)}
 .cup-band{margin:-2px -2px 8px;padding:6px 10px;border-radius:12px 12px 6px 6px;background:linear-gradient(90deg,#3b2a05,#8a6512 45%,#d4a52c 70%,#8a6512);color:#fff7df}
