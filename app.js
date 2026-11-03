@@ -39,7 +39,7 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "v31";
+const VERSION = "v32";
 const LOGO_SMALL = a => `logos/${String(a).toLowerCase()}.png`;
 const LOGO_FULL  = a => `https://a.espncdn.com/i/teamlogos/nba/500/${String(a).toLowerCase()}.png`;
 document.addEventListener("error", e => {
@@ -2100,19 +2100,23 @@ function renderNBA(){
 const CUP_GROUPS = [["Doğu A",["BKN","DET","MIL","ORL","TOR"]],["Doğu B",["CLE","IND","MIA","NY","PHI"]],["Doğu C",["ATL","BOS","CHA","CHI","WSH"]],
   ["Batı A",["DAL","DEN","HOU","PHX","UTAH"]],["Batı B",["LAC","MEM","MIN","NO","OKC"]],["Batı C",["GS","LAL","POR","SAC","SA"]]];
 function cupHTML(){
-  const st={}, ko=[];
+  const st={}, ko=[], h2h={};
   for(const g of Object.values(S.arch.games||{})){ if(!g.cup) continue;
     if(!/group/i.test(g.cupStage||"Group")){ ko.push(g); continue; }
-    for(const [me,op] of [["home","away"],["away","home"]]){ const a=g[me].abbr, x=st[a] ||= {w:0,l:0,pd:0};
-      if(g.winner===a) x.w++; else x.l++; x.pd += (g[me].score||0)-(g[op].score||0); } }
+    h2h[g.home.abbr+"|"+g.away.abbr]=g.winner; h2h[g.away.abbr+"|"+g.home.abbr]=g.winner;
+    for(const [me,op] of [["home","away"],["away","home"]]){ const a=g[me].abbr, x=st[a] ||= {w:0,l:0,pd:0,pf:0};
+      if(g.winner===a) x.w++; else x.l++; x.pd += (g[me].score||0)-(g[op].score||0); x.pf += g[me].score||0; } }
+  // NBA.com sırası: galibiyet yüzdesi (maçı olmayan en sonda), ikili maç, sayı farkı, atılan sayı
+  const pct = r => r.w+r.l ? r.w/(r.w+r.l) : -1;
+  const cmp = (x,y) => pct(y)-pct(x) || (h2h[x.a+"|"+y.a]===x.a ? -1 : h2h[x.a+"|"+y.a]===y.a ? 1 : 0) || y.pd-x.pd || y.pf-x.pf;
   const fav=S.players[S.uid]?.favTeam, nm=a=>ALLP?.teams.find(t=>t.a===a)?.n?.split(" ").slice(-1)[0] || a;
-  const grp=([name,teams])=>{ const rows=teams.map(a=>({a, ...(st[a]||{w:0,l:0,pd:0})})).sort((x,y)=>y.w-x.w || x.l-y.l || y.pd-x.pd);
+  const grp=([name,teams])=>{ const rows=teams.map(a=>({a, ...(st[a]||{w:0,l:0,pd:0,pf:0})})).sort(cmp);
     return `<div class="cup-g"><div class="cup-gh">${esc(name)}</div>${rows.map((r,i)=>`<button class="cup-r ${i===0&&r.w?"lead":""} ${r.a===fav?"fav":""}" data-tp="${r.a}" style="--tc:${tcol(r.a)}"><span class="cup-n">${i+1}</span><img src="${LOGO_SMALL(r.a)}" alt=""><b>${esc(nm(r.a))}</b><span class="tnum">${r.w}-${r.l}</span><span class="tnum cup-pd ${r.pd>0?"pos":r.pd<0?"neg":""}">${r.pd>0?"+":""}${r.pd}</span></button>`).join("")}</div>`; };
   const koHTML = ko.length ? `<div class="sec-title"><h2 style="font-size:20px">Eleme turu</h2></div><div class="cup-ko">${ko.sort((a,b)=>a.day.localeCompare(b.day)).map(g=>`<div class="cup-kr"><small>${esc(cupStageTR(g.cupStage))} · ${dayNice(g.day,{day:"numeric",month:"short"})}</small><span><img src="${LOGO_SMALL(g.away.abbr)}" alt="">${esc(g.away.abbr)} <b>${g.away.score}</b> – <b>${g.home.score}</b> ${esc(g.home.abbr)}<img src="${LOGO_SMALL(g.home.abbr)}" alt=""></span></div>`).join("")}</div>` : "";
   if(!ALLP) allPlayers().then(()=>{ if(S.nba.sub==="kupa") $("#nbaBody").innerHTML=cupHTML(); }).catch(()=>{});
   return `<div class="cup-hero">${ICON.cup}<div><b>NBA Kupası 2026</b><small>Grup maçları cuma geceleri, son grup maçları 24-25 Kasım. Çeyrek finaller 4-5 Aralık, final Indianapolis'te. Kupa maçlarına yapılan tahminler 2 kat puan getirir.</small></div></div>
     <div class="cup-grid">${CUP_GROUPS.map(grp).join("")}</div>
-    <small class="muted st-key">Her grubun birincisi ve her konferansta en iyi grup ikincisi çeyrek finale çıkar. Eşitlikte ikili maç ve sayı farkı (Fark) bakılır.</small>${koHTML}
+    <small class="muted st-key">Her grubun birincisi ve her konferansta en iyi grup ikincisi çeyrek finale çıkar. Eşitlikte sırasıyla ikili maç, sayı farkı ve atılan sayıya bakılır (NBA.com ile aynı).</small>${koHTML}
     <button class="btn awards-btn" data-lt="c_2026" type="button">${ICON.cup}Kupa şampiyonunu tahmin et (Uzun vade)</button>`;
 }
 function standingsHTML(confs){
