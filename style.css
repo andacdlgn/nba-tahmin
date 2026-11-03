@@ -268,11 +268,6 @@ footer{color:var(--muted);font-size:12px;text-align:center;margin:28px 0 8px}
 .split{display:grid;gap:10px}
 .split .box h4{margin:0 0 6px;display:flex;align-items:center;gap:8px;font-size:16px}
 .split .box h4 img{width:24px;height:24px}
-.side-col{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px}
-.side-col > div{background:var(--panel-2);border-radius:10px;padding:8px 10px}
-.side-col .tm{display:flex;align-items:center;gap:6px;font-weight:700;margin-bottom:4px}
-.side-col .tm img{width:22px;height:22px}
-.side-col .nm{display:block;font-weight:600;font-size:14px}
 
 /* ---------- Puan & İstatistik ---------- */
 .tbl{background:var(--panel);border:1px solid var(--line);border-radius:16px;overflow:hidden}
@@ -299,9 +294,6 @@ footer{color:var(--muted);font-size:12px;text-align:center;margin:28px 0 8px}
 .kpi small{color:var(--muted);font-size:12.5px}
 .bar2{height:8px;border-radius:4px;background:var(--track);overflow:hidden;margin-top:6px}
 .bar2 i{display:block;height:100%}
-.trow3{display:grid;grid-template-columns:28px 1fr 60px;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--line);font-size:14px}
-.trow3:first-of-type{border-top:0}
-.trow3 img{width:24px;height:24px}
 
 /* ---------- Alt pencere ---------- */
 .sheet-bg{position:fixed;inset:0;z-index:50;background:rgba(5,10,16,.55);display:flex;align-items:flex-end;justify-content:center}
@@ -342,8 +334,7 @@ footer{color:var(--muted);font-size:12px;text-align:center;margin:28px 0 8px}
 .nav a svg{width:23px;height:23px}
 .nav a[aria-current="page"]{color:var(--ink)}
 .nav a[aria-current="page"]::after{content:"";position:absolute;top:0;width:28px;height:3px;border-radius:0 0 3px 3px;background:var(--amber)}
-.live-dot{position:absolute;top:10px;left:calc(50% + 8px);width:8px;height:8px;border-radius:50%;background:var(--live);border:2px solid var(--panel);animation:pulse 1.4s infinite}
-@media (prefers-reduced-motion:reduce){ .badge-live::before,.live-dot{animation:none} }
+@media (prefers-reduced-motion:reduce){ .badge-live::before{animation:none} }
 
 /* ---- kayıt: ad kuralı ve güvenlik sorusu */
 .hint{display:block;margin-top:5px;font-size:12.5px;color:var(--muted)}
@@ -522,7 +513,6 @@ button.cc:hover{transform:scale(1.2)}
 .av.lg.emo{font-size:34px}
 .av.lg .av-team{width:28px;height:28px;background:var(--panel);box-shadow:0 0 0 2px var(--panel)}
 .me-btn{background:var(--pc)!important;border-color:transparent!important;color:#fff!important;font-size:17px;border-radius:50%!important}
-.pf-head{display:flex;align-items:center;gap:16px;margin:4px 0 14px}
 .pf-sec{border-top:1px solid var(--line);padding:12px 0}
 .pf-sec h4{margin:0 0 8px;font-size:15px}
 .pf-sec small{display:block;margin-top:6px;font-size:12.5px}
@@ -644,8 +634,6 @@ button.cc:hover{transform:scale(1.2)}
 .fo-pi{min-width:0;flex:1}
 .fo-pi b{display:block;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .fo-pi small{display:block;color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.fo-pts{font-family:"Barlow Condensed";font-weight:800;font-size:18px}
-.fo-pts.pos{color:var(--win)} .fo-pts.neg{color:var(--lose)}
 .fo-flag{align-self:flex-start;font-size:12px;font-weight:800;color:#fff;background:var(--win);border-radius:6px;padding:2px 7px}
 .fo-flag.lead{background:transparent;color:var(--win);border:1px solid var(--win)}
 .fo-body{grid-template-columns:minmax(0,1fr) 22px minmax(0,1fr)}
@@ -808,12 +796,6 @@ button.cc:hover{transform:scale(1.2)}
 [data-pu]{cursor:pointer}
 .pc-head{display:flex;gap:12px;align-items:center}
 .pc-head img{border-radius:12px}
-.pc-nights{display:flex;gap:6px}
-.pc-n{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px 4px;text-align:center;display:flex;flex-direction:column;gap:2px;position:relative}
-.pc-n span{font-size:12px;color:var(--muted)}
-.pc-n b{font-family:"Barlow Condensed";font-size:22px;font-weight:800}
-.pc-n i{height:4px;border-radius:2px;margin:2px 10px 0;background:var(--line)}
-.pc-n i.W{background:var(--win)} .pc-n i.L{background:var(--lose)}
 .pc-teams{display:flex;gap:8px}
 .pc-t{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px;display:flex;flex-direction:column;align-items:center;gap:2px;color:inherit;cursor:pointer}
 .pc-t img{width:30px;height:30px}
@@ -1773,3 +1755,34 @@ button,a,[data-act],.plr,.pf-av,.pf-emo{touch-action:manipulation;-webkit-tap-hi
 .pt-badge.neg,.pill-n,.btn.armed{color:var(--on-lose)}
 .av-star,.conf-btn[aria-pressed="true"]{color:var(--on-amber,#1a1200)}
 .an-bank i.ok{color:var(--on-win)} .an-bank i.no{color:var(--on-lose)}
+
+/* 1.9.3 mobil: dokunma alanları en az ~40 px, taşmalar */
+.btn.sm{min-height:36px;min-width:40px}
+.th-nav .btn.sm{min-height:40px;min-width:44px;padding:6px 12px}
+.cal-nav .btn{min-width:44px;min-height:40px}
+.fo-hs{padding:8px 3px;margin:-8px 0}
+#foot .linkish{padding:10px 6px;display:inline-block}
+.tk-ch{padding:10px 4px}
+#takim .pc-cover{margin:0 0 0;border-radius:18px 18px 0 0}
+.none-line{display:block;margin-top:4px;color:var(--muted);font-size:12.5px;font-weight:500}
+.qrows .none-line{flex-basis:100%}
+
+/* 1.10.0: kaydırınca saklanan çubuklar (yalnızca mobil) */
+@media (max-width:760px){
+  .topbar,.nav{transition:transform .25s ease}
+  body.bars-hidden .topbar{transform:translateY(-100%)}
+  body.bars-hidden .nav{transform:translateY(calc(100% + 4px))}
+  body.bars-hidden .pickbar.show{transform:translateY(calc(-1 * (var(--top-h) + env(safe-area-inset-top))))}
+  body.bars-hidden #alert.sticky{top:0}
+}
+
+/* 1.10.0: diğer sekmelerde ince puan şeridi */
+#board.compact{display:none}
+.board-strip{display:flex;align-items:center;justify-content:space-between;gap:10px;width:calc(100% + 28px);margin:0 -14px;padding:10px 18px 12px;border:0;border-radius:0 0 18px 18px;
+  background:var(--board);color:var(--board-ink);font:inherit;font-size:14px;cursor:pointer;text-align:left}
+.board-strip.hide{display:none}
+.board-strip i{font-style:normal;opacity:.5;margin:0 4px}
+.board-strip .tnum{font-family:"Barlow Condensed";font-weight:800;font-size:17px;margin-left:2px}
+.bs-t{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bs-c{flex:none;font-size:12.5px;font-weight:700;opacity:.8}
+#board:not(.compact)+.board-strip{border-radius:0;margin-top:-8px}
