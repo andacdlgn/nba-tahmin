@@ -43,7 +43,7 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from sync import CONFIG, ESPN, PERGAME_FROM, espn_today, get, load, lock_gap, scoreboard, week_key  # noqa: E402
+from sync import CONFIG, ESPN, PERGAME_FROM, inj_out, espn_today, get, load, lock_gap, scoreboard, week_key  # noqa: E402
 
 TR = ZoneInfo("Europe/Istanbul")
 REMIND_AT = CONFIG.get("remindAt", "21:00")                       # her akşam bu saatte (Türkiye)
@@ -305,7 +305,7 @@ def injury_list():
                 continue
             st, det = i.get("status", ""), i.get("details") or {}
             why = "ceza" if st == "Suspension" else INJ_PART.get(det.get("type", ""), (det.get("type") or "sakatlık").lower())
-            out[pid] = {"name": a.get("displayName", "Oyuncu"), "out": st in ("Out", "Suspension"), "why": why,
+            out[pid] = {"name": a.get("displayName", "Oyuncu"), "out": inj_out(i), "why": why,
                         "back": det.get("returnDate", "")}
     return out
 
@@ -397,7 +397,7 @@ def lt_alerts(db, out, inj):
             names = d.get("names") or {}
             locked = now >= lt_lock(k)
             for c, pid in picks.items():
-                if c in ("coy", "cw", "cfe", "cfw") or not pid:
+                if c in ("coy", "cw", "cfe", "cfw", "champ", "fe", "fw") or not pid:
                     continue
                 pid = str(pid)
                 who = inj.get(pid, {}).get("name") or names.get(c) or pst.get(pid, {}).get("n", "Seçtiğin oyuncu")
@@ -426,7 +426,7 @@ def lt_alerts(db, out, inj):
 
 # ---------------------------------------------------------------- 2c) uzun vade kilit hatırlatması
 LT_TITLES = {"w": "Haftanın oyuncusu", "m": "Ayın ödülleri", "c": "NBA Kupası", "k": "Konferans sıralaması", "s": "Sezon ödülleri"}
-LT_COUNT = {"w": 2, "m": 6, "c": 4, "k": 12, "s": 6}
+LT_COUNT = {"w": 2, "m": 6, "c": 4, "k": 12, "s": 9}
 
 
 def lt_lock_mail(db, out):

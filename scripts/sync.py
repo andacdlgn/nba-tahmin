@@ -248,7 +248,7 @@ LT_PTS = {"w": {"e": 2, "w": 2},
           "m": {"pe": 4, "pw": 4, "re": 3, "rw": 3, "de": 3, "dw": 3},
           "c": {"cw": 8, "cfe": 3, "cfw": 3, "cmvp": 6},
           "k": {f"{c}{i}": 2 for c in "ew" for i in range(1, 7)},
-          "s": {"mvp": 12, "roy": 8, "dpoy": 8, "mip": 8, "smoy": 8, "coy": 8}}
+          "s": {"mvp": 12, "roy": 8, "dpoy": 8, "mip": 8, "smoy": 8, "coy": 8, "champ": 10, "fe": 5, "fw": 5}}
 
 
 def fs_list(coll):
@@ -486,6 +486,22 @@ def valid_before(doc, start_iso, gap=LOCK):
 
 
 # ---------------------------------------------------------------- ana akış
+# Sitedeki (app.js INJ_OUT_RX) ile aynı kural: durum GTD olsa da son 40 saatteki notta "ruled out" vb. varsa oynamıyor
+INJ_OUT_RX = re.compile(r"ruled out|\bis out\b|\bwill be out\b|will not play|won't play|will miss|sitting out|will sit|will be rested|\bout for (?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|tonight)", re.I)
+
+
+def inj_out(i):
+    st = i.get("status", "")
+    if st in ("Out", "Suspension"):
+        return True
+    try:
+        d = datetime.fromisoformat((i.get("date") or "").replace("Z", "+00:00"))
+        recent = datetime.now(timezone.utc) - d < timedelta(hours=40)
+    except ValueError:
+        recent = False
+    return bool(recent and INJ_OUT_RX.search(i.get("shortComment") or ""))
+
+
 INJ_TR = {"Out": "Oynamıyor", "Day-To-Day": "Belirsiz", "Suspension": "Cezalı", "Questionable": "Belirsiz", "Doubtful": "Şüpheli"}
 
 
@@ -504,7 +520,8 @@ def save_injuries():
             if not pid:
                 continue
             det = i.get("details") or {}
-            out[pid] = {"s": INJ_TR.get(i.get("status"), i.get("status", "")), "y": det.get("type", ""),
+            st = "Cezalı" if i.get("status") == "Suspension" else "Oynamıyor" if inj_out(i) else "Belirsiz"
+            out[pid] = {"s": st, "y": det.get("type", ""), "c": i.get("shortComment", ""),
                         "r": det.get("returnDate", ""), "t": a.get("team", {}).get("abbreviation", "")}
     return save("injuries.json", out)
 
