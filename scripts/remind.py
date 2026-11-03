@@ -314,7 +314,7 @@ def injuries(db, mail, day, games, inj):
 # ---------------------------------------------------------------- 2b) uzun vade uyarıları
 LT_NAMES = {"e": "haftanın oyuncusu (Doğu)", "w": "haftanın oyuncusu (Batı)", "pe": "ayın oyuncusu (Doğu)", "pw": "ayın oyuncusu (Batı)",
             "re": "ayın çaylağı (Doğu)", "rw": "ayın çaylağı (Batı)", "de": "ayın savunmacısı (Doğu)", "dw": "ayın savunmacısı (Batı)",
-            "mvp": "MVP", "roy": "yılın çaylağı", "dpoy": "yılın savunmacısı", "mip": "en çok gelişen oyuncu", "smoy": "yılın 6. adamı"}
+            "cmvp": "NBA Kupası MVP'si", "mvp": "MVP", "roy": "yılın çaylağı", "dpoy": "yılın savunmacısı", "mip": "en çok gelişen oyuncu", "smoy": "yılın 6. adamı"}
 
 
 def lt_lock(k):
@@ -322,14 +322,16 @@ def lt_lock(k):
         return datetime.strptime(k[2:], "%Y%m%d").replace(tzinfo=timezone.utc) + timedelta(hours=71)
     if k[0] == "m":
         return datetime(int(k[2:6]), int(k[6:8]), 15, 17, tzinfo=timezone.utc)
-    return datetime(2026, 11, 15, 17, tzinfo=timezone.utc)
+    if k[0] == "c":
+        return datetime(2026, 12, 4, 17, tzinfo=timezone.utc)
+    return datetime(2027, 1, 15, 17, tzinfo=timezone.utc)
 
 
 def lt_alerts(db, mail, inj):
     today = espn_today().strftime("%Y%m%d")
     y, m = int(today[:4]), int(today[4:6])
     mk = "m_202611" if (y, m) in ((2026, 10), (2026, 11)) else f"m_{y}{m:02d}"
-    keys = ["w_" + week_key(today), mk, "s_2027"]
+    keys = ["w_" + week_key(today), mk, "c_2026", "s_2027"]
     now = datetime.now(timezone.utc)
     # 65 maç kuralı: takımın oynadığı - oyuncunun oynadığı maç
     games = load("games.json", {})
@@ -353,7 +355,7 @@ def lt_alerts(db, mail, inj):
             names = d.get("names") or {}
             locked = now >= lt_lock(k)
             for c, pid in picks.items():
-                if c == "coy" or not pid:
+                if c in ("coy", "cw") or not pid:
                     continue
                 pid = str(pid)
                 who = inj.get(pid, {}).get("name") or names.get(c) or pst.get(pid, {}).get("n", "Seçtiğin oyuncu")

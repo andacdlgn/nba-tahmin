@@ -139,6 +139,10 @@ def finished_game(ev):
         "bucket": margin_bucket(abs(h["score"] - a["score"])),
         "ot": int(c["status"].get("period") or 4) > 4,
     }
+    note = next((n.get("headline", "") for n in c.get("notes", []) if "NBA Cup" in n.get("headline", "")), "")
+    g["cup"] = bool(note)
+    if note:
+        g["cupStage"] = note.split("-", 1)[-1].strip() if "-" in note else "Group Play"
     sr = series_info(ev)
     if sr:
         g["series"] = sr
@@ -220,7 +224,8 @@ def ts(s):
 # ---------------------------------------------------------------- puanlama
 def score_game(g, pick, conf, top_ids):
     """Bir oyuncunun bir maçtan aldığı puan ve ayrıntısı."""
-    mult = 2 if g["seasonType"] == 3 else 1          # playoff modu
+    # playoff ve (4 Kasım 2026'dan itibaren) NBA Kupası maçları 2 kat
+    mult = 2 if g["seasonType"] == 3 or (g.get("cup") and g.get("day", "") >= CUP2X_FROM) else 1
     r = {"w": 0, "m": 0, "s": 0, "c": bool(conf), "pts": 0, "pick": None}
     if not pick:
         return r
@@ -239,7 +244,8 @@ def score_game(g, pick, conf, top_ids):
 
 
 LOCK = timedelta(0)  # 3 Kasım 2026 öncesi: gecenin bütün tahminleri ilk maç başlayınca kilitlenir
-GAP_FROM, PERGAME_FROM = "20261103", "20261104"   # 3 Kasım: kilit 10 dk önce; 4 Kasım: her maç kendi saatinde
+GAP_FROM, PERGAME_FROM = "20261103", "20261104"
+CUP2X_FROM = "20261104"   # 3 Kasım: kilit 10 dk önce; 4 Kasım: her maç kendi saatinde
 
 
 def lock_gap(day):
@@ -326,6 +332,8 @@ def main(full=False):
 
     start = datetime.strptime(CONFIG["seasonStart"], "%Y%m%d").date()
     today = espn_today()
+    if any("cup" not in x for x in games.values()):   # NBA Kupası bilgisi eski kayıtlara bir kere eklenir
+        full = True
     first = start if (full or not games) else max(start, today - timedelta(days=3))
 
     nights = load("nights.json", {})
@@ -342,6 +350,9 @@ def main(full=False):
             if not g or g["seasonType"] == 1:
                 continue
             if games.get(g["id"], {}).get("top") and g["id"] in counted:
+                games[g["id"]]["cup"] = g["cup"]
+                if g.get("cupStage"):
+                    games[g["id"]]["cupStage"] = g["cupStage"]
                 continue
             try:
                 bx = box(g["id"])

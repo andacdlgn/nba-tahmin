@@ -46,7 +46,8 @@ service cloud.firestore {
     function ltLock(k) {
       return k.matches('^w_[0-9]{8}$') ? timestamp.date(int(k[2:6]), int(k[6:8]), int(k[8:10])) + duration.value(71, 'h')
         : k.matches('^m_[0-9]{6}$') ? timestamp.date(int(k[2:6]), int(k[6:8]), 15) + duration.value(17, 'h')
-        : timestamp.date(2026, 11, 15) + duration.value(17, 'h');
+        : k == 'c_2026' ? timestamp.date(2026, 12, 4) + duration.value(17, 'h')
+        : timestamp.date(2027, 1, 15) + duration.value(17, 'h');
     }
     match /lt/{id} {
       allow read: if resource == null
@@ -55,7 +56,7 @@ service cloud.firestore {
       allow create, update: if isPlayer()
         && id == request.resource.data.key + '_' + request.auth.uid
         && request.resource.data.uid == request.auth.uid
-        && request.resource.data.key.matches('^(w_[0-9]{8}|m_[0-9]{6}|s_2027)$')
+        && request.resource.data.key.matches('^(w_[0-9]{8}|m_[0-9]{6}|c_2026|s_2027)$')
         && request.resource.data.keys().hasOnly(['uid', 'key', 'picks', 'names', 'swaps', 'updatedAt'])
         && request.resource.data.picks is map && request.resource.data.picks.size() <= 6
         && request.resource.data.updatedAt == request.time
