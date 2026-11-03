@@ -45,10 +45,11 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.11.0";
+const VERSION = "1.11.1";
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.11.1", d:"3 Kasım 2026", items:["Avatar artık yalnızca basketbolcu fotoğrafı olabiliyor; profilde istediğin oyuncuyu arayıp seçebilirsin.","Diğer sekmelerdeki ince puan şeridi daha anlaşılır: lider, senin sıran ve puanın."]},
   {v:"1.11.0", d:"3 Kasım 2026", items:["Gecenin kazananı gece bitince sahneye çıkıyor, puan tablosunda satırı parlıyor.","Sıralama: Sezon yarışı — gece gece puanlarla çubuk yarışı, Oynat'a bas.","Oyuncu kartı: takım logosu, son 10 maçın sayı grafiği, 10 maçlık günlük, sakatlık notu ve ligde kaç kez skorer seçildiği.","Boş ekranlar çizimli ve yönlendiren hale geldi.","Rozetler: ilerleme çubuğu ve ligde kaç kişide olduğu."]},
   {v:"1.10.3", d:"3 Kasım 2026", items:["Takım sayfasındaki son maç tarihleri sitenin geri kalanı gibi ABD tarihine göre.","Gece kazananı yıldızının rengi her avatarda okunur."]},
   {v:"1.10.2", d:"3 Kasım 2026", items:["İngilizce arayüzde kalan Türkçe metinler çevrildi."]},
@@ -601,12 +602,13 @@ const STARS = [["5104157","Victor Wembanyama"],["4278073","Shai Gilgeous-Alexand
 const FACE = id => `https://a.espncdn.com/combiner/i?img=/i/headshots/nba/players/full/${id}.png&w=96&h=70&scale=crop&cquality=70`;
 const faceImg = (id, cls="face") => id ? `<img class="${cls}" src="${FACE(id)}" alt="" loading="lazy">` : "";
 const HEADSHOT = id => `https://a.espncdn.com/combiner/i?img=/i/headshots/nba/players/full/${id}.png&w=160&h=117&scale=crop&cquality=70`;
-const avImg = av => { const m=/^(t|p):(\w+)$/.exec(av||""); if(!m) return ""; return m[1]==="t" ? `<img class="av-img logo" src="${LOGO_SMALL(m[2])}" alt="">` : `<img class="av-img" src="${HEADSHOT(m[2])}" alt="" loading="lazy">`; };
+// Avatar yalnızca basketbolcu olabilir ("p:id"); eski takım logosu ve emoji avatarları gösterilmez, baş harfler görünür
+const avImg = av => { const m=/^p:(\w+)$/.exec(av||""); return m ? `<img class="av-img" src="${HEADSHOT(m[1])}" alt="" loading="lazy">` : ""; };
 const avatar = (u, cls="") => { const p=S.players[u]||{}; const h=honors(); const img=avImg(p.av);
   const crown = h.week===u ? `<span class="av-crown" title="Geçen haftanın şampiyonu">👑</span>` : "";
   const star = h.night===u ? `<span class="av-star" title="Son gecenin kazananı">★</span>` : "";
-  const badge = p.favTeam && p.av!==`t:${p.favTeam}` ? `<img class="av-team" src="${LOGO_SMALL(p.favTeam)}" alt="">` : "";
-  return `<span class="av ${cls} ${img?"has-img":p.emoji?"emo":""}" style="--pc:${col(u)}">${img?`<span class="av-ini">${esc(initials(pname(u)))}</span>${img}`:p.emoji?p.emoji:esc(initials(pname(u)))}${badge}${crown}${star}</span>`; };
+  const badge = p.favTeam ? `<img class="av-team" src="${LOGO_SMALL(p.favTeam)}" alt="">` : "";
+  return `<span class="av ${cls} ${img?"has-img":""}" style="--pc:${col(u)}">${img?`<span class="av-ini">${esc(initials(pname(u)))}</span>${img}`:esc(initials(pname(u)))}${badge}${crown}${star}</span>`; };
 // Geçen haftanın tek şampiyonu ve son bitmiş gecenin tek kazananı (+ o gecenin puanları)
 function honors(){
   const key = S.today + "|" + Object.keys(S.arch.scores.days||{}).length + "|" + S.order.length + "|" + (S.days[S.today]?.at||0) + "|" + (S.days[shiftDay(S.today,-1)]?.at||0);
@@ -730,7 +732,7 @@ function renderBoardStrip(){
   if(!compact) return;
   const tot=seasonTotals(), rk=rankOrder(tot), lead=rk[0], me=rk.indexOf(S.uid);
   el.innerHTML = open ? `<span class="bs-t">Tabloyu küçült</span><span class="bs-c">▴</span>`
-    : `<span class="bs-t"><b style="color:${col(lead)}">1. ${esc(pname(lead))}</b> <span class="tnum">${tot[lead]||0}</span>${me>0?` <i>·</i> <b>Sen ${me+1}.</b> <span class="tnum">${tot[S.uid]||0}</span>`:me===0?` <i>·</i> <b>Zirvedesin</b>`:""}</span><span class="bs-c">Tablo ▾</span>`;
+    : `<span class="bs-t">${me===0 ? `👑 <b>Zirvedesin</b> · ${tot[S.uid]||0} puan` : `👑 Lider <b style="color:${col(lead)}">${esc(pname(lead))}</b> ${tot[lead]||0} puan${me>0?` <i>·</i> Sen <b>${me+1}.</b> sıradasın, ${tot[S.uid]||0} puan`:""}`}</span><span class="bs-c">Tabloyu aç ▾</span>`;
 }
 function renderBoard(){
   const brk = seasonBreakdown();
@@ -2345,7 +2347,7 @@ function renderBanners(){
     <span class="bn-acts"><button class="btn sm" data-bn="mail">${S.contact?.email?"Onayla":"Ekle"}</button><button class="linkish" data-bn="later">Sonra</button></span></div>`;
   // Profilini özelleştirmemiş olana (favori takım ya da avatar seçmemiş) hatırlatma
   const me=S.players[S.uid];
-  const missP = me ? [!me.favTeam && "favori takımını", !me.emoji && !me.av && "avatarını"].filter(Boolean) : [];
+  const missP = me ? [!me.favTeam && "favori takımını", !avImg(me.av) && "avatarını"].filter(Boolean) : [];
   if(missP.length && Date.now()>+(lsGet("profileNudge")||0)) html += `<div class="banner nudge"><span class="bn-i">${ICON.palette}</span><span class="bn-t"><b>Profilini özelleştir</b> ${missP.length===2?"Favori takımını, avatarını ve rengini seç":missP[0][0].toLocaleUpperCase("tr")+missP[0].slice(1)+" da seç"}, puan tablosunda öyle görün.</span>
     <span class="bn-acts"><button class="btn sm" data-bn="profile">Seç</button><button class="linkish" data-bn="plater">Sonra</button></span></div>`;
   box.innerHTML=html;
@@ -2379,7 +2381,7 @@ function profCover(u){
   return m?.[1]==="p" ? `<div class="pc-cover photo" style="--pc:${col(u)};--cv:url('https://a.espncdn.com/combiner/i?img=/i/headshots/nba/players/full/${m[2]}.png&w=600&h=438&scale=crop&cquality=75')"></div>`
     : m?.[1]==="t" ? `<div class="pc-cover team" style="--tc:${tcol(m[2])}"><img src="${LOGO_SMALL(m[2])}" alt=""></div>`
     : p.favTeam ? `<div class="pc-cover team soft" style="--tc:${tcol(p.favTeam)}"><img src="${LOGO_SMALL(p.favTeam)}" alt=""></div>`
-    : `<div class="pc-cover plain" style="--pc:${col(u)}"><span>${p.emoji||esc(initials(pname(u)))}</span></div>`;
+    : `<div class="pc-cover plain" style="--pc:${col(u)}"><span>${esc(initials(pname(u)))}</span></div>`;
 }
 function profStats(u){
   const recs=userRecs(u), n=recs.length, tot=seasonTotals();
@@ -3687,17 +3689,14 @@ const obLock = on => { S.sheetLocked=on; $("#shClose").classList.toggle("hide", 
 function openOnboard(step){
   S.obStep=step;
   if(step===4){
-    const me=S.players[S.uid]||{}; S.ob = S.ob || {club:me.club||"", team:me.favTeam||"", av:me.av||"", avTab:(me.av||"").startsWith("p:")?"oyu":"tak"};
+    const me=S.players[S.uid]||{}; S.ob = S.ob || {club:me.club||"", team:me.favTeam||"", av:avImg(me.av)?me.av:""};
     const teams=(ALLP?.teams||[]).slice().sort((a,b)=>a.n.localeCompare(b.n,"tr"));
     openSheet(`${S.onboard?stepBar(4):""}<h3 id="shTitle">Takım adın</h3><p class="muted">Ligde adının altında görünür (ör. Kyle Korver Sevenler Derneği). Zorunlu.</p>
       <input id="obClub" class="adm-in" style="width:100%" maxlength="40" placeholder="ör. Kyle Korver Sevenler Derneği" value="${esc(S.ob.club||"")}"><small class="hint" id="obClubErr"></small>
       <h3 style="margin-top:18px">Favori takımın</h3><p class="muted">Uygulamanın renkleri (tema) bu takıma göre olur. Sonra Ayarlar'dan değiştirebilirsin.</p>
       <div class="tm-grid ob-teams">${teams.map(t=>`<button class="tg" data-obt="${t.a}" aria-pressed="${S.ob.team===t.a}" style="--tc:${tcol(t.a)}"><span class="tg-l"><img src="${LOGO_SMALL(t.a)}" alt=""></span><b>${esc(t.n.split(" ").slice(-1)[0])}</b></button>`).join("") || `<p class="muted">Takımlar yükleniyor…</p>`}</div>
-      <h3 style="margin-top:18px">Avatarın</h3><p class="muted">Bir takım logosu ya da bir basketbolcu seç; sıralamada ve tahtada adının yanında görünür.</p>
-      <div class="seg2 ob-avtab"><button type="button" data-obtab="tak" aria-pressed="${S.ob.avTab==="tak"}">Takım logosu</button><button type="button" data-obtab="oyu" aria-pressed="${S.ob.avTab==="oyu"}">Basketbolcu</button></div>
-      <div class="pf-avs ob-avs">${S.ob.avTab==="tak"
-        ? teams.map(t=>`<button class="pf-av logo" data-oba="t:${t.a}" aria-pressed="${S.ob.av===`t:${t.a}`}" title="${esc(t.n)}"><img src="${LOGO_SMALL(t.a)}" alt=""><small>${esc(t.n.split(" ").slice(-1)[0])}</small></button>`).join("")
-        : STARS.map(([id,n])=>`<button class="pf-av" data-oba="p:${id}" aria-pressed="${S.ob.av===`p:${id}`}"><img src="${HEADSHOT(id)}" alt="" loading="lazy"><small>${esc(n.split(" ").slice(-1)[0])}</small></button>`).join("")}</div>
+      <h3 style="margin-top:18px">Avatarın</h3><p class="muted">Bir basketbolcu seç; sıralamada ve tahtada adının yanında fotoğrafı görünür. Sonra profilinden değiştirebilir, listede olmayan bir oyuncuyu da arayabilirsin.</p>
+      <div class="pf-avs ob-avs">${STARS.map(([id,n])=>`<button class="pf-av" data-oba="p:${id}" aria-pressed="${S.ob.av===`p:${id}`}"><img src="${HEADSHOT(id)}" alt="" loading="lazy"><small>${esc(n.split(" ").slice(-1)[0])}</small></button>`).join("")}</div>
       <p class="err" id="obErr"></p><button class="btn-primary" id="obNext" type="button">Devam</button>`);
     obLock(true);
     if(!ALLP) allPlayers().then(()=>{ if(S.obStep===4) openOnboard(4); }).catch(()=>{});
@@ -3705,8 +3704,7 @@ function openOnboard(step){
     const checkClub=()=>{ const v=clubInp.value.trim().replace(/\s+/g," "); S.ob.club=v; const p=v?clubProblem(v):null;
       $("#obClubErr").textContent = p || (v ? "✓ Uygun." : ""); $("#obClubErr").className = "hint "+(p?"bad":v?"good":""); return p; };
     clubInp.oninput=checkClub; if(clubInp.value) checkClub();
-    $("#sheet .ob-teams").onclick=e=>{ const b=e.target.closest("[data-obt]"); if(!b) return; S.ob.team=b.dataset.obt; if(!S.ob.av || S.ob.av.startsWith("t:")) S.ob.av="t:"+S.ob.team; openOnboard(4); };
-    $("#sheet .ob-avtab").onclick=e=>{ const b=e.target.closest("[data-obtab]"); if(!b) return; S.ob.avTab=b.dataset.obtab; openOnboard(4); };
+    $("#sheet .ob-teams").onclick=e=>{ const b=e.target.closest("[data-obt]"); if(!b) return; S.ob.team=b.dataset.obt; openOnboard(4); };
     $("#sheet .ob-avs").onclick=e=>{ const b=e.target.closest("[data-oba]"); if(!b) return; S.ob.av=b.dataset.oba; $$("#sheet [data-oba]").forEach(x=>x.setAttribute("aria-pressed", x===b)); };
     $("#obNext").onclick=async()=>{
       const club=clubInp.value.trim().replace(/\s+/g," ");
@@ -3904,13 +3902,13 @@ function paintProfile(){
     <div class="pf-sec"><h4>Rengin</h4><div class="pf-colors">${PKEYS.map(c=>{ const u=usedBy(c); return `<button class="pf-col" data-col="${c}" style="--c:var(--${c})" aria-pressed="${col(S.uid)===`var(--${c})`}" title="${u.length?esc(u.join(", "))+" de kullanıyor":""}">${u.length?"<i></i>":""}</button>`; }).join("")}</div>
       <small class="muted">Noktalı renkleri başka oyuncular da kullanıyor.</small></div>
     <div class="pf-sec"><h4>Avatar</h4>
-      <div class="seg2 pf-avtab">${[["emo","Emoji"],["tak","Takım"],["oyu","Oyuncu"]].map(([k,l])=>`<button data-avtab="${k}" aria-pressed="${avTab===k}">${l}</button>`).join("")}</div>
-      ${avTab==="emo" ? `<div class="pf-emojis"><button class="pf-emo ini" data-emo="" aria-pressed="${!me.emoji && !me.av}">${esc(initials(pname(S.uid)))}</button>${EMOJIS.map(e=>`<button class="pf-emo" data-emo="${e}" aria-pressed="${me.emoji===e && !me.av}">${e}</button>`).join("")}</div>`
-      : avTab==="tak" ? `<div class="pf-avs">${teams.map(t=>`<button class="pf-av logo" data-av="t:${t.a}" aria-pressed="${me.av===`t:${t.a}`}" title="${esc(t.n)}"><img src="${LOGO_SMALL(t.a)}" alt="${esc(t.n)}"></button>`).join("")}</div>`
-      : `<div class="pf-avs">${STARS.map(([id,n])=>`<button class="pf-av" data-av="p:${id}" aria-pressed="${me.av===`p:${id}`}" title="${esc(n)}"><img src="${HEADSHOT(id)}" alt="" loading="lazy"><small>${esc(n.split(" ").slice(-1)[0])}</small></button>`).join("")}</div>
-        <small class="muted">CBS Sports'un 2026-27 sezonu ilk 50 oyuncu sıralaması.</small>`}
-      ${me.av?`<button class="linkish" data-emo="" style="font-size:13px">Görseli kaldır</button>`:""}</div>
-    <div class="pf-sec"><h4>Favori takım</h4><small class="muted">Avatarında logosu görünür. Güvenlik sorusundan bağımsızdır.</small>
+      <small class="muted" style="margin:0 0 8px;display:block">Avatarın bir basketbolcunun fotoğrafı olur.</small>
+      <input class="search pf-avq" id="pfAvQ" placeholder="Oyuncu ara (ör. Curry)" autocomplete="off">
+      <div class="pf-avs" id="pfAvs">${(()=>{ const cur=(/^p:(\w+)$/.exec(me.av||"")||[])[1]; const list=[...(cur && !STARS.some(x=>x[0]===cur) ? [[cur,(ALLP?.players||[]).find(x=>x.id===cur)?.n||""]] : []), ...STARS];
+        return list.map(([id,n])=>`<button class="pf-av" data-av="p:${id}" aria-pressed="${me.av===`p:${id}`}" title="${esc(n)}"><img src="${HEADSHOT(id)}" alt="" loading="lazy"><small>${esc(n.split(" ").slice(-1)[0])}</small></button>`).join(""); })()}</div>
+        <small class="muted">Liste: CBS Sports'un 2026-27 sezonu ilk 50 oyuncusu. Başka bir oyuncu için yukarıdan ara.</small>
+      ${avImg(me.av)?`<button class="linkish" data-emo="" style="font-size:13px">Fotoğrafı kaldır</button>`:""}</div>
+    <div class="pf-sec"><h4>Favori takım</h4><small class="muted">Avatarının köşesinde küçük logosu görünür; site renklerini de buna göre seçebilirsin. Güvenlik sorusundan bağımsızdır.</small>
       <div class="pf-teams"><button class="pf-tm none" data-tm="" aria-pressed="${!me.favTeam}">Yok</button>${teams.map(t=>`<button class="pf-tm" data-tm="${t.a}" aria-pressed="${me.favTeam===t.a}" title="${esc(t.n)}"><img src="${LOGO_SMALL(t.a)}" alt="${esc(t.n)}"></button>`).join("")}</div></div>
     <div class="pf-sec"><h4>Site renkleri</h4><div class="seg2 pf-theme"><button data-th="default" aria-pressed="${me.theme!=="team"}">Varsayılan</button><button data-th="team" aria-pressed="${me.theme==="team"}" ${me.favTeam?"":"disabled"}>Favori takımım</button></div>
       <small class="muted">${me.favTeam?"Üst alan ve vurgu renkleri takımının renklerine geçer. Yalnızca sende görünür.":"Önce bir favori takım seç."}</small></div>
@@ -3935,6 +3933,9 @@ function paintProfile(){
     const t=e.target.closest("[data-tm]"); if(t) return saveProfile(t.dataset.tm ? {favTeam:t.dataset.tm} : {favTeam:"", theme:"default"});
     const h=e.target.closest("[data-th]"); if(h && !h.disabled) return saveProfile({theme:h.dataset.th});
   };
+  $("#pfAvQ")?.addEventListener("input", e=>{ const q=slug(e.target.value||""); const box2=$("#pfAvs"); if(!box2) return;
+    const list = q.length<2 ? STARS : (ALLP?.players||[]).filter(x=>slug(x.n).includes(q)).slice(0,30).map(x=>[x.id,x.n]);
+    box2.innerHTML = list.map(([id,n])=>`<button class="pf-av" data-av="p:${id}" title="${esc(n)}"><img src="${HEADSHOT(id)}" alt="" loading="lazy"><small>${esc(n.split(" ").slice(-1)[0])}</small></button>`).join("") || '<p class="muted">Oyuncu bulunamadı.</p>'; });
   $("#secChange").onclick=()=>openRecoverySheet(false);
   $("#adminBtn")?.addEventListener("click", openAdmin);
   $("#histBtn").onclick = () => openHistory();
@@ -3998,7 +3999,7 @@ function paintProfile(){
 
 }
 // Takım teması: üst alan ve vurgu rengi favori takımın renklerine geçer (yalnızca o oyuncuda)
-function paintMe(){ const p=S.players[S.uid]||{}; const img=avImg(p.av); $("#me").innerHTML = img ? img.replace('class="av-img','class="me-img') : (p.emoji || esc(pname(S.uid).slice(0,1).toLocaleUpperCase("tr"))); $("#me").style.setProperty("--pc", col(S.uid)); $("#me").classList.add("me-btn"); }
+function paintMe(){ const p=S.players[S.uid]||{}; const img=avImg(p.av); $("#me").innerHTML = img ? img.replace('class="av-img','class="me-img') : ("" || esc(pname(S.uid).slice(0,1).toLocaleUpperCase("tr"))); $("#me").style.setProperty("--pc", col(S.uid)); $("#me").classList.add("me-btn"); }
 function applyTheme(){
   if(S.uid) paintMe();
   const r=document.documentElement.style, me=S.uid && S.players[S.uid];
