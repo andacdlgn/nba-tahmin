@@ -31,7 +31,7 @@
 <script>
 // Açılış ekranı + sürüm kontrolü. Her güncellemede BUILD, version.json, app.js'deki VERSION ve
 // aşağıdaki ?v= numaraları birlikte artırılır (scripts/surum.py hepsini birden yapar).
-window.BUILD = "v27";
+window.BUILD = "v28";
 (function(){
   var t0 = Date.now(), MIN = 1000, MAX = 8000, ready = false, done = false;
   function hide(){ if(done) return; done = true; var s = document.getElementById("splash"); if(!s) return; s.classList.add("out"); setTimeout(function(){ s.remove(); }, 450); }
@@ -49,7 +49,7 @@ window.BUILD = "v27";
   }).catch(function(){});
 })();
 </script>
-<link rel="stylesheet" href="style.css?v=v27">
+<link rel="stylesheet" href="style.css?v=v28">
 </head>
 <body>
 
@@ -209,6 +209,6 @@ window.BUILD = "v27";
 
 <div class="toast hide" id="toast" role="status" aria-live="polite"></div>
 
-<script type="module" src="app.js?v=v27"></script>
+<script type="module" src="app.js?v=v28"></script>
 </body>
 </html>

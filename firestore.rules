@@ -36,7 +36,10 @@ service cloud.firestore {
         && (!('av' in d) || (d.av is string && d.av.matches('^(t:[A-Z]{2,4}|p:[0-9]{3,10})?$')))
         // bio: profildeki "Hakkında" satırı (en fazla 60 karakter, bariz küfürler engellenir; ayrıntılı kontrol sitede)
         && (!('bio' in d) || (d.bio is string && d.bio.size() <= 60
-            && !d.bio.lower().matches('.*(orospu|siktir|sikerim|sikeyim|yarrak|am[iı]nak|amc[iı]k|ibne|pezevenk|kahpe|[sş]erefsiz|fuck|bitch|nigg|faggot).*')));
+            && !d.bio.lower().matches('.*(orospu|siktir|sikerim|sikeyim|yarrak|am[iı]nak|amc[iı]k|ibne|pezevenk|kahpe|[sş]erefsiz|fuck|bitch|nigg|faggot).*')))
+        // club: takım adı (en fazla 40 karakter; bariz küfürler burada, ayrıntılı kontrol sitede)
+        && (!('club' in d) || (d.club is string && d.club.size() <= 40
+            && !d.club.lower().matches('.*(orospu|siktir|sikerim|sikeyim|sikik|yarrak|yarak|am[iı]nak|amc[iı]k|ibne|pezevenk|kahpe|kaltak|yav[sş]ak|[sş]erefsiz|gerizekal|dalyarak|ta[sş]ak|fuck|shit|bitch|cunt|nigg|faggot|whore|asshole).*')));
     }
 
     // Uzun vadeli tahminler: lt/{tur}_{uid}. Kilit tur anahtarından hesaplanır; kilitten sonra herkes görür.
@@ -116,7 +119,7 @@ service cloud.firestore {
             && exists(/databases/$(database)/documents/players/$(request.resource.data.ref))));
       // Profil: ad, renk, emoji, favori takım ve tema değiştirilebilir (listeden seçilir)
       allow update: if signedIn() && request.auth.uid == uid
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'color', 'emoji', 'favTeam', 'theme', 'av', 'bio'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'color', 'emoji', 'favTeam', 'theme', 'av', 'bio', 'club'])
         && (!('name' in request.resource.data.diff(resource.data).affectedKeys()) || validName(request.resource.data.name))
         && profileOk(request.resource.data);
       allow delete: if isAdmin();

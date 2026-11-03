@@ -39,7 +39,7 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "v27";
+const VERSION = "v28";
 const LOGO_SMALL = a => `logos/${String(a).toLowerCase()}.png`;
 const LOGO_FULL  = a => `https://a.espncdn.com/i/teamlogos/nba/500/${String(a).toLowerCase()}.png`;
 document.addEventListener("error", e => {
@@ -86,6 +86,7 @@ async function espn(path){
 // Arayüz simgeleri: hepsi aynı çizgi tarzında (emojiler yalnızca avatar, tepki ve şeritte)
 const IC = (d, cls="ic") => `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
 const ICON = {
+  shield: IC('<path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z"/>'),
   bolt: IC('<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>'),
   cards: IC('<rect x="7" y="3" width="13" height="17" rx="2"/><path d="M4 7v12a2 2 0 0 0 2 2h9"/>'),
   list: IC('<path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/>'),
@@ -271,7 +272,7 @@ async function loadPlayers(){
   S.players = {};
   // katılma saati henüz sunucudan gelmediyse "en yeni" say (renk sırası kaymasın)
   snap.forEach(d => { const x=d.data({serverTimestamps:"estimate"});
-    S.players[d.id] = {name:x.name, joined:x.joined?.toMillis?.()||Date.now(), color:x.color||"", emoji:x.emoji||"", favTeam:x.favTeam||"", theme:x.theme||"default", av:x.av||"", bio:x.bio||"", ref:x.ref||""}; });
+    S.players[d.id] = {name:x.name, joined:x.joined?.toMillis?.()||Date.now(), color:x.color||"", emoji:x.emoji||"", favTeam:x.favTeam||"", theme:x.theme||"default", av:x.av||"", bio:x.bio||"", ref:x.ref||"", club:x.club||""}; });
   S.order = Object.keys(S.players).sort((a,b) => (S.players[a].joined-S.players[b].joined) || pname(a).localeCompare(pname(b),"tr"));
   S.colorOrder = [...S.order];
   // giriş yapan oyuncu her zaman ilk sırada (iki kişide solda)
@@ -1524,10 +1525,10 @@ function renderPuan(){
   // podyum: ilk üç (puan varsa)
   const rk=[...S.order].sort((a,b)=>tot[b]-tot[a]);
   const pod = rk.length>=2 && tot[rk[0]]>0 ? `<div class="podium">${[1,0,2].filter(i=>rk[i]).map(i=>{ const u=rk[i];
-    return `<div class="pd pd${i+1}" data-pu="${u}" style="--pc:${col(u)}">${avatar(u, i===0?"lg":"")}<b style="color:${col(u)}">${esc(pname(u))}</b><span class="pd-pts tnum">${tot[u]}</span><div class="pd-step"><span>${i+1}</span></div></div>`; }).join("")}</div>` : "";
+    return `<div class="pd pd${i+1}" data-pu="${u}" style="--pc:${col(u)}">${avatar(u, i===0?"lg":"")}<b style="color:${col(u)}">${esc(pname(u))}</b>${S.players[u]?.club?`<small class="pd-club">${esc(S.players[u].club)}</small>`:""}<span class="pd-pts tnum">${tot[u]}</span><div class="pd-step"><span>${i+1}</span></div></div>`; }).join("")}</div>` : "";
   let html = pod + `<div class="sec-title"><h2>Puan tablosu</h2><span class="aside">${S.league?.start ? dayNice(leagueStart(),{day:"numeric",month:"long"})+" gecesinden beri" : "sezon"}</span></div>
     <div class="tbl"><div class="tr th t-lb"><span>#</span><span>Oyuncu</span><span class="r">Puan</span><span class="c">Gece</span><span class="c">Hafta</span></div>
-    ${ranked.map((u,i)=>`<div class="tr t-lb"><span class="muted">${i+1}</span><span class="pn"><i style="background:${col(u)}"></i><span>${esc(pname(u))}</span></span><span class="r big tnum">${tot[u]}</span><span class="c tnum">${wins[u]}</span><span class="c tnum">${wks[u]}</span></div>`).join("")}</div>
+    ${ranked.map((u,i)=>`<div class="tr t-lb"><span class="muted">${i+1}</span><span class="pn"><i style="background:${col(u)}"></i><span>${esc(pname(u))}${S.players[u]?.club?`<small class="pn-club">${esc(S.players[u].club)}</small>`:""}</span></span><span class="r big tnum">${tot[u]}</span><span class="c tnum">${wins[u]}</span><span class="c tnum">${wks[u]}</span></div>`).join("")}</div>
     <p class="muted" style="font-size:13px;margin:6px 2px">Gece: tek başına en çok puan aldığın geceler. Hafta: kazandığın haftalar (pazartesi–pazar).</p>`;
   const brk = seasonBreakdown();
   html += `<div class="sec-title"><h2>Puanlar nereden geldi</h2></div>
@@ -1864,6 +1865,7 @@ function paintProf(){
   else if(tab==="roz") body=badgesFull(u);
   else body=`<div id="prof"></div>`;
   box.innerHTML = profCover(u) + `<div class="pc-head on-cover">${avatar(u,"lg")}<div style="min-width:0"><h3 id="shTitle" style="margin:0;color:${col(u)}">${esc(pname(u))}</h3>
+      ${p.club?`<div class="pf-club">${ICON.shield}${esc(p.club)}</div>`:""}
       ${p.bio?`<div class="pf-bio">“${esc(p.bio)}”</div>`:""}
       ${(inv=>inv.length?`<div class="pf-inv">${ICON.link}Lige getirdiği: ${inv.map(x=>`<b style="color:${col(x)}">${esc(pname(x))}</b>`).join(", ")}</div>`:"")(invitedBy(u))}
       <small class="muted">${st.rank}. sırada · ${st.tot} puan${p.favTeam?` · <span data-tp="${p.favTeam}" class="linkish" style="font-size:13px">${esc(fav?.n||p.favTeam)}</span> taraftarı`:""} · Ligde ${daysIn}. günü</small></div></div>
@@ -2541,6 +2543,28 @@ function nameProblem(name){
   return null;
 }
 
+// Takım adı (ör. "Kyle Korver Sevenler Derneği"): ad kuralından daha sıkı kontrol.
+// Harf oyunları (s.i.k, 4m1n4, siiiktir), tek harflere bölme ve birleşik yazım ayrı ayrı denenir.
+const CLUB_BAD_WORD = new Set(["amk","aq","amq","mk","oc","pic","got","sik","sg","mal","salak","aptal","pust","lan","ulan","anani","dick","cock","fag","ass","fck","sex","seks","kro","pezo","fuk","nazi","amina","sikim","sikem","sokam","dalyak","gerzek","embesil","moron","hiyar","oglan","kodum","kodumun","kudur","ebeni","bok","boktan","sic","sicmak","osur","idiot","stupid","loser","porno","meme","gay","lez","travesti","terorist","pkk","isid","isis"].map(x=>squeeze(foldName(x))));
+const CLUB_BAD_SUB = [...BAD_SUB, ...["gerizekal","dangalak","yavsak","pezeven","ananin","anan","bacin","avrad","ebeni","sikis","sikti","sikey","sikec","sikin","amina","amcik","yarra","yarag","tasak","daşşak","dassak","godo","kaltak","fahis","orosp","oruspu","ibnel","puşt","pust","kevas","kahpe","sürtük","surtuk","şerefsiz","namussuz","haysiyetsiz","pislik","aşağılık","asagilik","motherfuck","dumbass","jackass","bullshit","fucker","shithead","nigg","kike","chink","retard","dalyak","kodumun","ananiz","sikmis","siksin","sokay","sokar","yalak","yalaka","gotver","gotun","osuruk"].map(x=>squeeze(foldName(x).replace(/[^a-z]/g,"")))];
+// kısa kökler ek almış halde de yakalanır: "Mallar", "Götler", "Piçler"
+const CLUB_STEM = /^(mal|got|sik|pic|oc|bok|pust|amk|aq|lan|gay|lez|sic|osur|salak|aptal|gerzek|hiyar|moron|idiot)(lar|ler|lari|leri|larin|lerin|cu|ci|cuk|cik|cular|ciler|culer|cilar|lik|luk|um|im|umuz|imiz)?$/;
+function clubProblem(t){
+  if(!t) return null;
+  if(t.length < 3) return "Takım adı en az 3 karakter olmalı.";
+  if(t.length > 40) return "Takım adı en fazla 40 karakter olabilir.";
+  if(!/^[\p{L}\p{N}][\p{L}\p{N} .'&!\-]*$/u.test(t)) return "Takım adında yalnızca harf, rakam, boşluk ve . - ' & ! olabilir.";
+  if(/(.)\1{3,}/u.test(t)) return "Aynı harfi art arda bu kadar çok yazma.";
+  const f = foldName(t), joined = squeeze(f.replace(/[^a-z]/g,""));
+  const words = f.split(/[^a-z]+/).filter(Boolean).map(squeeze);
+  // tek harflere bölünmüş yazımı birleştir: "s i k" -> "sik"
+  const glued = f.split(/[^a-z]+/).filter(Boolean).reduce((a,w)=>{ if(w.length===1 && a.length && a[a.length-1].one) a[a.length-1].w+=w; else a.push({w, one:w.length===1}); return a; }, []).map(x=>squeeze(x.w));
+  const raw = f.split(/[^a-z]+/).filter(Boolean);
+  const bad = raw.some(w=>CLUB_STEM.test(w)) || CLUB_BAD_SUB.some(x=>x.length>=4 && joined.includes(x)) || [...words, ...glued].some(w=>CLUB_BAD_WORD.has(w) || BAD_WORD.has(w) || CLUB_STEM.test(w) || CLUB_BAD_SUB.some(x=>x.length<4 && w===x))
+    || textProblem(t) || bioProblem(t);
+  return bad ? "Bu takım adı uygun değil. Küfür, argo ya da hakaret içermeyen bir ad seç." : null;
+}
+
 /* ====================================================== güvenlik sorusu */
 // Herkes bir takım ve bir basketbolcu seçer. Cevap tuzlu SHA-256 olarak saklanır (recovery/{uid});
 // "Şifremi unuttum" isteğini GitHub'daki görev birkaç dakikada bir işler.
@@ -2802,17 +2826,21 @@ function openOnboard(step){
   if(step===4){
     const me=S.players[S.uid]||{}; S.ob = S.ob || {team:me.favTeam||"", av:me.av||""};
     const teams=(ALLP?.teams||[]).slice().sort((a,b)=>a.n.localeCompare(b.n,"tr"));
-    openSheet(`${stepBar(4)}<h3 id="shTitle">Favori takımın</h3>
+    openSheet(`${stepBar(4)}<h3 id="shTitle">Takım adın</h3><p class="muted">Ligde adının altında görünür. İstersen boş bırak.</p>
+      <input id="obClub" class="adm-in" style="width:100%" maxlength="40" placeholder="ör. Kyle Korver Sevenler Derneği" value="${esc(S.ob.club||"")}"><small class="err" id="obClubErr"></small>
+      <h3 style="margin-top:18px">Favori takımın</h3>
       <div class="tm-grid ob-teams">${teams.map(t=>`<button class="tg" data-obt="${t.a}" aria-pressed="${S.ob.team===t.a}" style="--tc:${tcol(t.a)}"><span class="tg-l"><img src="${LOGO_SMALL(t.a)}" alt=""></span><b>${esc(t.n.split(" ").slice(-1)[0])}</b></button>`).join("") || `<p class="muted">Takımlar yükleniyor…</p>`}</div>
       <h3 style="margin-top:18px">Avatarın</h3><p class="muted">Sıralamada ve tahtada adının yanında görünür.</p>
       <div class="pf-avs ob-avs">${S.ob.team?`<button class="pf-av logo" data-oba="t:${S.ob.team}" aria-pressed="${S.ob.av===`t:${S.ob.team}`}"><img src="${LOGO_SMALL(S.ob.team)}" alt=""><small>Takımım</small></button>`:""}
         ${STARS.map(([id,n])=>`<button class="pf-av" data-oba="p:${id}" aria-pressed="${S.ob.av===`p:${id}`}"><img src="${HEADSHOT(id)}" alt="" loading="lazy"><small>${esc(n.split(" ").slice(-1)[0])}</small></button>`).join("")}</div>
       <p class="err" id="obErr"></p><div class="jw-nav"><button class="btn" id="obSkip" type="button">Sonra</button><button class="btn-primary" id="obNext" type="button">Kaydet ve devam</button></div>`);
     if(!ALLP) allPlayers().then(()=>{ if(S.obStep===4) openOnboard(4); }).catch(()=>{});
+    $("#obClub").oninput=()=>{ const v=$("#obClub").value.trim().replace(/\s+/g," "); S.ob.club=v; $("#obClubErr").textContent = v ? (clubProblem(v)||"") : ""; };
     $("#sheet .ob-teams").onclick=e=>{ const b=e.target.closest("[data-obt]"); if(!b) return; S.ob.team=b.dataset.obt; if(!S.ob.av || S.ob.av.startsWith("t:")) S.ob.av="t:"+S.ob.team; openOnboard(4); };
     $("#sheet .ob-avs").onclick=e=>{ const b=e.target.closest("[data-oba]"); if(!b) return; S.ob.av=b.dataset.oba; $$("#sheet [data-oba]").forEach(x=>x.setAttribute("aria-pressed", x===b)); };
     $("#obSkip").onclick=()=>openOnboard(5);
     $("#obNext").onclick=async()=>{ const patch={}; if(S.ob.team){ patch.favTeam=S.ob.team; } if(S.ob.av){ patch.av=S.ob.av; }
+      const club=($("#obClub").value||"").trim().replace(/\s+/g," "); if(club){ const p=clubProblem(club); if(p){ $("#obClubErr").textContent=p; return; } patch.club=club; }
       if(Object.keys(patch).length){ try{ await saveProfile(patch); }catch(e){} } openOnboard(5); };
     return;
   }
@@ -2954,6 +2982,9 @@ function paintProfile(){
   const myInv=invitedBy(S.uid);
   box.innerHTML = `<div class="pf-sec"><h4>Arkadaşını davet et</h4><small class="muted">Linkinle katılan herkes profilinde "Lige getirdiği" olarak görünür.${myInv.length?` Şimdiye kadar ${myInv.length} kişi getirdin: ${myInv.map(x=>esc(pname(x))).join(", ")}.`:""}</small>
       <button class="btn" id="pfInvite" type="button" style="margin-top:8px">${ICON.link}Davet linkimi paylaş</button><small class="muted" id="pfInvMsg"></small></div>
+    <div class="pf-sec"><h4>Takım adın</h4><small class="muted">Sıralamada ve profilinde adının altında görünür (ör. Kyle Korver Sevenler Derneği). En fazla 40 karakter; küfür, argo ve hakaret yazılamaz.</small>
+      <div class="adm-row" style="margin-top:6px"><input id="pfClub" class="adm-in" maxlength="40" placeholder="ör. Kyle Korver Sevenler Derneği" value="${esc(me.club||"")}"><button class="btn" id="pfClubSave" type="button">Kaydet</button></div>
+      <small class="err" id="pfClubErr"></small></div>
     <div class="pf-sec"><h4>Hakkında</h4><small class="muted">Profilinde adının altında görünür. En fazla 60 karakter; küfür, argo ve hakaret yazılamaz.</small>
       <div class="adm-row" style="margin-top:6px"><input id="pfBio" class="adm-in" maxlength="60" placeholder="ör. Lakers'tan ölürüm" value="${esc(me.bio||"")}"><button class="btn" id="pfBioSave" type="button">Kaydet</button></div>
       <small class="err" id="pfBioErr"></small></div>
@@ -2995,6 +3026,12 @@ function paintProfile(){
   $("#adminBtn")?.addEventListener("click", openAdmin);
   $("#histBtn").onclick = openHistory;
   $("#pfInvite").onclick = () => shareInvite($("#pfInvMsg"));
+  $("#pfClub").oninput = () => { const v=$("#pfClub").value.trim().replace(/\s+/g," "); $("#pfClubErr").textContent = v ? (clubProblem(v)||"") : ""; };
+  $("#pfClubSave").onclick = async () => {
+    const v=$("#pfClub").value.trim().replace(/\s+/g," "); const p=clubProblem(v);
+    if(p) return $("#pfClubErr").textContent=p;
+    $("#pfClubErr").textContent=""; await saveProfile({club:v}); toast(v?"Takım adın kaydedildi.":"Takım adın kaldırıldı.");
+  };
   $("#pfBioSave").onclick = async () => {
     const v=$("#pfBio").value.trim().replace(/\s+/g," ");
     if(v.length>60) return $("#pfBioErr").textContent="En fazla 60 karakter.";
