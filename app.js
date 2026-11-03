@@ -49,7 +49,7 @@ const VERSION = "1.10.0";
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
-  {v:"1.10.0", d:"3 Kasım 2026", items:["Mobilde aşağı kaydırınca üst çubuk ve alt menü saklanıyor, yukarı kaydırınca geri geliyor.","Puan tablosu tam haliyle Bu Gece ve Sıralama'da; diğer sekmelerde tek satırlık şerit, dokununca açılıyor.","İngilizce çeviriler ayrı dosyada; Türkçe kullananlar için site daha hafif.","Stil dosyası ve yazı tipleri sadeleşti."]},
+  {v:"1.10.0", d:"3 Kasım 2026", items:["Mobilde aşağı kaydırınca üst çubuk ve alt menü saklanıyor, yukarı kaydırınca geri geliyor.","Puan tablosu tam haliyle Bu Gece ve Sıralama'da; diğer sekmelerde tek satırlık şerit, dokununca açılıyor.","İngilizce çeviriler ayrı dosyada; Türkçe kullananlar için site daha hafif.","Stil dosyası ve yazı tipleri sadeleşti.","Renk zıtlığı: takım temasının vurgu rengi ve oyuncu renkleri her temada okunur hale getirildi."]},
   {v:"1.9.3", d:"3 Kasım 2026", items:["Mobilde dokunma alanları büyüdü (gün okları, isimler, alt bilgi bağlantıları).","Günün oyuncusu ve gecenin sorusunda seçmeyenler tek satırda.","NBA sekmesinde son açtığın bölüm hatırlanıyor.","Takım logoları daha hafif, sayfa daha hızlı açılıyor."]},
   {v:"1.9.2", d:"3 Kasım 2026", items:["1.9.1'deki açılmama hatası düzeltildi."]},
   {v:"1.9.1", d:"3 Kasım 2026", items:["Seçili düğmelerde okunmayan yazı rengi düzeldi.","NBA → Oyuncu ara: istediğin istatistiğe göre sırala; takım, konferans, çaylak ve bu gece oynayanlar filtreleri.","Sezon ödülleri gerçek adlarıyla; finalistler artık Eastern ve Western Conference Champion.","Uzun vadeden konferans sıralaması kaldırıldı.","Kurallar ve açıklamalar son değişikliklere göre güncellendi."]},
@@ -559,6 +559,14 @@ const TEAM_COL = {ATL:["c8102e","fdb927"],BOS:["008348","ffffff"],BKN:["000000",
   LAL:["552583","fdb927"],MEM:["5d76a9","12173f"],MIA:["98002e","000000"],MIL:["00471b","eee1c6"],MIN:["266092","79bc43"],NO:["0a2240","b4975a"],NY:["1d428a","f58426"],
   OKC:["007ac1","ef3b24"],ORL:["0150b5","9ca0a3"],PHI:["1d428a","e01234"],PHX:["29127a","e56020"],POR:["e03a3e","000000"],SAC:["5a2d81","6a7a82"],SA:["000000","c4ced4"],
   TOR:["d91244","000000"],UTAH:["4e008e","79a3dc"],WSH:["e31837","002b5c"]};
+// iki renk arasındaki zıtlık (WCAG) ve bir rengi zeminde okunur hale getirme
+const hexMix = (a,b,t) => { const A=parseInt(a,16), B=parseInt(b,16); return [16,8,0].map(k=>Math.round(((A>>k)&255)*t+((B>>k)&255)*(1-t)).toString(16).padStart(2,"0")).join(""); };
+const contrast = (a,b) => { const x=lum(a), y=lum(b); return (Math.max(x,y)+.05)/(Math.min(x,y)+.05); };
+function readableOn(hex, bgs, min=4.5){
+  let c=hex.replace("#",""); const darkBg = lum(bgs[0]) < .2;
+  for(let i=0;i<20 && bgs.some(b=>contrast(c,b)<min);i++) c=hexMix(c, darkBg?"ffffff":"000000", .88);
+  return "#"+c;
+}
 const lum = h => { const n=parseInt(h,16), c=[n>>16&255,n>>8&255,n&255].map(v=>{v/=255; return v<=.03928?v/12.92:((v+.055)/1.055)**2.4;}); return .2126*c[0]+.7152*c[1]+.0722*c[2]; };
 function tcol(abbr){
   const c = TEAM_COL[abbr]; if(!c) return "var(--line)";
@@ -3924,7 +3932,8 @@ function applyTheme(){
   r.setProperty("--board-line", `color-mix(in srgb, ${c1} 35%, #2a3646)`);
   r.setProperty("--amber", acc);
   r.setProperty("--on-amber", lum(acc.slice(1)) > .28 ? "#1a1200" : "#fff");   // vurgu renginin üstündeki yazı okunsun
-  r.setProperty("--amber-ink", isDark() ? acc : `color-mix(in srgb, ${acc} 70%, #000)`);
+  // yazı olarak kullanılan vurgu rengi: zeminle en az 4.5 zıtlık olana kadar açılır (koyu tema) ya da koyulaşır (açık tema)
+  r.setProperty("--amber-ink", readableOn(acc, isDark() ? ["18212c","10161e"] : ["ffffff","eef1f4"]));
   r.setProperty("--amber-soft", `color-mix(in srgb, ${acc} 18%, var(--panel))`);
   // tarayıcı çubuğunun rengi
   const n=parseInt(tc[0],16), mix=v=>Math.round(v*.32+ [7,11,16][mixi++]*.68); let mixi=0;

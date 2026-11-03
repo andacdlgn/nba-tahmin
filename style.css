@@ -2,9 +2,9 @@
   --bg:#eef1f4; --panel:#ffffff; --panel-2:#f4f6f9; --ink:#121a24; --muted:#5f6b78; --line:#dde3e9;
   --amber:#e09410; --amber-ink:#9a6200; --amber-soft:#fbefd8;
   --p0:#2457d6; --p0-soft:#e4ebfb; --p1:#d42a3c; --p1-soft:#fbe4e7;
-  --p2:#0f8a6a; --p3:#7a3fd1; --p4:#c25e0a; --p5:#0a7fa8;
-  --p6:#c2387f; --p7:#5f8a12; --p8:#a8860b; --p9:#56657a;
-  --win:#11905a; --win-soft:#def3e9; --lose:#b0412f; --lose-soft:#f8e5e1;
+  --p2:#0b7a5d; --p3:#7a3fd1; --p4:#ad5205; --p5:#0a7fa8;
+  --p6:#c2387f; --p7:#4c7210; --p8:#806600; --p9:#56657a;
+  --win:#0b7d4d; --win-soft:#def3e9; --lose:#b0412f; --lose-soft:#f8e5e1;
   --live:#e5263a; --track:#e3e8ed;
   --board:#121a24; --board-2:#1b2633; --board-ink:#f4f6f8; --board-muted:#8b98a8; --board-line:#243142;
   --nav-h:64px; --top-h:52px;
@@ -1786,3 +1786,6 @@ button,a,[data-act],.plr,.pf-av,.pf-emo{touch-action:manipulation;-webkit-tap-hi
 .bs-t{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bs-c{flex:none;font-size:12.5px;font-weight:700;opacity:.8}
 #board:not(.compact)+.board-strip{border-radius:0;margin-top:-8px}
+
+/* renk zıtlığı: puan tablosu, üst çubuk ve şerit her temada koyu zeminli; oyuncu renklerinin açık tonları kullanılsın */
+.board,.board-strip,.pickbar,.topbar{--p0:#7ea2f6;--p1:#f2737f;--p2:#4fd0aa;--p3:#b38cf5;--p4:#f0a35c;--p5:#5cc6ec;--p6:#f07ab8;--p7:#a6d65a;--p8:#e8c84a;--p9:#a7b4c6;--win:#4fd093;--lose:#ef8d79}
