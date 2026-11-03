@@ -39,7 +39,7 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "v29";
+const VERSION = "v30";
 const LOGO_SMALL = a => `logos/${String(a).toLowerCase()}.png`;
 const LOGO_FULL  = a => `https://a.espncdn.com/i/teamlogos/nba/500/${String(a).toLowerCase()}.png`;
 document.addEventListener("error", e => {
@@ -2378,9 +2378,11 @@ function ltPStat(id, k){
   const ps=S.pstats?.[id]; if(!ps) return null;
   const [a,b,lab]=ltRange(k);
   if(k[0]!=="s" && k[0]!=="c" && ps.lg){ const g=ps.lg.filter(x=>x[0]>=a && x[0]<=b);
-    if(g.length){ const sum=i=>g.reduce((t,x)=>t+x[i],0), n=g.length; return {lab, gp:n, pts:sum(1)/n, reb:sum(2)/n, ast:sum(3)/n, stl:sum(4)/n, blk:sum(5)/n, w:sum(6), l:n-sum(6)}; } }
+    if(g.length){ const sum=i=>g.reduce((t,x)=>t+(x[i]||0),0), n=g.length; return {lab, gp:n, pts:sum(1)/n, reb:sum(2)/n, ast:sum(3)/n, stl:sum(4)/n, blk:sum(5)/n, w:sum(6), l:n-sum(6),
+      fg:sum(8)?sum(7)/sum(8):null, tp:sum(10)?sum(9)/sum(10):null}; } }
   if(!ps.gp) return null;
-  return {lab:"sezon", gp:ps.gp, pts:ps.pts/ps.gp, reb:ps.reb/ps.gp, ast:ps.ast/ps.gp, stl:(ps.stl||0)/ps.gp, blk:(ps.blk||0)/ps.gp, season:true};
+  return {lab:"sezon", gp:ps.gp, pts:ps.pts/ps.gp, reb:ps.reb/ps.gp, ast:ps.ast/ps.gp, stl:(ps.stl||0)/ps.gp, blk:(ps.blk||0)/ps.gp, season:true,
+    fg:ps.fga?ps.fgm/ps.fga:null, tp:ps.tpa?ps.tpm/ps.tpa:null};
 }
 // Takımın aralıktaki galibiyet-mağlubiyeti (biten maç arşivinden)
 function ltTeamWL(abbr, k){
@@ -2415,11 +2417,12 @@ function bindLTPicker(){
     let list=(ALLP?.players||[]).filter(p=>(!cf || confOf(p.t)===cf) && (!rook || !hasR || p.r)).map(p=>{ const st=ltPStat(p.id,k); return {...p, st, key: st ? (def ? st.stl+st.blk+st.reb/10 : st.pts) : -1}; });
     if(q) list=list.filter(p=>slug(p.n).includes(q)); list.sort((a,b)=>b.key-a.key); list=list.slice(0,40);
     $("#ltList").innerHTML=list.map(p=>{ const st=p.st, tw=ltTeamWL(p.t,k);
-      const line = st ? (def ? `${f1(st.stl)} top çalma · ${f1(st.blk)} blok · ${f1(st.reb)} rib.` : `${f1(st.reb)} rib. · ${f1(st.ast)} asist`) + ` · ${st.gp} maç` : "Bu sezon maçı yok";
-      const big = st ? (def ? f1(st.stl+st.blk) : f1(st.pts)) : "–";
+      const pct = v => v==null ? null : "%"+Math.round(v*100);
+      const big = st ? (def ? [["RİB",st.reb],["TÇ",st.stl],["BLK",st.blk]] : [["SAY",st.pts],["RİB",st.reb],["AST",st.ast]]) : [];
+      const sm = st ? [def ? `${f1(st.pts)} sayı · ${f1(st.ast)} asist` : `${f1(st.stl)} top çalma · ${f1(st.blk)} blok`, pct(st.fg)&&`${pct(st.fg)} saha içi`, pct(st.tp)&&`${pct(st.tp)} üçlük`, `${st.gp} maç (${st.lab})`].filter(Boolean).join(" · ") : "Bu sezon maçı yok";
       return `<button class="plr lt-pl" data-ltp="${p.id}" data-ltn="${esc(p.n)}"><img src="${FACE(p.id)}" alt="" loading="lazy">
-        <span class="pi"><b>${esc(p.n)}</b><small>${esc(p.t)}${tw.w+tw.l?` <span class="lt-wl">takım ${tw.w}-${tw.l}</span>`:""} · ${line}</small>${injTxt(p.id)}</span>
-        <span class="ppg">${big}<small>${def?"çalma+blok":"sayı"} · ${st?.lab||""}</small></span></button>`; }).join("") || `<p class="muted">Oyuncu bulunamadı.</p>`; };
+        <span class="pi"><b>${esc(p.n)}</b><small>${esc(p.t)}${tw.w+tw.l?` · <span class="lt-wl">takım ${tw.w}-${tw.l}</span>`:""}</small><small class="lt-sm">${sm}</small>${injTxt(p.id)}</span>
+        <span class="lt-big">${big.map(([l,v],x)=>`<span class="${x===0?"lead":""}">${f1(v)}<small>${l}</small></span>`).join("") || "<span>–</span>"}</span></button>`; }).join("") || `<p class="muted">Oyuncu bulunamadı.</p>`; };
   $("#ltSearch").oninput=paint; $("#ltList").onclick=e=>{ const b=e.target.closest("[data-ltp]"); if(b) choose(b.dataset.ltp, b.dataset.ltn); };
   paint(); $("#ltSearch").focus(); if(!S.inj) loadInj().then(()=>{ if($("#ltList")) paint(); });
 }

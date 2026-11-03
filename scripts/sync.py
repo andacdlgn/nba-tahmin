@@ -91,6 +91,15 @@ def scoreboard(day: str):
     return get(f"{ESPN}/scoreboard?dates={day}&limit=50").get("events", [])
 
 
+def made_att(v):
+    """'7-15' -> (7, 15)"""
+    try:
+        a, b = str(v or "0-0").split("-")
+        return int(a), int(b)
+    except ValueError:
+        return 0, 0
+
+
 def box(event_id: str):
     s = get(f"{ESPN}/summary?event={event_id}")
     players = []
@@ -115,6 +124,8 @@ def box(event_id: str):
                     "id": a["athlete"]["id"], "name": a["athlete"]["displayName"], "team": abbr,
                     "pts": pts, "reb": num("rebounds"), "ast": num("assists"),
                     "stl": num("steals"), "blk": num("blocks"),
+                    "fg": made_att(row.get("fieldGoalsMade-fieldGoalsAttempted")),
+                    "tp": made_att(row.get("threePointFieldGoalsMade-threePointFieldGoalsAttempted")),
                     "min": row.get("minutes", "0"),
                 })
     return players
@@ -325,8 +336,8 @@ def save_all_players():
 def main(full=False):
     games = load("games.json", {})
     pstats = load("players.json", {"counted": [], "p": {}})
-    if pstats.get("v") != 2:   # v2: maç maç kayıt (uzun vade istatistikleri için); bir kere baştan kurulur
-        pstats = {"v": 2, "counted": [], "p": {}}
+    if pstats.get("v") != 3:   # v3: maç maç kayıt + isabet yüzdeleri (uzun vade istatistikleri için); bir kere baştan kurulur
+        pstats = {"v": 3, "counted": [], "p": {}}
         full = True
     counted = set(pstats["counted"])
 
@@ -370,9 +381,12 @@ def main(full=False):
                     s["n"], s["t"] = p["name"], p["team"]
                     s["gp"] += 1; s["pts"] += p["pts"]; s["reb"] += p["reb"]; s["ast"] += p["ast"]
                     s["stl"] = s.get("stl", 0) + p["stl"]; s["blk"] = s.get("blk", 0) + p["blk"]
+                    for k, (m, a) in (("fg", p["fg"]), ("tp", p["tp"])):
+                        s[k + "m"] = s.get(k + "m", 0) + m; s[k + "a"] = s.get(k + "a", 0) + a
                     s["l5"] = (s.get("l5", []) + [p["pts"]])[-5:]   # son 5 maçın sayıları (formda olanlar listesi için)
-                    # son 16 maç: [gün, sayı, ribaund, asist, top çalma, blok, galibiyet]
-                    s["lg"] = (s.get("lg", []) + [[day, p["pts"], p["reb"], p["ast"], p["stl"], p["blk"], 1 if p["team"] == winner else 0]])[-16:]
+                    # son 16 maç: [gün, sayı, ribaund, asist, top çalma, blok, galibiyet, isabet, deneme, üçlük isabet, üçlük deneme]
+                    s["lg"] = (s.get("lg", []) + [[day, p["pts"], p["reb"], p["ast"], p["stl"], p["blk"], 1 if p["team"] == winner else 0,
+                                                   p["fg"][0], p["fg"][1], p["tp"][0], p["tp"][1]]])[-16:]
                 counted.add(g["id"])
         d += timedelta(days=1)
     pstats["counted"] = sorted(counted)
