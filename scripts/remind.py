@@ -1,4 +1,11 @@
-"""Mailler (GitHub Actions, 10 dakikada bir):
+"""Mailler (GitHub Actions, 10 dakikada bir).
+
+Spama düşmemek için kişi başına günde en fazla bir "gecenin özeti" maili gider: hatırlatma, sakatlık ve uzun vade
+haberleri bu tek mailde toplanır (Outbox). Özet gittikten sonra çıkan acil bir haber (bu geceki seçimin oynamıyor,
+uzun vade kilidine birkaç saat kaldı) için o gün en fazla bir ek mail gider. Haftalık özet ve kod mailleri ayrıdır.
+Mailler sade, kişisel mail gibi görünür (gizli önizleme metni, düğme, koyu başlık yok).
+
+Bölümler:
 
 1. Hatırlatma: her akşam 21.00'de (Türkiye) eksik tahmini olanlara bir kez. Gecenin ilk maçı
    21.00'den önceyse maçtan 1 saat önce.
@@ -97,24 +104,21 @@ nice = lambda d: f"{int(d[6:])} {MONTHS[int(d[4:6]) - 1]}"  # ESPN (ABD) tarihi,
 
 
 def card(title, sub, inner, button="Siteye git", pre=""):
-    """Bütün mailler için ortak görünüm (tam HTML belgesi; spam filtreleri yarım HTML'i sevmez)."""
-    pre_html = f'<div style="display:none;max-height:0;overflow:hidden;opacity:0">{escape(pre)}</div>' if pre else ""
-    return f"""<!DOCTYPE html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{escape(title)}</title></head>
-<body style="margin:0;padding:16px;background:#ffffff">{pre_html}<div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;color:#121a24">
-  <div style="background:#121a24;color:#f4f6f8;border-radius:14px 14px 0 0;padding:18px 20px;border-bottom:4px solid #e09410">
-    <div style="font-size:13px;color:#8b98a8">NBA Tahmin · {escape(sub)}</div>
-    <div style="font-size:22px;font-weight:bold;margin-top:4px">{escape(title)}</div></div>
-  <div style="border:1px solid #dde3e9;border-top:0;border-radius:0 0 14px 14px;padding:18px 20px">{inner}
-    <a href="{escape(SITE)}" style="display:inline-block;margin-top:6px;background:#121a24;color:#fff;text-decoration:none;font-weight:bold;padding:12px 20px;border-radius:10px">{escape(button)}</a>
-    <p style="margin:16px 0 0;color:#8b98a8;font-size:12px">Bu maili NBA Tahmin ligine katıldığın ve profilinden mail bildirimlerini açtığın için alıyorsun. İstemiyorsan sitede profilinden kapatabilir ya da bu maile "abonelikten çık" yazarak cevap verebilirsin.</p></div></div></body></html>"""
+    """Bütün mailler için sade görünüm: kişisel mail gibi, tek düz link. (sub ve pre geriye uyum için duruyor.)"""
+    return f"""<!DOCTYPE html><html lang="tr"><head><meta charset="utf-8"><title>{escape(title)}</title></head>
+<body style="margin:0;padding:12px"><div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.5;color:#1d2330;max-width:560px">
+<p style="margin:0 0 12px;font-size:17px"><b>{escape(title)}</b></p>
+{inner}
+<p style="margin:14px 0 0">{escape(button)}: <a href="{escape(SITE)}">{escape(SITE)}</a></p>
+<p style="margin:20px 0 0;color:#80868f;font-size:12px">Bu maili NBA Tahmin ligindeki arkadaşların arasında olduğun için alıyorsun. İstemiyorsan sitede profilinden kapatabilir ya da bu maile cevap verebilirsin.</p>
+</div></body></html>"""
 
 
 def build(email, subject, text, html, name="", kind="bildirim"):
     msg = EmailMessage()
     msg["Subject"] = subject
     msg["To"] = formataddr((name, email)) if name else email
-    msg["X-NBA-Kind"] = kind
-    msg.set_content(text + f"\n\n{SITE}\n\nBu maili NBA Tahmin ligine katıldığın ve mail bildirimlerini açtığın için alıyorsun. İstemiyorsan sitede profilinden kapatabilirsin.\n")
+    msg.set_content(text + f"\n\n{SITE}\n\nBu maili NBA Tahmin ligindeki arkadaşların arasında olduğun için alıyorsun. İstemiyorsan sitede profilinden kapatabilirsin.\n")
     msg.add_alternative(html, subtype="html")
     return msg
 
@@ -141,9 +145,7 @@ class Mailer:
             msg["Reply-To"] = formataddr(("NBA Tahmin", self.user))
         # otomatik bildirim olduğunu açıkça söyleyen başlıklar (otomatik yanıtları da engeller)
         msg["Auto-Submitted"] = "auto-generated"
-        msg["X-Auto-Response-Suppress"] = "All"
         msg["Content-Language"] = "tr"
-        msg["Feedback-ID"] = f"{msg.get('X-NBA-Kind', 'bildirim')}:nbatahmin"
         if self.dry:
             print("[deneme]", msg["To"], "|", msg["Subject"])
             return True
@@ -190,8 +192,59 @@ def once(db, key):
     return None if ref.get().exists else ref
 
 
+# ---------------------------------------------------------------- günlük tek mail
+class Outbox:
+    """Bölümleri kişi başına toplar; günde bir özet + gerekirse bir acil ek mail gönderir.
+    Bölüm: (başlık, paragraflar, maddeler, gönderilince yazılacak 'reminders' belgeleri, acil mi)."""
+
+    def __init__(self, db, mail, day, digest_at):
+        self.db, self.mail, self.day, self.digest_at, self.box = db, mail, day, digest_at, {}
+
+    def add(self, uid, name, email, title, paras, items, refs, urgent=False, order=5):
+        b = self.box.setdefault(uid, {"name": name, "email": email, "secs": []})
+        b["secs"].append({"title": title, "paras": paras, "items": items, "refs": refs, "urgent": urgent, "order": order})
+
+    def flush(self):
+        now = datetime.now(timezone.utc)
+        due = now >= self.digest_at
+        for uid, b in self.box.items():
+            st_ref = self.db.collection("reminders").document(f"mail_{self.day}_{uid}")
+            snap = st_ref.get()
+            st = snap.to_dict() if snap.exists else {}
+            if not st.get("digest"):
+                if not due:
+                    continue
+                secs, flag = b["secs"], "digest"
+            else:
+                secs, flag = [x for x in b["secs"] if x["urgent"]], "extra"
+                if not secs or st.get("extra"):
+                    continue
+            secs = sorted(secs, key=lambda x: x["order"])
+            name = b["name"]
+            if flag == "extra":
+                subject = secs[0]["title"]
+            elif secs[0]["order"] == 0:
+                subject = f"Bu geceki tahminlerin ({nice(self.day)})"
+            else:
+                subject = f"NBA Tahmin notların ({nice(self.day)})" if len(secs) > 1 else secs[0]["title"]
+            html, text = [f'<p style="margin:0 0 12px">Selam {escape(name)},</p>'], [f"Selam {name},"]
+            for x in secs:
+                html.append(f'<p style="margin:14px 0 4px"><b>{escape(x["title"])}</b></p>')
+                html += [f'<p style="margin:0 0 6px">{escape(t)}</p>' for t in x["paras"]]
+                if x["items"]:
+                    html.append('<ul style="margin:0 0 8px;padding-left:20px">' + "".join(f"<li>{escape(t)}</li>" for t in x["items"]) + "</ul>")
+                text += ["", x["title"]] + x["paras"] + [f"- {t}" for t in x["items"]]
+            msg = build(b["email"], subject, "\n".join(text),
+                        card("Bu gece" if flag == "digest" and secs[0]["order"] == 0 else "NBA Tahmin", "", "".join(html), "Siteye git"), name)
+            if self.mail.send(msg) and not self.mail.dry:
+                for x in secs:
+                    for r in x["refs"]:
+                        r.set({"at": firestore.SERVER_TIMESTAMP})
+                st_ref.set({flag: True, "at": firestore.SERVER_TIMESTAMP}, merge=True)
+
+
 # ---------------------------------------------------------------- 1) hatırlatma
-def reminders(db, mail, day, games, force):
+def reminders(db, out, day, games, force):
     lock = games[0]["night_lock"]
     now = datetime.now(timezone.utc)
     when = remind_time(lock)
@@ -219,21 +272,12 @@ def reminders(db, mail, day, games, force):
             parts.append("gecenin sorusu cevaplanmadı")
         if not parts:
             continue
-        rows = "".join(f"<li>{escape(g['away'])} – {escape(g['home'])}</li>" for g in missing[:15])
         per = day >= PERGAME_FROM
         rule = (f"Her maç başlamadan 10 dakika önce kilitlenir; ilk kilit saati {lock_tr} (Türkiye saati). Banko, günün oyuncusu ve gecenin sorusu da bu ilk kilitle kapanır."
                 if per else f"Bütün tahminlerin kilit saati {lock_tr} (Türkiye saati).")
-        rows = "".join(f"<li>{escape(g['away'])} – {escape(g['home'])} <span style=\"color:#8b98a8\">(kilit {g['lock'].astimezone(TR):%H:%M})</span></li>" for g in missing[:15])
-        inner = (f'<p style="margin:0 0 10px">Selam {escape(name)}, {escape(", ".join(parts))}.</p>'
-                 f'<p style="margin:0 0 12px;color:#5f6b78;font-size:14px">{escape(rule)}</p>'
-                 + (f'<ul style="margin:0 0 14px;padding-left:20px;font-size:14px">{rows}</ul>' if rows else ""))
-        text = (f"Selam {name}, {', '.join(parts)}.\n{rule}\n"
-                + ("\nEksik maçlar:\n" + "\n".join(f"- {g['away']} – {g['home']} (kilit {g['lock'].astimezone(TR):%H:%M})" for g in missing[:15]) if missing else ""))
-        subj = parts[0][:1].upper() + parts[0][1:]
-        msg = build(email, f"Bu gecenin tahminleri: {subj} (ilk kilit {lock_tr})", text,
-                    card(f"İlk kilit: {lock_tr}", nice(day), inner, "Tahmin yap", pre=f"{', '.join(parts)}."), name, "hatirlatma")
-        if mail.send(msg) and not mail.dry:
-            ref.set({"at": firestore.SERVER_TIMESTAMP, "missing": len(missing)})
+        head = ", ".join(parts)
+        items = [f"{g['away']} – {g['home']} (kilit {g['lock'].astimezone(TR):%H:%M})" for g in missing[:15]]
+        out.add(uid, name, email, "Bu gecenin tahminleri", [head[:1].upper() + head[1:] + ".", rule], items, [ref], order=0)
 
 
 # ---------------------------------------------------------------- 2) sakatlık uyarısı
@@ -277,7 +321,7 @@ def back_txt(info):
         return ""
 
 
-def injuries(db, mail, day, games, inj):
+def injuries(db, out, day, games, inj):
     now = datetime.now(timezone.utc)
     out_ids = {pid for pid, x in inj.items() if x["out"]}
     if not out_ids:
@@ -301,14 +345,10 @@ def injuries(db, mail, day, games, inj):
             continue
         lines = [f"{inj[pid]['name']} bu gece oynamıyor ({inj[pid]['why']}{back_txt(inj[pid])}). Bu, {where}. Kilide kadar değiştirebilirsin (kilit saati {lk.astimezone(TR):%H:%M}, Türkiye saati)."
                  for pid, where, lk, _ in new]
-        inner = (f'<p style="margin:0 0 10px">Selam {escape(name)}, ESPN\'e göre seçtiğin oyunculardan biri bu gece oynamayacak:</p>'
-                 f'<ul style="margin:0 0 12px;padding-left:20px;font-size:14px">{"".join(f"<li>{escape(x)}</li>" for x in lines)}</ul>')
         first = inj[new[0][0]]["name"]
-        msg = build(email, f"{first} bu gece oynamıyor, seçimini değiştirebilirsin", f"Selam {name},\n" + "\n".join(lines),
-                    card("Seçtiğin oyuncu oynamıyor", nice(day), inner, "Seçimi değiştir", pre=lines[0]), name, "sakatlik")
-        if mail.send(msg) and not mail.dry:
-            for *_, ref in new:
-                ref.set({"at": firestore.SERVER_TIMESTAMP})
+        out.add(uid, name, email, f"{first} bu gece oynamıyor" if len(new) == 1 else "Seçtiğin oyuncular bu gece oynamıyor",
+                ["ESPN'e göre seçtiğin oyunculardan biri bu gece oynamayacak:" if len(new) == 1 else "ESPN'e göre seçtiğin bazı oyuncular bu gece oynamayacak:"],
+                lines, [r for *_, r in new], urgent=True, order=1)
 
 
 # ---------------------------------------------------------------- 2b) uzun vade uyarıları
@@ -329,7 +369,7 @@ def lt_lock(k):
     return datetime(2027, 1, 15, 17, tzinfo=timezone.utc)
 
 
-def lt_alerts(db, mail, inj):
+def lt_alerts(db, out, inj):
     today = espn_today().strftime("%Y%m%d")
     y, m = int(today[:4]), int(today[4:6])
     mk = "m_202611" if (y, m) in ((2026, 10), (2026, 11)) else f"m_{y}{m:02d}"
@@ -380,13 +420,8 @@ def lt_alerts(db, mail, inj):
         if not new:
             continue
         lines = [x for x, _ in new]
-        inner = (f'<p style="margin:0 0 10px">Selam {escape(name)}, uzun vade seçimlerinle ilgili bir gelişme var:</p>'
-                 f'<ul style="margin:0 0 12px;padding-left:20px;font-size:14px">{"".join(f"<li>{escape(x)}</li>" for x in lines)}</ul>')
         subj = "Uzun vade seçimin 65 maç kuralına takıldı" if any("takıldı" in x for x in lines) else "Uzun vade seçiminle ilgili sakatlık haberi"
-        msg = build(email, subj, f"Selam {name},\n" + "\n".join(lines), card("Uzun vade", "seçimlerin", inner, "Uzun vadeye git", pre=lines[0]), name, "uzunvade")
-        if mail.send(msg) and not mail.dry:
-            for _, ref in new:
-                ref.set({"at": firestore.SERVER_TIMESTAMP})
+        out.add(uid, name, email, subj, [], lines, [r for _, r in new], order=3)
 
 
 # ---------------------------------------------------------------- 2c) uzun vade kilit hatırlatması
@@ -394,14 +429,14 @@ LT_TITLES = {"w": "Haftanın oyuncusu", "m": "Ayın ödülleri", "c": "NBA Kupas
 LT_COUNT = {"w": 2, "m": 6, "c": 4, "k": 12, "s": 6}
 
 
-def lt_lock_mail(db, mail):
-    """Kilide 24 saatten az kalan uzun vade turunda eksik seçimi olanlara bir kez mail."""
+def lt_lock_mail(db, out):
+    """Kilide 36 saatten az kalan uzun vade turunda eksik seçimi olanlara bir kez (özet mailde; son 6 saatte acil)."""
     today = espn_today().strftime("%Y%m%d")
     y, m = int(today[:4]), int(today[4:6])
     mk = "m_202611" if (y, m) in ((2026, 10), (2026, 11)) else f"m_{y}{m:02d}"
     nxt = (datetime.strptime(week_key(today), "%Y%m%d") + timedelta(days=7)).strftime("%Y%m%d")
     now = datetime.now(timezone.utc)
-    due = [k for k in ("w_" + week_key(today), "w_" + nxt, mk, "c_2026", "k_2027", "s_2027") if timedelta(0) < lt_lock(k) - now <= timedelta(hours=24)]
+    due = [k for k in ("w_" + week_key(today), "w_" + nxt, mk, "c_2026", "k_2027", "s_2027") if timedelta(0) < lt_lock(k) - now <= timedelta(hours=36)]
     if not due:
         return
     for uid, name, email in people(db, "remind"):
@@ -418,13 +453,9 @@ def lt_lock_mail(db, mail):
         if not rows:
             continue
         lines = [x for _, x in rows]
-        inner = (f'<p style="margin:0 0 10px">Selam {escape(name)}, uzun vade tahminlerinde eksik seçimin var ve kilide 1 günden az kaldı:</p>'
-                 f'<ul style="margin:0 0 12px;padding-left:20px;font-size:14px">{"".join(f"<li>{escape(x)}</li>" for x in lines)}</ul>')
-        msg = build(email, "Uzun vade tahminlerin kilitlenmek üzere", f"Selam {name},\nUzun vade tahminlerinde eksik seçimin var:\n" + "\n".join(lines),
-                    card("Uzun vade kilitleniyor", "uzun vade", inner, "Seçimlerimi tamamla", pre=lines[0]), name, "uzunvade")
-        if mail.send(msg) and not mail.dry:
-            for ref, _ in rows:
-                ref.set({"at": firestore.SERVER_TIMESTAMP})
+        soon = any(lt_lock(k) - now <= timedelta(hours=6) for k in due)
+        out.add(uid, name, email, "Uzun vade tahminlerin kilitlenmek üzere", ["Uzun vade tahminlerinde eksik seçimin var:"], lines,
+                [r for r, _ in rows], urgent=soon, order=2)
 
 
 # ---------------------------------------------------------------- 2d) sorun bildirimleri -> yönetici
@@ -606,14 +637,21 @@ def main():
     games = night_games(day)
     upcoming = [g for g in games if g["state"] == "pre"]
     inj = injury_list()
+    # günün özet saati: maç varsa hatırlatma saati, yoksa akşam 21.00 (Türkiye)
+    hh, mm = (int(x) for x in REMIND_AT.split(":"))
+    digest_at = remind_time(games[0]["night_lock"]) if games else datetime.combine(datetime.strptime(day, "%Y%m%d").date(), time(hh, mm), TR)
+    if force:
+        digest_at = datetime.now(timezone.utc)
+    out = Outbox(db, mail, day, digest_at)
     if games and len(upcoming) == len(games):
-        reminders(db, mail, day, games, force)
+        reminders(db, out, day, games, force)
     if games and upcoming:
-        injuries(db, mail, day, games, inj)
+        injuries(db, out, day, games, inj)
     else:
         print(day, "maç yok ya da gece bitti")
-    lt_alerts(db, mail, inj)
-    lt_lock_mail(db, mail)
+    lt_alerts(db, out, inj)
+    lt_lock_mail(db, out)
+    out.flush()
     report_mail(db, mail)
     # uzun vade sonuçları (Wikipedia) saatte bir
     if force or datetime.now(timezone.utc).minute < 12:

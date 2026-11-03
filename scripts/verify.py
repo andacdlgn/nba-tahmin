@@ -19,7 +19,7 @@ from html import escape
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from remind import Mailer, build, card, firestore, init  # noqa: E402
 
-VALID = timedelta(minutes=30)
+VALID = timedelta(hours=3)
 
 
 def main():
@@ -55,9 +55,9 @@ def main():
         h = hashlib.sha256((salt + code).encode("utf-8")).digest()
         inner = (f'<p style="margin:0 0 10px">Selam {escape(name)}, e-posta adresini onaylamak için bu kodu sitede profiline yaz:</p>'
                  f'<p style="margin:0 0 14px;font-size:34px;font-weight:bold;letter-spacing:8px;font-family:monospace">{code}</p>'
-                 '<p style="margin:0 0 12px;color:#5f6b78;font-size:14px">Kod 30 dakika geçerli. Bu isteği sen yapmadıysan bu maili yok sayabilirsin.</p>')
+                 '<p style="margin:0 0 12px;color:#5f6b78;font-size:14px">Kod 3 saat geçerli. Bu isteği sen yapmadıysan bu maili yok sayabilirsin.</p>')
         msg = build(email, f"NBA Tahmin onay kodun: {code}",
-                    f"Selam {name},\n\nE-posta onay kodun: {code}\nKod 30 dakika geçerli. Bu isteği sen yapmadıysan bu maili yok sayabilirsin.",
+                    f"Selam {name},\n\nE-posta onay kodun: {code}\nKod 3 saat geçerli. Bu isteği sen yapmadıysan bu maili yok sayabilirsin.",
                     card("E-posta onay kodu", "Profil", inner, "Siteye git"))
         if dry:
             print("[deneme] kod:", code)

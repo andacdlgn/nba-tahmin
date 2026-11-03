@@ -1697,3 +1697,4 @@ button,a,[data-act],.plr,.pf-av,.pf-emo{touch-action:manipulation;-webkit-tap-hi
 .hs-m img{width:18px;height:18px;object-fit:contain}
 .hs-x{display:block;color:var(--muted);font-size:12px;margin-top:4px;line-height:1.4}
 .hs-up{color:#b98a1e}
+.ob-skip{display:block;margin:12px auto 0;font-size:14px;color:var(--muted)}

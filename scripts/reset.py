@@ -131,16 +131,16 @@ def send_code(db, d, now):
     salt = secrets.token_hex(16)
     inner = (f'<p style="margin:0 0 10px">Selam {escape(pname)}, şifreni sıfırlamak için bu kodu sitedeki "Şifremi unuttum" ekranına yaz:</p>'
              f'<p style="margin:0 0 14px;font-size:34px;font-weight:bold;letter-spacing:8px;font-family:monospace">{code}</p>'
-             '<p style="margin:0 0 12px;color:#5f6b78;font-size:14px">Kod 30 dakika geçerli. Bu isteği sen yapmadıysan bu maili yok say; şifren değişmez.</p>')
+             '<p style="margin:0 0 12px;color:#5f6b78;font-size:14px">Kod 3 saat geçerli. Bu isteği sen yapmadıysan bu maili yok say; şifren değişmez.</p>')
     msg = build(email, f"NBA Tahmin şifre sıfırlama kodun: {code}",
-                f"Selam {pname},\n\nŞifre sıfırlama kodun: {code}\nKod 30 dakika geçerli. Bu isteği sen yapmadıysan bu maili yok say; şifren değişmez.",
+                f"Selam {pname},\n\nŞifre sıfırlama kodun: {code}\nKod 3 saat geçerli. Bu isteği sen yapmadıysan bu maili yok say; şifren değişmez.",
                 card("Şifre sıfırlama kodu", "Şifremi unuttum", inner, "Siteye git", pre=f"Kodun: {code}"), pname, "sifre")
     if not mail.send(msg):
         mail.close()
         return "error", {}
     mail.close()
     db.collection("resetCode").document(uid).set({"salt": salt, "h": hashlib.sha256((salt + code).encode()).hexdigest(),
-                                                  "exp": now + timedelta(minutes=30), "sentAt": now})
+                                                  "exp": now + timedelta(hours=3), "sentAt": now})
     return "sent", {"m": mask(email)}
 
 

@@ -41,10 +41,11 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.5.2";
+const VERSION = "1.6.0";
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.6.0", d:"3 Kasım 2026", items:["Mail onayı artık zorunlu değil; onaylamadan da oynayabilirsin, ama site ara ara hatırlatır.","Onay ve şifre sıfırlama kodları 3 saat geçerli.","Mailler sadeleşti ve azaldı: günde en fazla bir özet maili gelir (gerekirse bir de acil sakatlık uyarısı)."]},
   {v:"1.5.2", d:"3 Kasım 2026", items:["Puan durumunda takım adları üstte ve büyük, gerçek isimler altta.","Grafiklerde berabere olanların isimleri ve puanları artık üst üste binmiyor."]},
   {v:"1.5.1", d:"3 Kasım 2026", items:["İngilizce arayüz büyük ölçüde tamamlandı: tarihler, kayan şerit, gecenin manşeti, hata mesajları ve açıklamalar da çevriliyor."]},
   {v:"1.5.0", d:"3 Kasım 2026", items:[
@@ -311,9 +312,12 @@ Object.assign(EN, {
 "Noktalı renkleri başka oyuncular da kullanıyor.":"Dotted colors are used by other players too.","O gecenin bütün maçları arasından bir oyuncu seçersin. Gecenin en çok sayı atan oyuncusu o olursa":"Pick one player from all of the night's games. If they're the night's top scorer",
 "Oklarla diğer günlere bakabilirsin.":"Use the arrows to see other days.","Olmadı":"Didn't work","Onaylanmadı":"Not verified","Oynamayacak:":"Out:","Oynanmadı":"Not played",
 "Oyuna devam etmek için mail adresini onaylaman gerekiyor. Şifreni unutursan sıfırlama kodu bu adrese gelir. Adresini yalnızca sen görürsün.":"Verify your email to continue. PIN reset codes go here. Only you see your address.",
+"Onaylı mail adresin olursa eksik tahmin ve sakatlık hatırlatmaları gelir, şifreni unutursan sıfırlama kodu bu adrese gelir. Adresini yalnızca sen görürsün. Şimdilik geçebilirsin, oyun yine açık.":"With a verified email you get pick and injury reminders, and PIN reset codes. Only you see your address. You can skip for now; the game stays open.",
+"Şimdilik geç, sonra onaylarım":"Skip for now","Mail adresini onayla":"Verify your email","Onayla":"Verify",
+"Onaylı adres olmadan hatırlatma maili gelmez ve şifreni unutursan kodla sıfırlayamazsın.":"Without a verified address you get no reminder emails and can't reset your PIN by code.",
 "Oyuncu adı yaz":"Type a player name","Oyuncu adı yaz (ör. Curry)":"Type a player name (e.g. Curry)","Oyuncu ara":"Search players","Oyuncu bulunamadı.":"No player found.","Pazartesi günleri haftalık özet":"Weekly summary on Mondays",
 "Playoff serileri":"Playoff series","Playoff serisi":"Playoff series","Playoff'ta bütün puanlar iki katına çıkar.":"All points double in the playoffs.","Playoff: bütün puanlar iki katı":"Playoffs: all points doubled",
-"Profilinde onayladığın mail adresine 6 haneli bir kod gönderilir. Kod 30 dakika geçerli.":"A 6-digit code goes to your verified email. Valid 30 minutes.","Profilini özelleştir":"Customize your profile","Puan topla, zirveye çık":"Collect points, reach the top",
+"Profilinde onayladığın mail adresine 6 haneli bir kod gönderilir. Kod 3 saat geçerli.":"A 6-digit code goes to your verified email. Valid 3 hours.","Profilini özelleştir":"Customize your profile","Puan topla, zirveye çık":"Collect points, reach the top",
 "Puanlar":"Points","Puanların nereden geliyor":"Where your points come from","Rakibin":"Your rival","Rakip":"Rival","Rakip analizi":"Rival analysis","Rakip kaldırıldı.":"Rival removed.","Rekorlar":"Records",
 "Renkli çubuklar geceyi kazandığı geceler.":"Colored bars are nights won.","Rib":"Reb","RİB":"REB","SAY":"PTS","Sakat oyuncu yok":"No injured players","Sakat oyuncu yok.":"No injured players.","Sayı":"Points",
 "Sen tek başına":"Only you picked","Sen ve":"You and","Senin karnen":"Your record","Seri":"Streak","Seri tahminin alındı.":"Series pick saved.","Seriyi kim, kaç maçta alır? Kazananı bilirsen +3, maç sayısını da bilirsen +2 daha.":"Who wins the series, in how many? Winner +3, games +2 more.",
@@ -2273,8 +2277,8 @@ function renderBanners(){
   const n=S.notice;
   if(n?.text && lsGet("noticeSeen")!==String(n.at)) html += `<div class="banner notice"><span class="bn-i">${ICON.megaphone}</span><span class="bn-t">${esc(n.text)}</span><button class="bn-x" data-bn="notice" aria-label="Kapat">✕</button></div>`;
   const later=+(lsGet("mailNudge")||0);
-  if(S.contactLoaded && !S.contact?.verified && Date.now()>later) html += `<div class="banner nudge"><span class="bn-i">${ICON.mail}</span><span class="bn-t"><b>Mail adresini ekle</b> Tahminin eksik kalınca ya da seçtiğin oyuncu sakatlanınca haber verelim.</span>
-    <span class="bn-acts"><button class="btn sm" data-bn="mail">Ekle</button><button class="linkish" data-bn="later">Sonra</button></span></div>`;
+  if(S.contactLoaded && !S.contact?.verified && Date.now()>later) html += `<div class="banner nudge"><span class="bn-i">${ICON.mail}</span><span class="bn-t"><b>${S.contact?.email?"Mail adresini onayla":"Mail adresini ekle"}</b> Onaylı adres olmadan hatırlatma maili gelmez ve şifreni unutursan kodla sıfırlayamazsın.</span>
+    <span class="bn-acts"><button class="btn sm" data-bn="mail">${S.contact?.email?"Onayla":"Ekle"}</button><button class="linkish" data-bn="later">Sonra</button></span></div>`;
   // Profilini özelleştirmemiş olana (favori takım ya da avatar seçmemiş) hatırlatma
   const me=S.players[S.uid];
   const missP = me ? [!me.favTeam && "favori takımını", !me.emoji && !me.av && "avatarını"].filter(Boolean) : [];
@@ -2285,10 +2289,10 @@ function renderBanners(){
 $("#banners").addEventListener("click", e=>{
   const b=e.target.closest("[data-bn]"); if(!b) return;
   if(b.dataset.bn==="notice"){ lsSet("noticeSeen", String(S.notice?.at)); }
-  if(b.dataset.bn==="later"){ lsSet("mailNudge", String(Date.now()+3*864e5)); }
+  if(b.dataset.bn==="later"){ lsSet("mailNudge", String(Date.now()+6*36e5)); }
   if(b.dataset.bn==="plater"){ lsSet("profileNudge", String(Date.now()+3*864e5)); }
   if(b.dataset.bn==="profile"){ openProfile("ayar"); setTimeout(()=>{ $(".pf-avtab")?.closest(".pf-sec")?.scrollIntoView({block:"start"}); }, 300); }
-  if(b.dataset.bn==="mail"){ openProfile("ayar"); setTimeout(()=>{ $("#pfMail")?.scrollIntoView({block:"center"}); $("#pfMail")?.focus(); }, 300); }
+  if(b.dataset.bn==="mail"){ allPlayers().catch(()=>{}).finally(()=>openOnboard(5)); }
   renderBanners();
 });
 
@@ -3326,7 +3330,7 @@ pinBoxes($("#inPin"), () => { if(authMode==="login" && $("#inName").value.trim()
 // Mail ile sıfırlama: 1) ad -> mailReset/{id}; görev onaylı adrese kod yollar  2) kod + yeni şifre -> resets/{id}
 function paintRsMail(){
   const box=$("#rsMail");
-  if(!S.rsSent){ box.innerHTML = `<p class="muted" style="margin:10px 0 0">Profilinde onayladığın mail adresine 6 haneli bir kod gönderilir. Kod 30 dakika geçerli.</p>
+  if(!S.rsSent){ box.innerHTML = `<p class="muted" style="margin:10px 0 0">Profilinde onayladığın mail adresine 6 haneli bir kod gönderilir. Kod 3 saat geçerli.</p>
       <button class="btn-primary" id="rsSend" type="button">Kod gönder</button><p class="muted" id="rsMsg" style="margin:8px 0 0"></p>`;
     $("#rsSend").onclick = sendResetCode; return; }
   box.innerHTML = `<div class="reset-box ok" style="margin-top:12px"><b>Kod gönderildi</b><p>${esc(S.rsSent.m||"Mail adresine")} adresine bakmayı unutma; gereksiz klasörüne de düşebilir.</p></div>
@@ -3499,7 +3503,7 @@ function openOnboard(step){
   if(step===5){
     const em=S.contact?.email||"", rem=S.contact?.remind ?? true, wk=S.contact?.weekly ?? true;
     openSheet(`${S.onboard?stepBar(5):""}<h3 id="shTitle">Mail adresin</h3>
-      <p class="muted">Oyuna devam etmek için mail adresini onaylaman gerekiyor. Şifreni unutursan sıfırlama kodu bu adrese gelir. Adresini yalnızca sen görürsün.</p>
+      <p class="muted">Onaylı mail adresin olursa eksik tahmin ve sakatlık hatırlatmaları gelir, şifreni unutursan sıfırlama kodu bu adrese gelir. Adresini yalnızca sen görürsün. Şimdilik geçebilirsin, oyun yine açık.</p>
       <label class="fld"><span>E-posta</span><input id="obMail" type="email" autocomplete="email" inputmode="email" placeholder="ornek@gmail.com" value="${esc(em)}"></label>
       <div class="ob-opts"><b>Hangi mailler gelsin?</b> <small class="muted">İsteğe bağlı, sonra Ayarlar'dan değiştirebilirsin.</small>
         <label class="ob-chk"><input type="checkbox" id="obRemind" ${rem?"checked":""}><span>Eksik tahmin ve sakatlık hatırlatmaları</span></label>
@@ -3508,8 +3512,10 @@ function openOnboard(step){
       <button class="btn-primary" id="obSend" type="button">Onay kodu gönder</button>
       <div id="obCodeBox" class="hide"><div class="fld"><span>Maildeki 6 haneli kod</span><input id="obCode" inputmode="numeric" maxlength="6" autocomplete="one-time-code" data-show="1" aria-label="Onay kodu"></div>
         <button class="btn-primary" id="obOk" type="button">Onayla ve bitir</button></div>
-      <p class="muted" id="obMsg" style="margin-top:8px"></p>`);
-    obLock(true);
+      <p class="muted" id="obMsg" style="margin-top:8px"></p>
+      <button class="linkish ob-skip" id="obSkip" type="button">Şimdilik geç, sonra onaylarım</button>`);
+    obLock(false);
+    $("#obSkip").onclick=()=>{ lsSet("mailAsk", String(Date.now())); finishOnboard(); };
     const validMail = e => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e);
     const prefs = () => ({remind:$("#obRemind").checked, weekly:$("#obWeekly").checked});
     pinBoxes($("#obCode"), ()=>$("#obOk").click());
@@ -3533,16 +3539,18 @@ function openOnboard(step){
 const needClub = () => !S.players[S.uid]?.club;
 const needMail = () => !(S.contact?.verified && S.contact?.email);
 function nextOnboard(done){
-  if(done<5 && needMail()) return openOnboard(5);
+  if(done<5 && needMail()){ lsSet("mailAsk", String(Date.now())); return openOnboard(5); }
   finishOnboard();
 }
 function finishOnboard(){ const first=S.onboard; S.onboard=false; S.obStep=null; obLock(false); closeSheet(); if(first) setTimeout(()=>openHow(), 350); }
-// Girişte: takım adı ya da onaylı mail eksikse zorunlu adımlar açılır (atlanamaz)
+// Girişte: takım adı eksikse zorunlu adım açılır. Onaylı mail eksikse atlanabilir hatırlatma: en fazla 4 saatte bir.
+const MAIL_ASK_EVERY = 4*36e5;
 function maybeAskMail(){
   if(S.onboard || !S.contact) return;
-  if(!needClub() && !needMail()) return;
+  if(!needClub() && !(needMail() && Date.now() - +(lsGet("mailAsk")||0) > MAIL_ASK_EVERY)) return;
   const go=(n=0)=>{ if(S.onboard || S.obStep) return;
     if(!$("#sheet").classList.contains("hide")){ if(n<30) setTimeout(()=>go(n+1), 3000); return; }
+    if(!needClub()) lsSet("mailAsk", String(Date.now()));
     allPlayers().catch(()=>{}).finally(()=>openOnboard(needClub() ? 4 : 5)); };
   setTimeout(go, 1200);
 }
