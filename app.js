@@ -45,10 +45,11 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.10.0";
+const VERSION = "1.10.1";
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.10.1", d:"3 Kasım 2026", items:["Renk düzeltmelerinin herkese yüklenmesi için sürüm yenilendi; sakatlık rozetleri anlamına göre renkli."]},
   {v:"1.10.0", d:"3 Kasım 2026", items:["Mobilde aşağı kaydırınca üst çubuk ve alt menü saklanıyor, yukarı kaydırınca geri geliyor.","Puan tablosu tam haliyle Bu Gece ve Sıralama'da; diğer sekmelerde tek satırlık şerit, dokununca açılıyor.","İngilizce çeviriler ayrı dosyada; Türkçe kullananlar için site daha hafif.","Stil dosyası ve yazı tipleri sadeleşti.","Renk zıtlığı: takım temasının vurgu rengi ve oyuncu renkleri her temada okunur hale getirildi."]},
   {v:"1.9.3", d:"3 Kasım 2026", items:["Mobilde dokunma alanları büyüdü (gün okları, isimler, alt bilgi bağlantıları).","Günün oyuncusu ve gecenin sorusunda seçmeyenler tek satırda.","NBA sekmesinde son açtığın bölüm hatırlanıyor.","Takım logoları daha hafif, sayfa daha hızlı açılıyor."]},
   {v:"1.9.2", d:"3 Kasım 2026", items:["1.9.1'deki açılmama hatası düzeltildi."]},

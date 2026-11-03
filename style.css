@@ -1789,3 +1789,6 @@ button,a,[data-act],.plr,.pf-av,.pf-emo{touch-action:manipulation;-webkit-tap-hi
 
 /* renk zıtlığı: puan tablosu, üst çubuk ve şerit her temada koyu zeminli; oyuncu renklerinin açık tonları kullanılsın */
 .board,.board-strip,.pickbar,.topbar{--p0:#7ea2f6;--p1:#f2737f;--p2:#4fd0aa;--p3:#b38cf5;--p4:#f0a35c;--p5:#5cc6ec;--p6:#f07ab8;--p7:#a6d65a;--p8:#e8c84a;--p9:#a7b4c6;--win:#4fd093;--lose:#ef8d79}
+/* 1.10.1: sakatlık rozeti anlamına göre renklensin (oynamıyor = kırmızı, belirsiz = vurgu), yazı rengi her temada okunur */
+.inj{background:var(--lose-soft);color:var(--lose)}
+.inj.q{background:var(--amber-soft);color:var(--amber-ink)}
