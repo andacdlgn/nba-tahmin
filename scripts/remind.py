@@ -312,7 +312,7 @@ def injuries(db, mail, day, games, inj):
 
 
 # ---------------------------------------------------------------- 2b) uzun vade uyarıları
-LT_NAMES = {"e": "haftanın oyuncusu (Doğu)", "w": "haftanın oyuncusu (Batı)", "pe": "ayın oyuncusu (Doğu)", "pw": "ayın oyuncusu (Batı)",
+LT_NAMES = {"cfe": "kupa finalisti (Doğu)", "cfw": "kupa finalisti (Batı)", "e": "haftanın oyuncusu (Doğu)", "w": "haftanın oyuncusu (Batı)", "pe": "ayın oyuncusu (Doğu)", "pw": "ayın oyuncusu (Batı)",
             "re": "ayın çaylağı (Doğu)", "rw": "ayın çaylağı (Batı)", "de": "ayın savunmacısı (Doğu)", "dw": "ayın savunmacısı (Batı)",
             "cmvp": "NBA Kupası MVP'si", "mvp": "MVP", "roy": "yılın çaylağı", "dpoy": "yılın savunmacısı", "mip": "en çok gelişen oyuncu", "smoy": "yılın 6. adamı"}
 
@@ -355,7 +355,7 @@ def lt_alerts(db, mail, inj):
             names = d.get("names") or {}
             locked = now >= lt_lock(k)
             for c, pid in picks.items():
-                if c in ("coy", "cw") or not pid:
+                if c in ("coy", "cw", "cfe", "cfw") or not pid:
                     continue
                 pid = str(pid)
                 who = inj.get(pid, {}).get("name") or names.get(c) or pst.get(pid, {}).get("n", "Seçtiğin oyuncu")
@@ -384,6 +384,44 @@ def lt_alerts(db, mail, inj):
         msg = build(email, subj, f"Selam {name},\n" + "\n".join(lines), card("Uzun vade", "seçimlerin", inner, "Uzun vadeye git", pre=lines[0]), name, "uzunvade")
         if mail.send(msg) and not mail.dry:
             for _, ref in new:
+                ref.set({"at": firestore.SERVER_TIMESTAMP})
+
+
+# ---------------------------------------------------------------- 2c) uzun vade kilit hatırlatması
+LT_TITLES = {"w": "Haftanın oyuncusu", "m": "Ayın ödülleri", "c": "NBA Kupası", "s": "Sezon ödülleri"}
+LT_COUNT = {"w": 2, "m": 6, "c": 4, "s": 6}
+
+
+def lt_lock_mail(db, mail):
+    """Kilide 24 saatten az kalan uzun vade turunda eksik seçimi olanlara bir kez mail."""
+    today = espn_today().strftime("%Y%m%d")
+    y, m = int(today[:4]), int(today[4:6])
+    mk = "m_202611" if (y, m) in ((2026, 10), (2026, 11)) else f"m_{y}{m:02d}"
+    nxt = (datetime.strptime(week_key(today), "%Y%m%d") + timedelta(days=7)).strftime("%Y%m%d")
+    now = datetime.now(timezone.utc)
+    due = [k for k in ("w_" + week_key(today), "w_" + nxt, mk, "c_2026", "s_2027") if timedelta(0) < lt_lock(k) - now <= timedelta(hours=24)]
+    if not due:
+        return
+    for uid, name, email in people(db, "remind"):
+        rows = []
+        for k in due:
+            snap = db.collection("lt").document(f"{k}_{uid}").get()
+            n = len([v for v in ((snap.to_dict() or {}).get("picks") or {}).values() if v]) if snap.exists else 0
+            if n >= LT_COUNT[k[0]]:
+                continue
+            ref = once(db, f"ltlock_{k}_{uid}")
+            if ref:
+                lk = lt_lock(k).astimezone(TR)
+                rows.append((ref, f"{LT_TITLES[k[0]]}: {n}/{LT_COUNT[k[0]]} seçim yaptın. Kilit {lk.day} {MONTHS[lk.month - 1]}, saat {lk:%H:%M}."))
+        if not rows:
+            continue
+        lines = [x for _, x in rows]
+        inner = (f'<p style="margin:0 0 10px">Selam {escape(name)}, uzun vade tahminlerinde eksik seçimin var ve kilide 1 günden az kaldı:</p>'
+                 f'<ul style="margin:0 0 12px;padding-left:20px;font-size:14px">{"".join(f"<li>{escape(x)}</li>" for x in lines)}</ul>')
+        msg = build(email, "Uzun vade tahminlerin kilitlenmek üzere", f"Selam {name},\nUzun vade tahminlerinde eksik seçimin var:\n" + "\n".join(lines),
+                    card("Uzun vade kilitleniyor", "uzun vade", inner, "Seçimlerimi tamamla", pre=lines[0]), name, "uzunvade")
+        if mail.send(msg) and not mail.dry:
+            for ref, _ in rows:
                 ref.set({"at": firestore.SERVER_TIMESTAMP})
 
 
@@ -477,6 +515,14 @@ def weekly(db, mail, force):
     for row in days.values():
         for u, v in row.items():
             tot[u] = tot.get(u, 0) + v.get("tot", v.get("pts", 0))
+    # o hafta açıklanan uzun vade sonuçlarının puanları da haftaya eklenir
+    lt_week = {}
+    for u, x in (sc.get("lt") or {}).items():
+        for k, p in (x.get("rounds") or {}).items():
+            d = (sc.get("ltDays") or {}).get(k)
+            if d and week_key(d) == wk:
+                lt_week[u] = lt_week.get(u, 0) + p
+                tot[u] = tot.get(u, 0) + p
     ranked = sorted(tot.items(), key=lambda x: -x[1])
     champ = ranked[0][0] if len(ranked) == 1 or ranked[0][1] > ranked[1][1] else None
     best_night = max(((u, v.get("tot", v.get("pts", 0)), d) for d, row in days.items() for u, v in row.items()), key=lambda x: x[1])
@@ -501,6 +547,8 @@ def weekly(db, mail, force):
     if worst_banko:
         u, g, r = worst_banko
         facts.append(f"Haftanın yanan bankosu: {nm(u)}, {g['away']['abbr']} – {g['home']['abbr']}")
+    if lt_week:
+        facts.append("Uzun vade puanları: " + ", ".join(f"{nm(u)} +{p}" for u, p in sorted(lt_week.items(), key=lambda x: -x[1])))
     head = f"Haftanın şampiyonu {nm(champ)}" if champ else "Hafta berabere bitti"
     notes = week_notes(days, sc.get("games", {}), games_meta, wk, nm, ranked)
     notes_html = "".join(f'<p style="margin:0 0 8px">{escape(x)}</p>' for x in notes)
@@ -539,6 +587,14 @@ def main():
     else:
         print(day, "maç yok ya da gece bitti")
     lt_alerts(db, mail, inj)
+    lt_lock_mail(db, mail)
+    # uzun vade sonuçları (Wikipedia) saatte bir
+    if force or datetime.now(timezone.utc).minute < 12:
+        try:
+            from awards import auto_awards
+            auto_awards(db, dry)
+        except Exception as e:
+            print("otomatik ödüller çalışmadı:", type(e).__name__, e)
     weekly(db, mail, force)
     mail.close()
     print(f"{day}: {mail.sent} mail")

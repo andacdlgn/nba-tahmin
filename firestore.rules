@@ -52,7 +52,7 @@ service cloud.firestore {
     match /lt/{id} {
       allow read: if resource == null
         || (signedIn() && resource.data.uid == request.auth.uid)
-        || (signedIn() && request.time >= ltLock(resource.data.key));
+        || request.time >= ltLock(resource.data.key);
       allow create, update: if isPlayer()
         && id == request.resource.data.key + '_' + request.auth.uid
         && request.resource.data.uid == request.auth.uid

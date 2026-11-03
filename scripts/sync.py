@@ -21,6 +21,9 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import date, datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
+
+TR_TZ = ZoneInfo("Europe/Istanbul")
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA = os.path.join(ROOT, "data")
@@ -210,6 +213,47 @@ def fs_doc(path):
             return None
         raise
     return {k: fs_value(v) for k, v in d.get("fields", {}).items()}
+
+
+# Uzun vade: kategori -> puan (app.js'teki LT_CATS ile aynı)
+LT_PTS = {"w": {"e": 2, "w": 2},
+          "m": {"pe": 4, "pw": 4, "re": 3, "rw": 3, "de": 3, "dw": 3},
+          "c": {"cw": 8, "cfe": 3, "cfw": 3, "cmvp": 6},
+          "s": {"mvp": 12, "roy": 8, "dpoy": 8, "mip": 8, "smoy": 8, "coy": 8}}
+
+
+def fs_list(coll):
+    url = fs_url(f"{coll}?pageSize=300")
+    if not url:
+        return {}
+    try:
+        d = get(url, tries=2)
+    except urllib.error.HTTPError:
+        return {}
+    return {x["name"].rsplit("/", 1)[1]: {k: fs_value(v) for k, v in x.get("fields", {}).items()} for x in d.get("documents", [])}
+
+
+def lt_scores(players):
+    """Sonuçlanan uzun vade turlarının puanları: {uid: {tur: puan}} ve her turun gün anahtarı."""
+    out, days = {}, {}
+    for k, r in fs_list("ltResults").items():
+        cats = LT_PTS.get(k[:1], {})
+        if not any(r.get(c) for c in cats):
+            continue
+        at = r.get("at")
+        days[k] = (ts(at) - timedelta(hours=8)).astimezone(TR_TZ).strftime("%Y%m%d") if at else None
+        for uid in players:
+            d = fs_doc(f"lt/{k}_{uid}") or {}
+            picks, swaps = dict(d.get("picks") or {}), d.get("swaps") or {}
+            pts = 0
+            for c, p in cats.items():
+                sw = swaps.get(c) or {}
+                mine = sw.get("to") or picks.get(c)
+                if r.get(c) and mine and str(mine) == str(r[c]):
+                    pts += p // 2 if sw else p
+            if pts:
+                out.setdefault(uid, {})[k] = pts
+    return out, days
 
 
 def fs_players():
@@ -511,6 +555,23 @@ def main(full=False):
                 tot[uid]["dayWins"] += 1
             weeks.setdefault(v["week"], {}).setdefault(uid, 0)
             weeks[v["week"]][uid] += v["tot"]
+    # uzun vade puanları: toplama ve sonucun açıklandığı haftaya eklenir
+    try:
+        lt, lt_days = lt_scores(players)
+    except Exception as e:
+        print("Uzun vade puanları alınamadı:", e)
+        lt, lt_days = {}, {}
+    sc["lt"] = {uid: {"total": sum(r.values()), "rounds": r} for uid, r in lt.items()}
+    sc["ltDays"] = lt_days
+    for uid, rounds in lt.items():
+        if uid in tot:
+            tot[uid]["pts"] += sum(rounds.values())
+            tot[uid]["lt"] = sum(rounds.values())
+        for k, p in rounds.items():
+            d = lt_days.get(k)
+            if d:
+                weeks.setdefault(week_key(d), {}).setdefault(uid, 0)
+                weeks[week_key(d)][uid] += p
     cur_week = week_key(today.strftime("%Y%m%d"))
     for wk, row in weeks.items():
         if wk == cur_week:
