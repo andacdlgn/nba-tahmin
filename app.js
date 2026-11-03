@@ -45,10 +45,11 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.13.0";
+const VERSION = "1.14.0";
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.14.0", d:"4 Kasım 2026", items:["Sürpriz kademesi: ESPN'in şans vermediği takımı bilirsen kazanan puanı +2 (%33 ve altı) ya da +3 (%20 ve altı). Banko 2 kat, kazanan puanı en fazla 4.","Takım düğmelerinde ESPN'in maç önü kazanma şansı ve sürpriz puanı görünüyor."]},
   {v:"1.13.0", d:"3 Kasım 2026", items:["Fark artık kaydırıcıyla sayı olarak seçiliyor; gerçek farka 3 sayı ya da daha yakınsan +1.","Yedek tahmin (isteğe bağlı): unuttuğun gecede ESPN favorileri girer, her 2 doğru kazanan 1 puan.","Devamlılık bonusu: haftada en az 4 gece oynayana +2.","Hiç tahmin yapmamış oyunculara ilk maçta adım adım rehber.","Yönetim paneli: her oyuncunun oynadığı gece sayısı ve son girişi."]},
   {v:"1.12.0", d:"3 Kasım 2026", items:["Daha hızlı açılış: sitenin kendi dosyaları telefondaki kopyadan anında açılıyor, yeni sürüm arka planda iniyor.","Sakatlık listesi, kadrolar ve oyuncu listesi ilk ekran çizildikten sonra yükleniyor.","Fotoğraf sunucusuna ve sitenin koduna önceden bağlanılıyor."]},
   {v:"1.11.3", d:"3 Kasım 2026", items:["Görsel hizalar: kürsüde isimler aynı hizada, takım liderleri kartları eşit boyda, oyuncu arama seçicileri ekrandan taşmıyor, filtre düğmeleri alt satıra geçiyor, puan şeridi telefonda kesilmiyor, puan tablosunda takım adları iki satıra kadar görünüyor."]},
@@ -156,6 +157,27 @@ const bucketOf = (g, m) => isRules2(g) ? bucket2(m) : bucket(m);
 const MARGIN_TOL = 3, MARGIN_MAX = 40;
 const marginHit = (label, m) => /^\d+$/.test(String(label)) ? (+label>=MARGIN_MAX ? m>=MARGIN_MAX-MARGIN_TOL : Math.abs(+label-m)<=MARGIN_TOL) : MARGINS2.includes(label) ? bucket2(m)===label : bucket(m)===label;
 const dpValue = day => day>=RULES2_FROM ? 3 : 2;
+// Sürpriz kademesi (4 Kasım 2026'dan itibaren): ESPN'in maç önü şansı %20 ve altı +3, %33 ve altı +2, üstü +1.
+// Banko bunu 2 katına çıkarır; kazanan puanı (kupa/playoff katıyla birlikte) en fazla 4 olur. scripts/sync.py ile aynı.
+const TIER_FROM = "20261104", WIN_CAP = 4;
+function oddsTag(g, abbr){
+  const h=homeProb(g); if(h==null || isNaN(h)) return "";
+  const p=Math.round((abbr===g.home.abbr ? h : 1-h)*100), t=tierOf(g, abbr);
+  return `<span class="odds ${t>1?"t"+t:""}" title="ESPN maç önü kazanma şansı"><b>%${p}</b>${t>1?`<em>+${t}</em>`:""}</span>`;
+}
+function homeProb(g){
+  if(g.hp!=null) return +g.hp;
+  const s=S.sums?.[g.id]?.data; const pr=s?.predictor?.homeTeam?.gameProjection;
+  if(pr!=null && pr!=="") return +pr/100;
+  const wp=s?.winprobability?.[0]?.homeWinPercentage; return wp!=null ? +wp : null;
+}
+const gameDayOf = g => g.day || ymd(new Date(new Date(g.start).getTime()-8*36e5));
+function tierOf(g, abbr){
+  if(gameDayOf(g) < TIER_FROM) return 1;
+  const h=homeProb(g); if(h==null || isNaN(h)) return 1;
+  const p = abbr===g.home.abbr ? h : 1-h;
+  return p<=0.20 ? 3 : p<=0.33 ? 2 : 1;
+}
 const slug = s => s.toLocaleLowerCase("tr").replace(/[çğıöşü]/g, c => ({ç:"c",ğ:"g",ı:"i",ö:"o",ş:"s",ü:"u"}[c])).replace(/[^a-z0-9]/g, "");
 const weekKey = s => { const d = parseYmd(s); const w = (d.getUTCDay()+6)%7; d.setUTCDate(d.getUTCDate()-w); return ymd(d); };
 // 4 Kasım 2026 gecesinden itibaren her maçın tahmini kendi maçı başlamadan 10 dk önce kilitlenir (rakiplerin
@@ -390,11 +412,12 @@ function scorePick(g, pick, conf){
   const homeLead = (g.home.score??0) - (g.away.score??0);
   const winner = homeLead>0 ? g.home.abbr : homeLead<0 ? g.away.abbr : null;
   const won = winner && pick.winner===winner;
-  if(won){ r.w = conf?2:1; if(marginHit(pick.margin, Math.abs(homeLead))) r.m=1; }
+  r.tier = tierOf(g, pick.winner);
+  if(won){ r.w = (conf?2:1)*r.tier; if(marginHit(pick.margin, Math.abs(homeLead))) r.m=1; }
   else if(conf && winner) r.w = -1;
   const tops = g.state==="post" ? topsOf(g) : liveTops(g);
   if(tops && tops.some(t=>t.id===pick.scorerId)) r.s=1;
-  r.pts = (Math.max(r.w,0)+r.m+r.s)*mult + Math.min(r.w,0);   // yanan banko (-1) katlanmaz
+  r.pts = Math.min(WIN_CAP, Math.max(r.w,0)*mult) + (r.m+r.s)*mult + Math.min(r.w,0);   // kazanan en fazla 4; yanan banko (-1) katlanmaz
   return r;
 }
 function liveTops(g){
@@ -414,7 +437,7 @@ function dayPoints(day){
       const g = S.arch.games[gid]; const r = row[uid];
       if(!g || g.day!==day || !r) continue;
       const k = multOf(g);
-      p.w += r.w>0 ? r.w*k : r.w; p.m += r.m*k; p.s += r.s*k;
+      p.w += r.w>0 ? Math.min(WIN_CAP, r.w*k) : r.w; p.m += r.m*k; p.s += r.s*k;
     }
     return p;
   };
@@ -431,7 +454,7 @@ function dayPoints(day){
       if(g.state!=="post" && g.state!=="in") continue;
       const r = scorePick(g, pick, daily?.confGame===g.id);
       const k = multOf(g);
-      p.w += r.w>0 ? r.w*k : r.w; p.m += r.m*k; p.s += r.s*k; p.pts += r.pts;
+      p.w += r.w>0 ? Math.min(WIN_CAP, r.w*k) : r.w; p.m += r.m*k; p.s += r.s*k; p.pts += r.pts;
     }
     const dpr = dayPlayerResult(day, uid);
     if(dpr?.hit){ const v=dpValue(day); p.pts += v; p.dp = v; }
@@ -981,7 +1004,7 @@ function gameCard(g){
     const key = g.id+side, prev = S.prevSc[key], flash = g.state==="in" && prev!=null && s.score!=null && s.score!==prev;
     if(s.score!=null) S.prevSc[key] = s.score;
     return `<button class="tbtn ${loser?"loser":""} ${winner?"winner":""}" style="--tc:${tcol(s.abbr)}" data-act="win" data-g="${g.id}" data-v="${s.abbr}" aria-pressed="${sel}" ${lock?"disabled":""}>
-      <span class="tlogo"><img src="${s.logo||""}" alt=""></span><span class="tt"><b>${nm}</b>${s.rec&&g.state==="pre"?`<small class="rec">${s.rec}</small>`:""}<small class="ha">${side==="home"?ICON.home+"Ev sahibi":ICON.plane+"Deplasman"}</small></span>
+      <span class="tlogo"><img src="${s.logo||""}" alt=""></span><span class="tt"><b>${nm}</b>${s.rec&&g.state==="pre"?`<small class="rec">${s.rec}</small>`:""}<small class="ha">${side==="home"?ICON.home+"Ev sahibi":ICON.plane+"Deplasman"}</small></span>${g.state==="pre"?oddsTag(g,s.abbr):""}
       ${g.state!=="pre"?`<span class="sc ${flash?"flash":""}">${s.score??""}</span>`:""}</button>`;
   };
   let body = `<div class="teams">${t("away")}<span class="vs-mini">VS</span>${t("home")}</div>`;
@@ -1198,7 +1221,7 @@ function paintSwipe(dir=0){
   const g=gs[S.swipeIdx], d=draftFor(g), saved=D.picks[g.id]?.[S.uid];
   const same = saved && saved.winner===d.winner && saved.margin===d.margin && saved.scorerId===d.scorerId;
   const ready = d.winner && d.margin && d.scorerId;
-  const team = side => { const t=g[side]; return `<button class="sw-team" style="--tc:${tcol(t.abbr)}" data-sw="win" data-v="${t.abbr}" aria-pressed="${d.winner===t.abbr}"><img src="${t.logo||LOGO_SMALL(t.abbr)}" alt=""><b>${esc(t.name)}</b>${t.rec?`<small>${t.rec}</small>`:""}<small class="ha">${side==="home"?ICON.home+"Ev sahibi":ICON.plane+"Deplasman"}</small></button>`; };
+  const team = side => { const t=g[side]; return `<button class="sw-team" style="--tc:${tcol(t.abbr)}" data-sw="win" data-v="${t.abbr}" aria-pressed="${d.winner===t.abbr}"><img src="${t.logo||LOGO_SMALL(t.abbr)}" alt=""><b>${esc(t.name)}</b>${t.rec?`<small>${t.rec}</small>`:""}<small class="ha">${side==="home"?ICON.home+"Ev sahibi":ICON.plane+"Deplasman"}</small>${oddsTag(g,t.abbr)}</button>`; };
   const dots = gs.map((x,i)=>`<i class="${i===S.swipeIdx?"on":""} ${D.picks[x.id]?.[S.uid]?"ok":""}"></i>`).join("");
   box.innerHTML = `<div class="sw-top"><b>${S.swipeIdx+1} / ${gs.length}</b><span class="sw-dots">${dots}</span></div>
     <div class="sw-card ${dir>0?"in-r":dir<0?"in-l":""}" style="--ca:${pairCols(g.away.abbr,g.home.abbr)[0]};--ch:${pairCols(g.away.abbr,g.home.abbr)[1]}">
@@ -1425,7 +1448,7 @@ function paintQuick(){
   const rows=games.map(g=>{
     const d=draftFor(g), sv=D.picks[g.id]?.[S.uid];
     const same = sv && sv.winner===d.winner && sv.margin===d.margin && sv.scorerId===d.scorerId;
-    const team = t => `<button class="qk-t ${d.winner===t.abbr?"on":""}" style="--tc:${tcol(t.abbr)}" data-qw="${t.abbr}" data-g="${g.id}"><img src="${t.logo}" alt="">${esc(t.abbr)}</button>`;
+    const team = t => `<button class="qk-t ${d.winner===t.abbr?"on":""}" style="--tc:${tcol(t.abbr)}" data-qw="${t.abbr}" data-g="${g.id}"><img src="${t.logo}" alt="">${esc(t.abbr)}${oddsTag(g,t.abbr)}</button>`;
     const opts = d.winner ? teamTop(g,d.winner) : [];
     const sel = d.winner ? `<select class="qk-s" data-qs="${g.id}">${d.scorerId && !opts.some(o=>o.id===d.scorerId) ? `<option value="${d.scorerId}" selected>${esc(d.scorerName)}</option>` : ""}${opts.map(o=>`<option value="${o.id}" ${o.id===d.scorerId?"selected":""}>${esc(o.name)}${o.ppg!=null?` · ${o.ppg.toFixed(1)}`:""}</option>`).join("")}</select>` : `<span class="muted qk-hint">Önce kazananı seç</span>`;
     return `<div class="qk ${same?"saved":d.winner?"dirty":""}"><div class="qk-h"><span>${timeTR(g.start)}</span><span>${same?'<span class="ok">✓ Kaydedildi</span>':d.winner&&d.margin&&d.scorerId?'<span class="need">Kaydedilmedi</span>':""}</span></div>
@@ -1615,13 +1638,15 @@ function openRules(){
   openSheet(`<div class="rules"><h3 id="shTitle">Kurallar</h3>
     <p>Her gece o günün bütün NBA maçları için üç tahmin yaparsın: <b>kazanan takım</b>, <b>fark aralığı</b> ve <b>maçın en skoreri</b>. Üçünü de doldurup "Tahmini kaydet"e basman gerekir.</p>
     <h4>Puanlar</h4>
-    <div class="pt"><span>Kazananı bilirsen</span><b>+1</b><span>Kazananla birlikte farkı da bilirsen</span><b>+1</b><span>Maçın en skorerini bilirsen</span><b>+1</b><span>Bir maçtan alınabilecek en yüksek puan</span><b>3 puan</b></div>
+    <div class="pt"><span>Kazananı bilirsen</span><b>+1</b><span>Kazananla birlikte farkı da bilirsen</span><b>+1</b><span>Maçın en skorerini bilirsen</span><b>+1</b><span>Sürpriz kazananı bilirsen (ESPN şansı %33 / %20 altı)</span><b>+2 / +3</b></div>
     <h4>Günün bankosu</h4>
     <p>Her gece bir maçı banko seçersin. O maçta kazananı bilirsen <b>+1</b> yerine <b>+2</b> alırsın, bilemezsen <b>-1</b> puan kaybedersin. Fark ve en skorer puanları değişmez. 2 kat puanlı maçlarda (NBA Kupası, playoff) tutan banko +4 olur, yanan banko yine -1. Bankoyu başka bir maça taşıyabilirsin ama tamamen kaldıramazsın.</p>
     <h4>Günün oyuncusu</h4>
     <p>O gecenin bütün maçları arasından bir oyuncu seçersin. Gecenin en çok sayı atan oyuncusu o olursa <b>+3</b>.</p>
     <h4>Gecenin sorusu</h4>
     <p>Her gece evet ya da hayır diye cevaplanan bir soru gelir (ör. "Bu gece biri 45 sayı atar mı?"). Doğru cevap <b>+1</b>. Sorular 21 soruluk bir havuzdan sırayla gelir, aynı soru 21 gün içinde tekrar etmez. Sonuç, gecenin maçları bitince (bazı sorularda koşul gerçekleştiği anda) belli olur.</p>
+    <h4>Sürpriz kademesi</h4>
+    <p>4 Kasım'dan itibaren kazanan puanı, ESPN'in maç önü kazanma şansına göre değişir; şans her takım düğmesinde yazar. Seçtiğin takımın şansı <b>%33 ve altındaysa +2</b>, <b>%20 ve altındaysa +3</b>, üstündeyse +1. Banko bunu 2 katına çıkarır (sürpriz bankoda +4 ya da +6 olur), yanan banko yine -1. Bir maçtan alınan kazanan puanı kupa ve playoff katıyla birlikte <b>en fazla 4</b> olur. Fark ve skorer puanları değişmez. Şans, maç önündeki ESPN tahminidir ve maç başladıktan sonra değişmez.</p>
     <h4>NBA Kupası</h4>
     <p>4 Kasım'dan itibaren NBA Kupası maçları altın şeritle işaretlenir ve <b>2 kat puan</b> getirir. Tutan banko +4, yanan banko yine -1.</p>
     <h4>Playoff serileri</h4>

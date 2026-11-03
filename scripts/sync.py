@@ -118,6 +118,30 @@ def made_att(v):
         return 0, 0
 
 
+def espn_hp(s):
+    """ESPN'in maç önü ev sahibi kazanma şansı (0-1): önce maç önü tahmini (sitede gösterilen), yoksa olasılık akışının ilk değeri."""
+    try:
+        pr = s.get("predictor", {}).get("homeTeam", {}).get("gameProjection")
+        if pr not in (None, ""):
+            return float(pr) / 100
+        wp = s.get("winprobability") or []
+        if wp:
+            return float(wp[0].get("homeWinPercentage"))
+    except (TypeError, ValueError):
+        pass
+    return None
+
+
+TIER_FROM, WIN_CAP = "20261104", 4   # sürpriz kademesi; app.js'teki tierOf ile aynı
+
+
+def tier_of(g, abbr):
+    if g.get("day", "") < TIER_FROM or g.get("hp") is None:
+        return 1
+    p = g["hp"] if abbr == g["home"]["abbr"] else 1 - g["hp"]
+    return 3 if p <= 0.20 else 2 if p <= 0.33 else 1
+
+
 def espn_fav(s):
     """ESPN'in maç önü favorisi: kazanma olasılığı akışının ilk değeri (yoksa maç önü tahmini)."""
     try:
@@ -409,8 +433,9 @@ def score_game(g, pick, conf, top_ids):
         return r
     r["pick"] = {"w": pick.get("winner"), "m": pick.get("margin"), "s": pick.get("scorerName")}
     won = pick.get("winner") == g["winner"]
+    r["tier"] = tier_of(g, pick.get("winner"))
     if won:
-        r["w"] = 2 if conf else 1
+        r["w"] = (2 if conf else 1) * r["tier"]
         lab = str(pick.get("margin") or "")
         if lab.isdigit():   # 1.13.0: sayıyla fark, gerçek farka 3 sayı ya da daha yakın (40 = 40 ve üstü)
             hit = g["margin"] >= MARGIN_MAX - MARGIN_TOL if int(lab) >= MARGIN_MAX else abs(int(lab) - g["margin"]) <= MARGIN_TOL
@@ -422,7 +447,7 @@ def score_game(g, pick, conf, top_ids):
         r["w"] = -1
     if pick.get("scorerId") in top_ids:
         r["s"] = 1
-    r["pts"] = (max(r["w"], 0) + r["m"] + r["s"]) * mult + min(r["w"], 0)   # yanan banko katlanmaz
+    r["pts"] = min(WIN_CAP, max(r["w"], 0) * mult) + (r["m"] + r["s"]) * mult + min(r["w"], 0)   # kazanan en fazla 4; yanan banko katlanmaz
     return r
 
 
@@ -594,6 +619,9 @@ def main(full=False):
                 continue
             top = max((p["pts"] for p in bx), default=0)
             g["fav"] = espn_fav(getattr(box, "last", {}) or {})
+            hp = espn_hp(getattr(box, "last", {}) or {})
+            if hp is not None:
+                g["hp"] = round(hp, 4)
             winner = g.get("winner")
             g["day"] = day
             g["top"] = [{"id": p["id"], "name": p["name"], "team": p["team"], "pts": p["pts"]} for p in bx if p["pts"] == top]

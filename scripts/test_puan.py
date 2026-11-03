@@ -42,11 +42,12 @@ for day, st in (("20261102", 2), ("20261106", 2), ("20261030", 2), ("20270420", 
                          {"winner": "NY", "margin": "8-12", "scorerId": "1"}, {"winner": "BOS", "margin": "13-19", "scorerId": "2"}, {"winner": "NY", "margin": "4-7", "scorerId": "2"},
                          {"winner": "BOS", "margin": "5", "scorerId": "1"}, {"winner": "BOS", "margin": "15", "scorerId": "2"}, {"winner": "NY", "margin": "9", "scorerId": "1"}, {"winner": "BOS", "margin": "40", "scorerId": "1"}, None):
                 for conf in (False, True):
-                    CASES.append({"day": day, "seasonType": st, "cup": cup, "winner": winner, "margin": margin, "pick": pick, "conf": conf, "tops": ["1"]})
+                    for hp in (None, 0.85, 0.75, 0.5, 0.25, 0.12):   # ev sahibi BOS'un maç önü şansı (sürpriz kademesi)
+                        CASES.append({"day": day, "seasonType": st, "cup": cup, "winner": winner, "margin": margin, "pick": pick, "conf": conf, "tops": ["1"], "hp": hp})
 
 
 def py_score(c):
-    g = {"seasonType": c["seasonType"], "cup": c["cup"], "day": c["day"], "winner": c["winner"], "margin": c["margin"], "bucket": sync.margin_bucket(c["margin"])}
+    g = {"seasonType": c["seasonType"], "cup": c["cup"], "day": c["day"], "winner": c["winner"], "margin": c["margin"], "bucket": sync.margin_bucket(c["margin"]), "home": {"abbr": "BOS"}, "away": {"abbr": "NY"}, **({"hp": c["hp"]} if c["hp"] is not None else {})}
     r = sync.score_game(g, c["pick"], c["conf"], set(c["tops"]))
     return [r["w"], r["m"], r["s"], r["pts"]]
 
@@ -55,12 +56,13 @@ def js_scores():
     src = "\n".join([
         "const PERGAME_FROM = Date.UTC(2026,10,4,12);",
         js_const("CUP2X_FROM"), js_const("multOf"), js_const("bucket"), js_const("MARGINS2"), js_const("bucket2"), "const MARGIN_TOL = 3, MARGIN_MAX = 40;", js_const("marginHit"),
-        "const topsOf = g => g._tops; const liveTops = g => g._tops;",
+        "const topsOf = g => g._tops; const liveTops = g => g._tops; const S = {sums:{}};",
+        js_const("TIER_FROM, WIN_CAP") if False else "const TIER_FROM = '20261104', WIN_CAP = 4;", js_const("pad") if "const pad" in APP else "const pad = n => String(n).padStart(2,'0');", js_const("ymd"), js_const("gameDayOf"), js_func("homeProb"), js_func("tierOf"),
         js_func("scorePick"),
         "const cases = JSON.parse(require('fs').readFileSync(process.argv[2], 'utf8'));",
         "const out = cases.map(c => { const home = c.winner === 'BOS' ? {abbr:'BOS', score:100+c.margin} : {abbr:'BOS', score:100};",
         "  const away = c.winner === 'NY' ? {abbr:'NY', score:100+c.margin} : {abbr:'NY', score:100};",
-        "  const g = {seasonType:c.seasonType, cup:c.cup, day:c.day, state:'post', home, away, _tops:c.tops.map(id=>({id}))};",
+        "  const g = {seasonType:c.seasonType, cup:c.cup, day:c.day, state:'post', home, away, _tops:c.tops.map(id=>({id})), ...(c.hp!=null?{hp:c.hp}:{})};",
         "  const r = scorePick(g, c.pick, c.conf); return [r.w, r.m, r.s, r.pts]; });",
         "console.log(JSON.stringify(out));",
     ])

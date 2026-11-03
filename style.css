@@ -1864,3 +1864,13 @@ body.bars-hidden .nav,body.bars-hidden .topbar{pointer-events:none}
 .fp-h{display:flex;justify-content:space-between;align-items:center;gap:10px}
 .fp-guide ol{list-style:none;padding:0;margin:8px 0 6px;display:grid;gap:4px;font-size:14px}
 .fp-guide li{color:var(--muted)}.fp-guide li.ok{color:var(--win);font-weight:700}.fp-guide li.now{color:var(--ink);font-weight:800}
+
+/* 1.14.0 ESPN şansı ve sürpriz kademesi rozetleri */
+.odds{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:700;color:var(--muted);margin-left:auto;padding:2px 7px;border-radius:999px;background:var(--panel-2);border:1px solid var(--line);flex:none}
+.odds b{font-family:"Barlow Condensed";font-size:14px;color:var(--ink)}
+.odds em{font-style:normal;font-weight:800;color:var(--on-amber,#1a1200);background:var(--amber);border-radius:999px;padding:0 6px;font-size:11.5px}
+.odds.t3 em{background:var(--live);color:#fff}
+.tbtn .odds{align-self:center}
+.tbtn[aria-pressed="true"] .odds{background:rgba(0,0,0,.22);border-color:transparent}.tbtn[aria-pressed="true"] .odds b{color:#fff}
+.sw-team .odds{margin:6px auto 0}
+.qk-t .odds{margin-left:6px;padding:1px 5px}
