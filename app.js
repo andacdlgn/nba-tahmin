@@ -39,7 +39,7 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "v30";
+const VERSION = "v31";
 const LOGO_SMALL = a => `logos/${String(a).toLowerCase()}.png`;
 const LOGO_FULL  = a => `https://a.espncdn.com/i/teamlogos/nba/500/${String(a).toLowerCase()}.png`;
 document.addEventListener("error", e => {
@@ -2889,65 +2889,94 @@ function paintJoin(){
   }
 }
 
-// Katıldıktan sonra: 4) takım + avatar, 5) mail. Girişte de onaylı mail yoksa 5. adım sorulur.
+// Katıldıktan sonra: 4) takım adı + favori takım + avatar, 5) mail (onay kodu zorunlu).
+// Takım adı ve onaylı mail zorunlu: eksik olan eski oyunculara da girişte sorulur, atlanamaz.
+const obLock = on => { S.sheetLocked=on; $("#shClose").classList.toggle("hide", on); };
 function openOnboard(step){
   S.obStep=step;
   if(step===4){
-    const me=S.players[S.uid]||{}; S.ob = S.ob || {team:me.favTeam||"", av:me.av||""};
+    const me=S.players[S.uid]||{}; S.ob = S.ob || {club:me.club||"", team:me.favTeam||"", av:me.av||"", avTab:(me.av||"").startsWith("p:")?"oyu":"tak"};
     const teams=(ALLP?.teams||[]).slice().sort((a,b)=>a.n.localeCompare(b.n,"tr"));
-    openSheet(`${stepBar(4)}<h3 id="shTitle">Takım adın</h3><p class="muted">Ligde adının altında görünür. İstersen boş bırak.</p>
-      <input id="obClub" class="adm-in" style="width:100%" maxlength="40" placeholder="ör. Kyle Korver Sevenler Derneği" value="${esc(S.ob.club||"")}"><small class="err" id="obClubErr"></small>
-      <h3 style="margin-top:18px">Favori takımın</h3>
+    openSheet(`${S.onboard?stepBar(4):""}<h3 id="shTitle">Takım adın</h3><p class="muted">Ligde adının altında görünür (ör. Kyle Korver Sevenler Derneği). Zorunlu.</p>
+      <input id="obClub" class="adm-in" style="width:100%" maxlength="40" placeholder="ör. Kyle Korver Sevenler Derneği" value="${esc(S.ob.club||"")}"><small class="hint" id="obClubErr"></small>
+      <h3 style="margin-top:18px">Favori takımın</h3><p class="muted">Uygulamanın renkleri (tema) bu takıma göre olur. Sonra Ayarlar'dan değiştirebilirsin.</p>
       <div class="tm-grid ob-teams">${teams.map(t=>`<button class="tg" data-obt="${t.a}" aria-pressed="${S.ob.team===t.a}" style="--tc:${tcol(t.a)}"><span class="tg-l"><img src="${LOGO_SMALL(t.a)}" alt=""></span><b>${esc(t.n.split(" ").slice(-1)[0])}</b></button>`).join("") || `<p class="muted">Takımlar yükleniyor…</p>`}</div>
-      <h3 style="margin-top:18px">Avatarın</h3><p class="muted">Sıralamada ve tahtada adının yanında görünür.</p>
-      <div class="pf-avs ob-avs">${S.ob.team?`<button class="pf-av logo" data-oba="t:${S.ob.team}" aria-pressed="${S.ob.av===`t:${S.ob.team}`}"><img src="${LOGO_SMALL(S.ob.team)}" alt=""><small>Takımım</small></button>`:""}
-        ${STARS.map(([id,n])=>`<button class="pf-av" data-oba="p:${id}" aria-pressed="${S.ob.av===`p:${id}`}"><img src="${HEADSHOT(id)}" alt="" loading="lazy"><small>${esc(n.split(" ").slice(-1)[0])}</small></button>`).join("")}</div>
-      <p class="err" id="obErr"></p><div class="jw-nav"><button class="btn" id="obSkip" type="button">Sonra</button><button class="btn-primary" id="obNext" type="button">Kaydet ve devam</button></div>`);
+      <h3 style="margin-top:18px">Avatarın</h3><p class="muted">Bir takım logosu ya da bir basketbolcu seç; sıralamada ve tahtada adının yanında görünür.</p>
+      <div class="seg2 ob-avtab"><button type="button" data-obtab="tak" aria-pressed="${S.ob.avTab==="tak"}">Takım logosu</button><button type="button" data-obtab="oyu" aria-pressed="${S.ob.avTab==="oyu"}">Basketbolcu</button></div>
+      <div class="pf-avs ob-avs">${S.ob.avTab==="tak"
+        ? teams.map(t=>`<button class="pf-av logo" data-oba="t:${t.a}" aria-pressed="${S.ob.av===`t:${t.a}`}" title="${esc(t.n)}"><img src="${LOGO_SMALL(t.a)}" alt=""><small>${esc(t.n.split(" ").slice(-1)[0])}</small></button>`).join("")
+        : STARS.map(([id,n])=>`<button class="pf-av" data-oba="p:${id}" aria-pressed="${S.ob.av===`p:${id}`}"><img src="${HEADSHOT(id)}" alt="" loading="lazy"><small>${esc(n.split(" ").slice(-1)[0])}</small></button>`).join("")}</div>
+      <p class="err" id="obErr"></p><button class="btn-primary" id="obNext" type="button">Devam</button>`);
+    obLock(true);
     if(!ALLP) allPlayers().then(()=>{ if(S.obStep===4) openOnboard(4); }).catch(()=>{});
-    $("#obClub").oninput=()=>{ const v=$("#obClub").value.trim().replace(/\s+/g," "); S.ob.club=v; $("#obClubErr").textContent = v ? (clubProblem(v)||"") : ""; };
+    const clubInp=$("#obClub");
+    const checkClub=()=>{ const v=clubInp.value.trim().replace(/\s+/g," "); S.ob.club=v; const p=v?clubProblem(v):null;
+      $("#obClubErr").textContent = p || (v ? "✓ Uygun." : ""); $("#obClubErr").className = "hint "+(p?"bad":v?"good":""); return p; };
+    clubInp.oninput=checkClub; if(clubInp.value) checkClub();
     $("#sheet .ob-teams").onclick=e=>{ const b=e.target.closest("[data-obt]"); if(!b) return; S.ob.team=b.dataset.obt; if(!S.ob.av || S.ob.av.startsWith("t:")) S.ob.av="t:"+S.ob.team; openOnboard(4); };
+    $("#sheet .ob-avtab").onclick=e=>{ const b=e.target.closest("[data-obtab]"); if(!b) return; S.ob.avTab=b.dataset.obtab; openOnboard(4); };
     $("#sheet .ob-avs").onclick=e=>{ const b=e.target.closest("[data-oba]"); if(!b) return; S.ob.av=b.dataset.oba; $$("#sheet [data-oba]").forEach(x=>x.setAttribute("aria-pressed", x===b)); };
-    $("#obSkip").onclick=()=>openOnboard(5);
-    $("#obNext").onclick=async()=>{ const patch={}; if(S.ob.team){ patch.favTeam=S.ob.team; } if(S.ob.av){ patch.av=S.ob.av; }
-      const club=($("#obClub").value||"").trim().replace(/\s+/g," "); if(club){ const p=clubProblem(club); if(p){ $("#obClubErr").textContent=p; return; } patch.club=club; }
-      if(Object.keys(patch).length){ try{ await saveProfile(patch); }catch(e){} } openOnboard(5); };
+    $("#obNext").onclick=async()=>{
+      const club=clubInp.value.trim().replace(/\s+/g," ");
+      if(!club){ $("#obErr").textContent="Bir takım adı yaz."; clubInp.focus(); return; }
+      const p=clubProblem(club); if(p){ $("#obErr").textContent=p; clubInp.focus(); return; }
+      const patch={club}; if(S.ob.team){ patch.favTeam=S.ob.team; patch.theme="team"; } if(S.ob.av){ patch.av=S.ob.av; patch.emoji=""; }
+      $("#obNext").disabled=true;
+      try{ await updateDoc(doc(S.db,"players",S.uid), patch); Object.assign(S.players[S.uid], patch); applyTheme(); render(); }
+      catch(e){ $("#obErr").textContent="Kaydedilemedi, tekrar dene."; $("#obNext").disabled=false; return; }
+      nextOnboard(4);
+    };
     return;
   }
   if(step===5){
-    const em=S.contact?.email||"";
+    const em=S.contact?.email||"", rem=S.contact?.remind ?? true, wk=S.contact?.weekly ?? true;
     openSheet(`${S.onboard?stepBar(5):""}<h3 id="shTitle">Mail adresin</h3>
-      <p class="muted">Tahminin eksik kalırsa, seçtiğin oyuncu sakatlanırsa ve haftalık özet için mail atarız. Şifreni unutursan da kodu buraya yollarız. Adresini yalnızca sen görürsün.</p>
+      <p class="muted">Oyuna devam etmek için mail adresini onaylaman gerekiyor. Şifreni unutursan sıfırlama kodu bu adrese gelir. Adresini yalnızca sen görürsün.</p>
       <label class="fld"><span>E-posta</span><input id="obMail" type="email" autocomplete="email" inputmode="email" placeholder="ornek@gmail.com" value="${esc(em)}"></label>
+      <div class="ob-opts"><b>Hangi mailler gelsin?</b> <small class="muted">İsteğe bağlı, sonra Ayarlar'dan değiştirebilirsin.</small>
+        <label class="ob-chk"><input type="checkbox" id="obRemind" ${rem?"checked":""}><span>Eksik tahmin ve sakatlık hatırlatmaları</span></label>
+        <label class="ob-chk"><input type="checkbox" id="obWeekly" ${wk?"checked":""}><span>Pazartesi haftalık özet</span></label>
+        <label class="ob-chk dis"><input type="checkbox" checked disabled><span>Şifre sıfırlama kodu (her zaman)</span></label></div>
       <button class="btn-primary" id="obSend" type="button">Onay kodu gönder</button>
       <div id="obCodeBox" class="hide"><div class="fld"><span>Maildeki 6 haneli kod</span><input id="obCode" inputmode="numeric" maxlength="6" autocomplete="one-time-code" data-show="1" aria-label="Onay kodu"></div>
-        <button class="btn-primary" id="obOk" type="button">Onayla</button></div>
-      <p class="muted" id="obMsg" style="margin-top:8px"></p>
-      <div class="jw-nav"><button class="btn" id="obLater" type="button">Sonra</button></div>`);
+        <button class="btn-primary" id="obOk" type="button">Onayla ve bitir</button></div>
+      <p class="muted" id="obMsg" style="margin-top:8px"></p>`);
+    obLock(true);
     const validMail = e => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e);
+    const prefs = () => ({remind:$("#obRemind").checked, weekly:$("#obWeekly").checked});
     pinBoxes($("#obCode"), ()=>$("#obOk").click());
-    $("#obLater").onclick=()=>{ lsSet("mailAsk", String(Date.now())); finishOnboard(); };
     $("#obSend").onclick=async()=>{ const email=$("#obMail").value.trim(); if(!validMail(email)) return $("#obMsg").textContent="Mail adresi geçerli görünmüyor.";
       $("#obSend").disabled=true;
-      try{ const d={email, remind:true, weekly:true, verified:false, updatedAt:serverTimestamp()};
+      try{ const d={email, ...prefs(), verified:false, updatedAt:serverTimestamp()};
         await setDoc(doc(S.db,"contacts",S.uid), d); S.contact={...d};
         await setDoc(doc(S.db,"verifyReq",S.uid), {email, at:serverTimestamp()});
-        $("#obCodeBox").classList.remove("hide"); $("#obSend").textContent="Tekrar gönder";
-        $("#obMsg").textContent=`Kod ${email} adresine gidiyor; genelde 1-2 dakika sürer. Gereksiz klasörüne de bak.`; setTimeout(()=>$("#obCode").focus(),50);
+        $("#obCodeBox").classList.remove("hide"); $("#obSend").textContent="Kodu tekrar gönder"; $("#obSend").className="btn"; $("#obSend").style.cssText="width:100%;margin-top:8px";
+        $("#obMsg").textContent=`Kod ${email} adresine gidiyor; genelde 1-2 dakika sürer. Gereksiz (spam) klasörüne de bak.`; setTimeout(()=>$("#obCode").focus(),50);
       }catch(e){ $("#obMsg").textContent="İstek gönderilemedi, tekrar dene."; }
       $("#obSend").disabled=false; };
     $("#obOk").onclick=async()=>{ const code=$("#obCode").value.trim(); if(!/^\d{6}$/.test(code)) return $("#obMsg").textContent="Kod 6 rakam olmalı.";
       $("#obOk").disabled=true;
-      try{ const d={email:$("#obMail").value.trim(), remind:true, weekly:true, verified:true, code, updatedAt:serverTimestamp()};
-        await setDoc(doc(S.db,"contacts",S.uid), d); S.contact={...d, code:undefined}; renderBanners(); toast("Mail adresin onaylandı."); finishOnboard(); }
+      try{ const d={email:$("#obMail").value.trim(), ...prefs(), verified:true, code, updatedAt:serverTimestamp()};
+        await setDoc(doc(S.db,"contacts",S.uid), d); S.contact={...d, code:undefined}; renderBanners(); toast("Mail adresin onaylandı."); nextOnboard(5); }
       catch(e){ $("#obMsg").textContent="Kod yanlış ya da süresi dolmuş. Tekrar dene ya da yeni kod iste."; $("#obCode").value=""; $("#obCode")._paint(); }
       $("#obOk").disabled=false; };
   }
 }
-function finishOnboard(){ const first=S.onboard; S.onboard=false; S.obStep=null; closeSheet(); if(first) setTimeout(()=>openHow(), 350); }
+const needClub = () => !S.players[S.uid]?.club;
+const needMail = () => !(S.contact?.verified && S.contact?.email);
+function nextOnboard(done){
+  if(done<5 && needMail()) return openOnboard(5);
+  finishOnboard();
+}
+function finishOnboard(){ const first=S.onboard; S.onboard=false; S.obStep=null; obLock(false); closeSheet(); if(first) setTimeout(()=>openHow(), 350); }
+// Girişte: takım adı ya da onaylı mail eksikse zorunlu adımlar açılır (atlanamaz)
 function maybeAskMail(){
-  if(S.onboard || !S.contact || (S.contact.verified && S.contact.email)) return;
-  const t=+(lsGet("mailAsk")||0); if(Date.now()-t < 3*864e5) return;
-  setTimeout(()=>{ if($("#sheet").classList.contains("hide") && !S.onboard) openOnboard(5); }, 1800);
+  if(S.onboard || !S.contact) return;
+  if(!needClub() && !needMail()) return;
+  const go=(n=0)=>{ if(S.onboard || S.obStep) return;
+    if(!$("#sheet").classList.contains("hide")){ if(n<30) setTimeout(()=>go(n+1), 3000); return; }
+    allPlayers().catch(()=>{}).finally(()=>openOnboard(needClub() ? 4 : 5)); };
+  setTimeout(go, 1200);
 }
 
 // Nasıl oynanır: 3 kaydırmalı kart
