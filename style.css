@@ -1521,7 +1521,7 @@ button,a,[data-act],.plr,.pf-av,.pf-emo{touch-action:manipulation;-webkit-tap-hi
 .t-lb{grid-template-columns:24px 1fr 52px 40px 40px 34px}
 .t-br{grid-template-columns:1fr 54px 40px 50px 44px 34px}
 .th-f{margin:0 0 10px}
-.th-f .chip[aria-pressed="true"]{background:var(--pc,var(--ink));border-color:var(--pc,var(--ink));color:#fff}
+.th-f .chip[aria-pressed="true"]{background:color-mix(in srgb,var(--pc,var(--ink)) 26%,var(--panel));border-color:var(--pc,var(--ink));color:var(--ink);box-shadow:inset 0 0 0 1px var(--pc,var(--ink))}
 .th-grp{margin:0 0 12px}
 .th-grp>summary{display:flex;align-items:center;justify-content:space-between;gap:8px;list-style:none;cursor:pointer;padding:8px 4px;font-size:15px}
 .th-grp>summary::-webkit-details-marker{display:none}
@@ -1754,3 +1754,22 @@ button,a,[data-act],.plr,.pf-av,.pf-emo{touch-action:manipulation;-webkit-tap-hi
 .arch-t{padding:6px 12px}.arch-r{display:grid;grid-template-columns:34px 1fr 48px 44px 40px;gap:6px;padding:7px 0;border-bottom:1px solid var(--line);font-size:14px;align-items:center}
 .arch-r:last-child{border-bottom:0}.arch-h{font-size:11.5px;color:var(--muted);font-weight:700}
 [data-arch]{cursor:pointer}
+
+/* 1.9.1: zıtlık — renkli zeminde beyaz yazı her renkte okunsun */
+.tbtn[aria-pressed="true"] .tt b,.tbtn[aria-pressed="true"] .tt small,.tbtn[aria-pressed="true"] .sc{text-shadow:0 1px 2px rgba(0,0,0,.55)}
+.me-btn{text-shadow:0 1px 2px rgba(0,0,0,.5)}
+.chip:disabled{opacity:.45}
+.ps-f{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+.ps-sel{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted);font-weight:700}
+.ps-sel select{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:9px 10px;font:inherit;font-size:14px;font-weight:600}
+.ps-c{margin-bottom:8px}
+.ps-n{width:22px;text-align:right;color:var(--muted);font-size:12px;font-weight:700;flex:none}
+
+/* 1.9.1: renkli rozetlerde yazı rengi temaya göre */
+:root{--on-win:#fff;--on-lose:#fff}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--on-win:#062615;--on-lose:#2a0d07}}
+:root[data-theme="dark"]{--on-win:#062615;--on-lose:#2a0d07}
+.pt-badge.pos,.fo-flag:not(.lead):not(.minor),.pf-sw input:checked+span{color:var(--on-win)}
+.pt-badge.neg,.pill-n,.btn.armed{color:var(--on-lose)}
+.av-star,.conf-btn[aria-pressed="true"]{color:var(--on-amber,#1a1200)}
+.an-bank i.ok{color:var(--on-win)} .an-bank i.no{color:var(--on-lose)}

@@ -354,7 +354,7 @@ def injuries(db, out, day, games, inj):
 # ---------------------------------------------------------------- 2b) uzun vade uyarıları
 LT_NAMES = {"cfe": "kupa finalisti (Doğu)", "cfw": "kupa finalisti (Batı)", "e": "haftanın oyuncusu (Doğu)", "w": "haftanın oyuncusu (Batı)", "pe": "ayın oyuncusu (Doğu)", "pw": "ayın oyuncusu (Batı)",
             "re": "ayın çaylağı (Doğu)", "rw": "ayın çaylağı (Batı)", "de": "ayın savunmacısı (Doğu)", "dw": "ayın savunmacısı (Batı)",
-            "cmvp": "NBA Kupası MVP'si", "mvp": "MVP", "roy": "yılın çaylağı", "dpoy": "yılın savunmacısı", "mip": "en çok gelişen oyuncu", "smoy": "yılın 6. adamı"}
+            "cmvp": "NBA Kupası MVP'si", "mvp": "Most Valuable Player", "roy": "Rookie of the Year", "dpoy": "Defensive Player of the Year", "mip": "Most Improved Player", "smoy": "Sixth Man of the Year"}
 
 
 def lt_lock(k):
@@ -436,7 +436,7 @@ def lt_lock_mail(db, out):
     mk = "m_202611" if (y, m) in ((2026, 10), (2026, 11)) else f"m_{y}{m:02d}"
     nxt = (datetime.strptime(week_key(today), "%Y%m%d") + timedelta(days=7)).strftime("%Y%m%d")
     now = datetime.now(timezone.utc)
-    due = [k for k in ("w_" + week_key(today), "w_" + nxt, mk, "c_2026", "k_2027", "s_2027") if timedelta(0) < lt_lock(k) - now <= timedelta(hours=36)]
+    due = [k for k in ("w_" + week_key(today), "w_" + nxt, mk, "c_2026", "s_2027") if timedelta(0) < lt_lock(k) - now <= timedelta(hours=36)]
     if not due:
         return
     for uid, name, email in people(db, "remind"):

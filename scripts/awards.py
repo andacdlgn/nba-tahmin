@@ -177,7 +177,7 @@ def collect(dir_):
         if p:
             put("c_2026", "cmvp", p["id"], p["n"])
     # konferans sıralaması: normal sezon bitince (13 Nisan 2027'den sonra) ESPN puan durumundan ilk 8
-    if datetime.utcnow() >= datetime(2027, 4, 13):
+    if False:   # konferans sıralaması turu 1.9.1'de kaldırıldı
         try:
             import json as _j
             st = _j.loads(_text("https://site.web.api.espn.com/apis/v2/sports/basketball/nba/standings?level=2"))

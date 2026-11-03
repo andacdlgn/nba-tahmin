@@ -45,10 +45,11 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.9.0";
+const VERSION = "1.9.1";
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.9.1", d:"3 Kasım 2026", items:["Seçili düğmelerde okunmayan yazı rengi düzeldi.","NBA → Oyuncu ara: istediğin istatistiğe göre sırala; takım, konferans, çaylak ve bu gece oynayanlar filtreleri.","Sezon ödülleri gerçek adlarıyla; finalistler artık Eastern ve Western Conference Champion.","Uzun vadeden konferans sıralaması kaldırıldı.","Kurallar ve açıklamalar son değişikliklere göre güncellendi."]},
   {v:"1.9.0", d:"3 Kasım 2026", items:["Sakatlıklar artık sitenin her yerinde aynı kaynaktan geliyor; ESPN'in notunda \"oynamayacak\" yazan oyuncu da oynamıyor görünür.","Uzun vadeye NBA şampiyonu (+10) ve finalistler (+5) eklendi.","Üstte küçük arama: kişi, takım ya da oyuncu.","Maç kartında oynamayanların adları ve iki takımın son karşılaşması.","Profilde \"Puanların nereden geldi\" ve \"Sezon özeti\".","NBA → Oyuncular: iki oyuncuyu karşılaştır.","Sıralama: Sezon arşivi.","Takımım: kadroyu istediğin istatistiğe göre sırala."]},
   {v:"1.8.0", d:"3 Kasım 2026", items:["Yeni sekme: Takımım. Favori takımının maçları, takvimi, kadrosu, sakatları, takım liderleri ve ligin o takımdaki tahmin karnesi tek yerde.","Formda olanlar: sayı, ribaund, asist ve verimlilik kategorileri.","Takvim NBA sekmesinden Takımım'a taşındı."]},
   {v:"1.7.0", d:"3 Kasım 2026", items:["Gecenin sorusu artık 21 soruluk havuzdan geliyor; aynı soru 3 hafta boyunca tekrar etmiyor, bazıları zor (ör. biri 45 atar mı?).","Günün oyuncusu +3.","2 kat puanlı maçlarda yanan banko yine -1.","Fark baremleri: 1-3 · 4-7 · 8-12 · 13-19 · 20+.","Eşit puanda sıra: önce gece birinciliği, sonra kazanan puanı.","Ayın tahmincisi ödülü +1.","Hepsi 4 Kasım gecesinden itibaren geçerli; eski geceler değişmedi."]},
@@ -395,6 +396,7 @@ Object.assign(EN, {"Bu gece biri 33 ya da daha fazla sayı atar mı?": "Will any
 Object.assign(EN, {"Ekim-Kasım ödülleri": "October–November awards", "1 Aralık'ta açıklanır": "Announced December 1", "Ayın tahmincisi": "Predictor of the month", "Banko ustası": "Lock master", "Sürpriz avcısı": "Upset hunter", "Skorer ustası": "Scorer master", "Fark ustası": "Margin master", "Ayın en çok puan toplayanı": "Most points this month", "En yüksek banko isabeti (en az 4 banko)": "Best lock hit rate (min. 4 locks)", "ESPN'in favorisinin karşısına geçip en çok bilen": "Most correct picks against ESPN's favorite", "En skoreri en çok bilen": "Most top scorers right", "Farkı en çok tutturan": "Most margins right"});
 Object.assign(EN, {"Takımım": "My team", "Takımı değiştir": "Change team", "Favori takımını seç": "Pick your favorite team", "Takım liderleri": "Team leaders", "maç başına, bu sezon": "per game, this season", "Top çalma + blok": "Steals + blocks", "Saha içi %": "FG %", "Üçlük %": "3P %", "Ligin bu takımdaki tahminleri": "The league's picks on this team", "biten maçlar": "finished games", "tahminlerde bu takım seçildi": "of picks chose this team", "kazanan doğru bilindi": "winner called right", "Takvim": "Calendar", "Verimlilik": "Efficiency", "Ribaund": "Rebounds", "Asist": "Assists", "Sayı": "Points", "Bu kategoride şu an öne çıkan oyuncu yok.": "No standout players in this category right now.", "Takvime şu an ulaşılamıyor.": "Calendar is unavailable right now.", "Bu takımın maçları bittikçe ligin karnesi burada görünecek.": "The league's record on this team will appear as games finish.", "Favori takımını seçersen bu sekmede o takımın maçları, takvimi, kadrosu ve istatistikleri görünür.": "Pick a favorite team to see its games, calendar, roster and stats here."});
 Object.assign(EN, {"Ara": "Search", "Kişi, takım ya da oyuncu": "Person, team or player", "En az 2 harf yaz.": "Type at least 2 letters.", "Ligdekiler": "League", "Takımlar": "Teams", "Oyuncular": "Players", "Sonuç yok.": "No results.", "Puanların nereden geldi": "Where your points came from", "Sezon özeti": "Season recap", "✨ Sezon özeti": "✨ Season recap", "Paylaş": "Share", "gece oynadı": "nights played", "kazananı bilme": "winners right", "en iyi gece": "best night", "üst üste doğru kazanan": "correct winners in a row", "tutan banko": "locks hit", "favorinin tersine bildi": "upsets called", "⚖️ İki oyuncuyu karşılaştır": "⚖️ Compare two players", "Oyuncu karşılaştır": "Compare players", "Oyuncu seç": "Pick a player", "İki oyuncu seç.": "Pick two players.", "Bu sezonun biten maçlarından, maç başına.": "Per game, from this season's finished games.", "Son 5 maç sayı": "Points, last 5", "Maç": "Games", "Top çalma": "Steals", "Blok": "Blocks", "📚 Sezon arşivi": "📚 Season archive", "Sezon arşivi": "Season archive", "‹ Bütün sezonlar": "‹ All seasons", "Ödüller": "Awards", "Oyuncu": "Player", "Puan": "Pts", "Gece": "Nights", "UV": "LT", "NBA şampiyonu": "NBA champion", "Finalist · Doğu": "Finalist · East", "Finalist · Batı": "Finalist · West", "Bu sezon henüz karşılaşmadılar.": "They haven't met this season.", "Eksik oyuncu yok": "No players out", "Oynamıyor": "Out", "Belirsiz": "Questionable", "Cezalı": "Suspended", "Kadro": "Roster", "Henüz biten bir lig yok. Yönetim panelinden \"Ligi sıfırla / yeni sezon\" yapıldığında biten lig puan tablosu, gece birincilikleri, uzun vade puanları ve ödülleriyle burada saklanır.": "No finished league yet. When the admin starts a new season, the finished league's standings, night wins, long-term points and awards are saved here."});
+Object.assign(EN, {"Most Valuable Player (MVP)": "Most Valuable Player (MVP)", "Coach of the Year (takımı seç)": "Coach of the Year (pick the team)", "Sırala": "Sort", "Takım": "Team", "Bütün takımlar": "All teams", "Hepsi": "All", "Doğu": "East", "Batı": "West", "Çaylaklar": "Rookies", "Bu filtrelerde oyuncu yok.": "No players match these filters.", "Maç başı üçlük": "3PM per game", "Bu gece maç yok": "No games tonight", "NBA Kupası": "NBA Cup", "Uzun vade": "Long-term", "Aylık lig ödülleri": "Monthly league awards", "Tamam": "OK"});
 EN_RX.push(
   [/^🏀 Zirvede (.+) var: (\d+) puan\. (.+) (\d+) puan geride\.$/, "🏀 $1 leads with $2 pts. $3 is $4 behind."],
   [/^🏀 Zirvede ortalık karışık: (.+) ve (.+) (\d+) puanla berabere\.?$/, "🏀 It's tight at the top: $1 and $2 tied on $3 pts."],
@@ -1698,7 +1700,9 @@ function openRules(){
     <h4>Günün oyuncusu</h4>
     <p>O gecenin bütün maçları arasından bir oyuncu seçersin. Gecenin en çok sayı atan oyuncusu o olursa <b>+3</b>.</p>
     <h4>Gecenin sorusu</h4>
-    <p>Her gece evet ya da hayır diye cevaplanan bir soru gelir (ör. "Bu gece uzatmaya giden maç olur mu?"). Doğru cevap <b>+1</b>. Sonuç, gecenin maçları bitince belli olur.</p>
+    <p>Her gece evet ya da hayır diye cevaplanan bir soru gelir (ör. "Bu gece biri 45 sayı atar mı?"). Doğru cevap <b>+1</b>. Sorular 21 soruluk bir havuzdan sırayla gelir, aynı soru 21 gün içinde tekrar etmez. Sonuç, gecenin maçları bitince (bazı sorularda koşul gerçekleştiği anda) belli olur.</p>
+    <h4>NBA Kupası</h4>
+    <p>4 Kasım'dan itibaren NBA Kupası maçları altın şeritle işaretlenir ve <b>2 kat puan</b> getirir. Tutan banko +4, yanan banko yine -1.</p>
     <h4>Playoff serileri</h4>
     <p>Playoff'ta her seri başlamadan önce seriyi kimin kaç maçta kazanacağını tahmin edersin. Kazananı bilirsen <b>+3</b>, maç sayısını da bilirsen <b>+2</b> daha. Tahminler serinin ilk maçı başlayınca kilitlenir.</p>
     <h4>Fark aralıkları</h4>
@@ -1708,9 +1712,13 @@ function openRules(){
     <h4>Eşitlikler</h4>
     <p>Birden fazla oyuncu aynı en yüksek sayıyı atarsa bunlardan birini seçen herkes bilmiş sayılır.</p>
     <h4>Gece, hafta, sezon</h4>
-    <p>Gecenin en çok puanını tek başına alan, o geceyi kazanır. Toplam puanı eşit olanlarda önce daha çok gece kazanan, o da eşitse daha çok kazanan puanı olan öne geçer. Haftalar pazartesi başlar, pazar biter. Sezon puanı bütün gecelerin toplamıdır. <b>Playoff'ta bütün puanlar iki katına çıkar.</b></p>
+    <p>Gecenin en çok puanını tek başına alan, o geceyi kazanır. Toplam puanı eşit olanlarda önce daha çok gece kazanan, o da eşitse daha çok kazanan puanı olan öne geçer. Haftalar pazartesi başlar, pazar biter. Sezon puanı bütün gecelerin, uzun vade tahminlerinin ve aylık lig ödüllerinin toplamıdır. <b>Playoff'ta bütün puanlar iki katına çıkar</b> (yanan banko yine -1).</p>
+    <h4>Uzun vade</h4>
+    <p>Haftanın oyuncusu, ayın ödülleri, NBA Kupası ve sezon ödülleri için önceden tahmin yaparsın; ayrıntılar Uzun Vade sekmesinde. Doğru tahminler ana sıralamaya eklenir.</p>
+    <h4>Aylık lig ödülleri</h4>
+    <p>Her ay sonunda Ayın tahmincisi <b>+1</b>; Banko ustası, Sürpriz avcısı, Skorer ustası ve Fark ustası <b>+2</b>'şer puan alır. Eşitlikte ödülü paylaşanların hepsi puanı alır. Ekim ve Kasım tek ay sayılır.</p>
     <h4>Yeni oyuncu</h4>
-    <p>Siteye girip "Yeni oyuncu" sekmesinde adını, güvenlik sorusunun cevabını, 6 haneli şifreni ve davet kodunu girerek katılırsın.</p>
+    <p>Siteye girip "Yeni oyuncu" sekmesinde adını, 6 haneli şifreni, güvenlik sorusunun cevabını ve davet kodunu girerek katılırsın; davet bağlantısıyla gelirsen kod sorulmaz. Sonra takım adını (zorunlu), favori takımını ve avatarını seçersin. Mail adresini onaylamak isteğe bağlıdır ama onaylı adres olmadan hatırlatma maili gelmez ve şifreni kodla sıfırlayamazsın.</p>
     <h4>Yorumlar</h4>
     <p>Maçlar kilitlendikten sonra her maça emoji bırakabilir ya da kısa bir yorum yazabilirsin. Küfür ve hakaret yazılamaz.</p>
     <p class="muted" style="margin-top:18px;font-size:12px;text-align:center">Sürüm ${VERSION}</p></div>`);
@@ -2892,6 +2900,14 @@ function teamsGridHTML(){
   return `<div class="tm-grid">${teams.map(t=>{ const e=all.find(x=>x.team.abbreviation===t.a);
     return `<button class="tg" data-tp="${t.a}" style="--tc:${tcol(t.a)}"><span class="tg-l"><img src="${LOGO_SMALL(t.a)}" alt=""></span><b>${esc(t.n.split(" ").slice(-1)[0])}</b><small class="tnum">${e?wlOf(e):""}</small></button>`; }).join("")}</div>`;
 }
+// Oyuncu aramasında sıralanabilen istatistikler: [etiket, değer, gösterim, en az şart]
+const PS_STATS = {
+  pts:["Sayı", p=>p.pts/p.gp, v=>v.toFixed(1)], reb:["Ribaund", p=>p.reb/p.gp, v=>v.toFixed(1)], ast:["Asist", p=>p.ast/p.gp, v=>v.toFixed(1)],
+  stl:["Top çalma", p=>(p.stl||0)/p.gp, v=>v.toFixed(1)], blk:["Blok", p=>(p.blk||0)/p.gp, v=>v.toFixed(1)],
+  eff:["Verimlilik", p=>(p.pts+p.reb+p.ast+(p.stl||0)+(p.blk||0)-((p.fga||0)-(p.fgm||0)))/p.gp, v=>v.toFixed(1)],
+  fg:["Saha içi %", p=>(p.fga||0)>=5*p.gp ? p.fgm/p.fga*100 : null, v=>"%"+v.toFixed(1)], tp:["Üçlük %", p=>(p.tpa||0)>=2*p.gp ? p.tpm/p.tpa*100 : null, v=>"%"+v.toFixed(1)],
+  tpm:["Maç başı üçlük", p=>(p.tpm||0)/p.gp, v=>v.toFixed(1)], l5:["Son 5 maç sayı", p=>p.l5?.length ? p.l5.reduce((a,b)=>a+b,0)/p.l5.length : null, v=>v.toFixed(1)], gp:["Maç", p=>p.gp, v=>String(v)],
+};
 function playersHTML(){
   const D=S.days[S.today], tonight=D?.games.length ? new Set(D.games.flatMap(g=>[g.home.abbr,g.away.abbr])) : new Set();
   // formda olanlar: son 5 maç ortalaması sezon ortalamasından en çok yüksek olanlar (bu gece oynayanlar arasında)
@@ -2905,18 +2921,31 @@ function playersHTML(){
     .filter(x=>!tonight.size || tonight.has(x.p.t)).filter(x=>x.l5>=fMin).sort((a,b)=>b.d-a.d).slice(0,6);
   const fchips=`<div class="chips fm-cat">${Object.entries(FC).map(([k,[l]])=>`<button class="chip" data-fcat="${k}" aria-pressed="${k===fc}">${l}</button>`).join("")}</div>`;
   const formHTML = form.length ? `<div class="sec-title"><h2 style="font-size:20px">Formda olanlar</h2><span class="aside">${tonight.size?"bu gece oynayanlar":"son 5 maç"}</span></div>${fchips}<div class="form-list">${form.map(x=>`<button class="fm" data-ath="${x.id}"><img src="${FACE(x.id)}" alt="" loading="lazy"><b>${esc(x.p.n.split(" ").slice(-1)[0])}</b><small>${esc(x.p.t)}</small><em class="tnum">${x.l5.toFixed(1)}</em><span class="fm-d">▲ ${x.d.toFixed(1)}</span></button>`).join("")}</div><small class="muted">Son 5 maçtaki ${fl.toLocaleLowerCase("tr")} ortalaması; ▲ sezon ortalamasından ne kadar yüksek olduğu.${fc==="eff"?" Verimlilik: sayı + ribaund + asist + top çalma + blok − kaçan şut.":""}</small>` : fchips+'<div class="note">Bu kategoride şu an öne çıkan oyuncu yok.</div>';
+  const f=S.nba, teams=(ALLP?.teams||[]).slice().sort((a,b)=>a.n.localeCompare(b.n,"tr"));
   return `${formHTML}<button class="btn" id="pcmpBtn" type="button" style="width:100%;margin-top:14px">⚖️ İki oyuncuyu karşılaştır</button><div class="sec-title"><h2 style="font-size:20px">Oyuncu ara</h2></div>
-    <div class="chips"><button class="chip" data-ntonight="0" aria-pressed="${!S.nba.tonight}">Bütün oyuncular</button><button class="chip" data-ntonight="1" aria-pressed="${S.nba.tonight}" ${tonight.size?"":"disabled"}>Bu gece oynayanlar</button></div>
+    <div class="ps-f">
+      <label class="ps-sel"><span>Sırala</span><select id="psSort">${Object.entries(PS_STATS).map(([k,[l]])=>`<option value="${k}" ${k===(f.sort||"pts")?"selected":""}>${l}</option>`).join("")}</select></label>
+      <label class="ps-sel"><span>Takım</span><select id="psTeam"><option value="">Bütün takımlar</option>${teams.map(t=>`<option value="${t.a}" ${t.a===f.team?"selected":""}>${esc(t.n)}</option>`).join("")}</select></label>
+    </div>
+    <div class="chips ps-c">${[["","Hepsi"],["E","Doğu"],["W","Batı"]].map(([k,l])=>`<button class="chip" data-pconf="${k}" aria-pressed="${(f.conf||"")===k}">${l}</button>`).join("")}
+      <button class="chip" data-prook="1" aria-pressed="${!!f.rookie}">Çaylaklar</button><button class="chip" data-ntonight="1" aria-pressed="${!!f.tonight}">Bu gece oynayanlar</button></div>
     <input class="search" id="nbaSearch" placeholder="Oyuncu adı yaz (ör. Curry)" autocomplete="off" value="${esc(S.nba.q)}"><div id="nbaPl" class="pl-list"></div>`;
 }
 function bindPlayerSearch(){
   const D=S.days[S.today], tonight=new Set((D?.games||[]).flatMap(g=>[g.home.abbr,g.away.abbr]));
-  const paint=()=>{ const q=slug(S.nba.q||""); let list=(ALLP?.players||[]).map(p=>({...p, ppg:ppg(p.id)}));
+  const k=PS_STATS[S.nba.sort]?S.nba.sort:"pts", [lab,fv,fm]=PS_STATS[k];
+  const paint=()=>{ const q=slug(S.nba.q||""); let list=(ALLP?.players||[]).map(p=>{ const st=S.pstats?.[p.id]; return {...p, v: st&&st.gp ? fv(st) : null}; });
     if(S.nba.tonight) list=list.filter(p=>tonight.has(p.t));
+    if(S.nba.team) list=list.filter(p=>p.t===S.nba.team);
+    if(S.nba.conf) list=list.filter(p=>confOf(p.t)===S.nba.conf);
+    if(S.nba.rookie) list=list.filter(p=>p.r);
     if(q) list=list.filter(p=>slug(p.n).includes(q));
-    list.sort((a,b)=>(b.ppg??-1)-(a.ppg??-1)); list=list.slice(0, q?40:25);
-    $("#nbaPl").innerHTML = list.length ? list.map(p=>`<button class="plr" data-ath="${p.id}"><img src="${FACE(p.id)}" alt="" loading="lazy"><span class="pi"><b>${esc(p.n)}</b><small>${esc(p.t)}</small></span><span class="ppg">${p.ppg!=null?p.ppg.toFixed(1):"–"}<small>sayı ort.</small></span></button>`).join("") : `<p class="muted">Oyuncu bulunamadı.</p>`; };
+    list.sort((a,b)=>(b.v??-1)-(a.v??-1)); list=list.slice(0, q||S.nba.team?60:30);
+    $("#nbaPl").innerHTML = list.length ? list.map((p,n)=>`<button class="plr" data-ath="${p.id}"><span class="ps-n">${n+1}</span><img src="${FACE(p.id)}" alt="" loading="lazy"><span class="pi"><b>${esc(p.n)}${injBadge(p.id)}</b><small>${esc(p.t)}${p.r?" · çaylak":""}</small></span><span class="ppg">${p.v!=null?fm(p.v):"–"}<small>${esc(lab.toLocaleLowerCase("tr"))}</small></span></button>`).join("") : '<p class="muted">Bu filtrelerde oyuncu yok.</p>';
   $("#nbaSearch").oninput=e=>{ S.nba.q=e.target.value; paint(); };
+  $("#psSort").onchange=e=>{ S.nba.sort=e.target.value; renderNBA(); };
+  $("#psTeam").onchange=e=>{ S.nba.team=e.target.value; renderNBA(); };
+  if(!S.inj) loadInj().then(()=>{ if($("#nbaPl")) paint(); }).catch(()=>{});
   paint();
 }
 // Oyuncu kartı: sezon ortalamaları, son 5 maç, sıradaki maç
@@ -2972,7 +3001,12 @@ $("#nba")?.addEventListener("click", e=>{
   const s1=e.target.closest("[data-nsub]"); if(s1){ S.nba.sub=s1.dataset.nsub; return renderNBA(); }
   const v=e.target.closest("[data-nview]"); if(v){ S.nba.view=v.dataset.nview; return renderNBA(); }
   const c=e.target.closest("[data-ncat]"); if(c){ S.nba.cat=c.dataset.ncat; return renderNBA(); }
-  const t=e.target.closest("[data-ntonight]"); if(t && !t.disabled){ S.nba.tonight=t.dataset.ntonight==="1"; return renderNBA(); }
+  const t=e.target.closest("[data-ntonight]");
+  if(t){ const D=S.days[S.today];
+    if(!S.nba.tonight && !D?.games.length){ openSheet(`<h3 id="shTitle">Bu gece maç yok</h3><p>Bu gece NBA'de maç oynanmıyor, o yüzden "Bu gece oynayanlar" listesi boş olurdu. Liste bütün oyuncuları göstermeye devam ediyor.</p><button class="btn-primary" type="button" onclick="document.getElementById('shClose').click()">Tamam</button>`); return; }
+    S.nba.tonight=!S.nba.tonight; return renderNBA(); }
+  const pc=e.target.closest("[data-pconf]"); if(pc){ S.nba.conf=pc.dataset.pconf; return renderNBA(); }
+  const pr=e.target.closest("[data-prook]"); if(pr){ S.nba.rookie=!S.nba.rookie; return renderNBA(); }
 });
 
 /* ====================================================== Uzun vadeli tahminler (haftanın, ayın oyuncusu, sezon ödülleri) */
@@ -2984,7 +3018,8 @@ const LT_CATS = {
   m: [["pe","Ayın oyuncusu · Doğu",4,"E"],["pw","Ayın oyuncusu · Batı",4,"W"],["re","Ayın çaylağı · Doğu",3,"E"],["rw","Ayın çaylağı · Batı",3,"W"],["de","Ayın savunmacısı · Doğu",3,"E"],["dw","Ayın savunmacısı · Batı",3,"W"]],
   k: [1,2,3,4,5,6].flatMap(i=>[["e"+i,`Doğu ${i}.`,2,"TE"],["w"+i,`Batı ${i}.`,2,"TW"]]).sort((a,b)=>a[0].localeCompare(b[0])),
   c: [["cw","NBA Kupası şampiyonu",8,"T"],["cfe","Kupa finalisti · Doğu",3,"TE"],["cfw","Kupa finalisti · Batı",3,"TW"],["cmvp","NBA Kupası MVP'si",6,""]],
-  s: [["mvp","MVP",12,""],["roy","Yılın çaylağı",8,""],["dpoy","Yılın savunmacısı",8,""],["mip","En çok gelişen",8,""],["smoy","Yılın 6. adamı",8,""],["coy","Yılın koçu (takımı seç)",8,"T"],["champ","NBA şampiyonu",10,"T"],["fe","Finalist · Doğu",5,"TE"],["fw","Finalist · Batı",5,"TW"]],
+  s: [["mvp","Most Valuable Player (MVP)",12,""],["roy","Rookie of the Year",8,""],["dpoy","Defensive Player of the Year",8,""],["mip","Most Improved Player",8,""],["smoy","Sixth Man of the Year",8,""],["coy","Coach of the Year (takımı seç)",8,"T"],
+      ["champ","NBA Champion",10,"T"],["fe","Eastern Conference Champion",5,"TE"],["fw","Western Conference Champion",5,"TW"]],
 };
 const LT_SWAP_END = Date.UTC(2027,2,1);
 const ltType = k => k[0];
@@ -3008,7 +3043,7 @@ function ltRounds(){
   const wk=weekKey(S.today), now=new Date();
   const mk=(y,m)=> (y===2026 && (m===10||m===11)) ? "m_202611" : `m_${y}${String(m).padStart(2,"0")}`;
   const y=+S.today.slice(0,4), m=+S.today.slice(4,6), pm=m===1?[y-1,12]:[y,m-1];
-  const keys=["w_"+wk, "w_"+shiftDay(wk,-7), mk(y,m), mk(...pm), "c_2026", "k_2027", "s_2027"];
+  const keys=["w_"+wk, "w_"+shiftDay(wk,-7), mk(y,m), mk(...pm), "c_2026", "s_2027"];
   return [...new Set(keys)].filter(k=>k>="w_20261102" || k[0]!=="w").filter(k=>k!=="m_202610");
 }
 S.lt = {mine:{}, all:{}, res:{}, loaded:false};
@@ -3089,8 +3124,7 @@ function renderUzun(){
     · Haftanın oyuncusu (Doğu ve Batı): çarşamba gecesi kilitlenir, doğru tahmin +2.<br>
     · Ayın oyuncusu +4, ayın çaylağı +3, ayın savunmacısı +3 (Doğu ve Batı ayrı): her ayın 15'inde 20.00'de kilitlenir. İlk tur Ekim-Kasım.<br>
     · NBA Kupası: şampiyon takım +8, Doğu ve Batı finalisti +3'er, kupanın MVP'si +6. 4 Aralık 20.00'de, çeyrek finallerden önce kilitlenir.<br>
-    · Konferans sıralaması: Doğu ve Batı'nın ilk 6'sını sırala. Tam yerinde biten her takım +2, bir sıra şaşan +1. 1 Aralık 20.00'de kilitlenir.<br>
-    · Sezon ödülleri: MVP +12; yılın çaylağı, savunmacısı, en çok gelişen, 6. adam ve koçu +8. 15 Ocak 20.00'de kilitlenir.<br>
+    · Sezon ödülleri: Most Valuable Player +12; Rookie of the Year, Defensive Player of the Year, Most Improved Player, Sixth Man of the Year ve Coach of the Year +8; NBA Champion +10; Eastern ve Western Conference Champion +5'er. 15 Ocak 20.00'de kilitlenir.<br>
     · Seçtiğin oyuncu 65 maç kuralına takılırsa 1 Mart'a kadar bir kere değiştirebilirsin; değişen seçim puanın yarısını alır.<br>
     · Seçimler kilitten sonra herkese açılır.</div>`;
 }
@@ -3702,8 +3736,7 @@ function paintJoin(){
   }
 }
 
-// Katıldıktan sonra: 4) takım adı + favori takım + avatar, 5) mail (onay kodu zorunlu).
-// Takım adı ve onaylı mail zorunlu: eksik olan eski oyunculara da girişte sorulur, atlanamaz.
+// Katıldıktan sonra: 4) takım adı + favori takım + avatar (takım adı zorunlu), 5) mail onayı (isteğe bağlı, atlanabilir).
 const obLock = on => { S.sheetLocked=on; $("#shClose").classList.toggle("hide", on); };
 function openOnboard(step){
   S.obStep=step;
@@ -3801,7 +3834,7 @@ function openHow(){
   const sl=[
     ["🏀","Her gece tahmin yap","Her maç için kazananı, farkı ve en çok sayı atacak oyuncuyu seç. Her doğru +1. Bir maçı banko yap: tutarsa +2, tutmazsa -1. Her maç başlamadan 10 dakika önce kilitlenir."],
     ["🏆","Puan topla, zirveye çık","Günün oyuncusu +3, gecenin sorusu +1. Gecenin ve haftanın kazananı tahtada taç ve yıldızla görünür; rozetler topla. Tahminler sekmesinde kimin neyi seçtiğini maç maç gör."],
-    ["📅","Uzun vadeyi kaçırma","Haftanın ve ayın oyuncusunu, sezon sonu ödüllerini önceden tahmin et. Doğru tahminler ana sıralamaya büyük puan olarak eklenir."]];
+    ["📅","Uzun vadeyi kaçırma","Haftanın ve ayın oyuncusunu, NBA Kupası'nı, sezon ödüllerini ve NBA şampiyonunu önceden tahmin et. Doğru tahminler ana sıralamaya büyük puan olarak eklenir."]];
   openSheet(`<h3 id="shTitle" class="sr">Nasıl oynanır?</h3><div class="how" id="how">${sl.map(([e,t,d])=>`<div class="how-s"><div class="how-e">${e}</div><h3>${t}</h3><p>${d}</p></div>`).join("")}</div>
     <div class="how-dots" id="howDots">${sl.map((_,i)=>`<i class="${i?"":"on"}"></i>`).join("")}</div><button class="btn-primary" id="howNext" type="button">Devam</button>`);
   const how=$("#how"), idx=()=>Math.round(how.scrollLeft/how.clientWidth);
@@ -3935,7 +3968,7 @@ function paintProfile(){
       <div class="pf-teams"><button class="pf-tm none" data-tm="" aria-pressed="${!me.favTeam}">Yok</button>${teams.map(t=>`<button class="pf-tm" data-tm="${t.a}" aria-pressed="${me.favTeam===t.a}" title="${esc(t.n)}"><img src="${LOGO_SMALL(t.a)}" alt="${esc(t.n)}"></button>`).join("")}</div></div>
     <div class="pf-sec"><h4>Site renkleri</h4><div class="seg2 pf-theme"><button data-th="default" aria-pressed="${me.theme!=="team"}">Varsayılan</button><button data-th="team" aria-pressed="${me.theme==="team"}" ${me.favTeam?"":"disabled"}>Favori takımım</button></div>
       <small class="muted">${me.favTeam?"Üst alan ve vurgu renkleri takımının renklerine geçer. Yalnızca sende görünür.":"Önce bir favori takım seç."}</small></div>
-    <div class="pf-sec"><h4>Hatırlatma maili</h4><small class="muted" style="margin:0 0 8px">Tahminin eksikse her akşam 21.00'de (ilk maç daha erkense maçtan 1 saat önce), seçtiğin oyuncu (maç skoreri, günün oyuncusu ya da uzun vade seçimin) sakatlanırsa ya da 65 maç kuralına takılırsa hemen mail gelir. Mail gelmesi için adresini bir kez onaylaman gerekir. Adresini yalnızca sen görürsün.</small>
+    <div class="pf-sec"><h4>Hatırlatma maili</h4><small class="muted" style="margin:0 0 8px">Günde en fazla bir özet maili gelir: akşam 21.00'de (ilk maç daha erkense maçtan 1 saat önce) eksik tahminlerin, seçtiğin oyuncuların sakatlıkları ve uzun vade haberleri tek mailde. Özetten sonra acil bir şey çıkarsa (bu geceki seçimin oynamıyor, uzun vade kilidine birkaç saat kaldı) o gün en fazla bir ek mail gelir. Mail gelmesi için adresini bir kez onaylaman gerekir. Adresini yalnızca sen görürsün.</small>
       <div class="pf-mail"><input id="pfMail" type="email" inputmode="email" autocomplete="email" placeholder="ornek@gmail.com" value="${esc(S.contact?.email||"")}"><span class="mail-st" id="pfMailSt"></span></div>
       <div id="pfOtp" class="pf-otp hide"><small class="muted" id="pfOtpMsg"></small>
         <div class="adm-row"><input id="pfCode" class="adm-in otp-in" inputmode="numeric" maxlength="6" placeholder="6 haneli kod" autocomplete="one-time-code"><button class="btn" id="pfCodeOk" type="button">Onayla</button></div>
@@ -4023,7 +4056,7 @@ function paintMe(){ const p=S.players[S.uid]||{}; const img=avImg(p.av); $("#me"
 function applyTheme(){
   if(S.uid) paintMe();
   const r=document.documentElement.style, me=S.uid && S.players[S.uid];
-  const keys=["--board","--board-2","--board-line","--amber","--amber-ink","--amber-soft"];
+  const keys=["--board","--board-2","--board-line","--amber","--amber-ink","--amber-soft","--on-amber"];
   const tc = me && me.theme==="team" && TEAM_COL[me.favTeam];
   if(!tc){ keys.forEach(k=>r.removeProperty(k)); $('meta[name="theme-color"]')?.setAttribute("content","#0f1620"); return; }
   const [c1,c2] = tc.map(h=>"#"+h);
@@ -4033,6 +4066,7 @@ function applyTheme(){
   r.setProperty("--board-2", `color-mix(in srgb, ${c1} 30%, #18222e)`);
   r.setProperty("--board-line", `color-mix(in srgb, ${c1} 35%, #2a3646)`);
   r.setProperty("--amber", acc);
+  r.setProperty("--on-amber", lum(acc.slice(1)) > .28 ? "#1a1200" : "#fff");   // vurgu renginin üstündeki yazı okunsun
   r.setProperty("--amber-ink", isDark() ? acc : `color-mix(in srgb, ${acc} 70%, #000)`);
   r.setProperty("--amber-soft", `color-mix(in srgb, ${acc} 18%, var(--panel))`);
   // tarayıcı çubuğunun rengi
