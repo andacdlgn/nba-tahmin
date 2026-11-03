@@ -10,6 +10,8 @@ import { getFirestore, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, colle
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
 const TZ = "Europe/Istanbul";
+const UI_EN = (()=>{ try{ return localStorage.getItem("lang")==="en"; }catch(e){ return false; } })();
+const LOC = UI_EN ? "en-US" : "tr-TR";
 const Q = new URLSearchParams(location.search);
 const ESPN_BASES = Q.get("espn") ? [Q.get("espn")] :
   ["https://site.web.api.espn.com/apis/site/v2/sports/basketball/nba", "https://site.api.espn.com/apis/site/v2/sports/basketball/nba"];
@@ -34,15 +36,16 @@ const parseYmd = s => new Date(Date.UTC(+s.slice(0,4), +s.slice(4,6)-1, +s.slice
 const shiftDay = (s, n) => { const d = parseYmd(s); d.setUTCDate(d.getUTCDate()+n); return ymd(d); };
 // "Bugün" = bu akşamın maçları. Türkiye saatiyle 08.00'e kadar dün gecenin maçları, sonra bu akşamınkiler.
 const espnToday = () => new Date(Date.now()-8*36e5).toLocaleDateString("sv-SE",{timeZone:"Europe/Istanbul"}).replaceAll("-","");
-const timeTR = d => d.toLocaleTimeString("tr-TR",{timeZone:TZ,hour:"2-digit",minute:"2-digit"});
-const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s).toLocaleDateString("tr-TR",{timeZone:"UTC",...o});
+const timeTR = d => d.toLocaleTimeString(LOC,{timeZone:TZ,hour:"2-digit",minute:"2-digit"});
+const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s).toLocaleDateString(LOC,{timeZone:"UTC",...o});
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.5.0";
+const VERSION = "1.5.1";
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.5.1", d:"3 Kasım 2026", items:["İngilizce arayüz büyük ölçüde tamamlandı: tarihler, kayan şerit, gecenin manşeti, hata mesajları ve açıklamalar da çevriliyor."]},
   {v:"1.5.0", d:"3 Kasım 2026", items:[
     "Tahminler sekmesinin üstünde gecenin özeti: en iyi tahmin, en çok yanılan, en çok seçilen takım ve bankoların durumu.",
     "Çoğunluktan ayrıldığın maçlarda \"Sen tek başına … dedin\" ya da \"Azınlıktasın\" etiketi.",
@@ -229,6 +232,160 @@ const EN_RX = [
   [/^Seçimler (.+)'de açılır$/, "Picks open at $1"], [/^Sürüm (.+) · Yenilikler$/, "Version $1 · What's new"], [/^Sürüm (.+)$/, "Version $1"],
   [/^Adım (\d)\/5 · (.+)$/, "Step $1/5"], [/^(\d+) maç bu gece$/, "$1 games tonight"],
 ];
+Object.assign(EN, {
+"(günün oyuncusu)":"(player of the night)","Günün oyuncusunu da bildi.":"Also called the player of the night.","· NBA Kupası (2× puan)":"· NBA Cup (2× points)",
+". Sonuç, gecenin maçları bitince belli olur.":". Settled when the night's games end.",". Üçünü de doldurup \"Tahmini kaydet\"e basman gerekir.":". Fill in all three and tap \"Save pick\".",
+"1-5 · 6-10 · 11-15 · 16+. Uzatmaya giden maçlarda da son skordaki fark geçerlidir. Fark puanını almak için kazananı da bilmen gerekir.":"1-5 · 6-10 · 11-15 · 16+. In overtime games the final margin counts. You must also get the winner right to earn the margin point.",
+"2× puan":"2× points","3 puan":"3 pts","6 haneli şifre":"6-digit PIN","7-10: play-in":"7-10: play-in","ABD tarihi":"US date","AST":"AST",
+"Ad büyük harfle başlamalı (ör. Andaç).":"Name must start with a capital letter.","Ad ya da şifre yanlış.":"Wrong name or PIN.","Adda yalnızca harf, rakam, boşluk ve . - ' olabilir.":"Names can only contain letters, digits, spaces and . - '",
+"Adım":"Step","Adını yaz.":"Type your name.","Anladım":"Got it","Ara: ör. Curry":"Search: e.g. Curry","Aralık":"December","Ast":"Ast","Attığı sayı":"Points scored","Attığı sayı (ort.)":"Points scored (avg)",
+"Avatarında logosu görünür. Güvenlik sorusundan bağımsızdır.":"Its logo shows on your avatar. Separate from your security question.","Ayak bileği":"Ankle","Aynı harfi art arda bu kadar çok yazma.":"Too many repeated letters.",
+"Az önce kod gönderildi; 2 dakika sonra tekrar dene.":"A code was just sent; try again in 2 minutes.","Açık maç kalmadı.":"No open games left.","Açık moda geç":"Switch to light mode","Ağustos":"August",
+"Aşağıdan birkaç adımda katılabilirsin.":"Join below in a few steps.","Baldır":"Calf","Banko gecenin ilk maçından 10 dk önce kilitlendi.":"The lock pick closed 10 min before the first game.","Banko seçildi.":"Lock pick set.",
+"Banko seçilmedi":"No lock pick","Bankon hazır, umarım tutar.":"Lock pick set, good luck.","Bankoyu başka maça taşıyabilirsin; kaldırılamaz.":"You can move your lock pick to another game, but not remove it.",
+"Batı":"West","Batı A":"West A","Batı B":"West B","Batı C":"West C","Başka bir gece…":"Another night…","Berabere":"Tie","Bilgilere şu an ulaşılamıyor.":"Info unavailable right now.",
+"Bir maçtan alınabilecek en yüksek puan":"Max points from one game","Bir takım adı yaz.":"Type a team name.","Bir tarih seç.":"Pick a date.","Biraz daha ayrıntı yaz.":"Add a bit more detail.",
+"Birden fazla oyuncu aynı en yüksek sayıyı atarsa bunlardan birini seçen herkes bilmiş sayılır.":"If several players tie for top scorer, picking any of them counts.",
+"Bu ad alınmış.":"That name is taken.","Bu ad alınmış. Giriş sekmesinden gir ya da başka bir ad seç.":"That name is taken. Log in instead or pick another name.","Bu ad alınmış. Sen isen Giriş sekmesinden gir.":"That name is taken. If it's you, log in.",
+"Bu ad uygun değil. Küfür, argo ya da hakaret içermeyen bir ad seç.":"That name isn't allowed. Pick one without profanity or insults.","Bu adla bir oyuncu bulunamadı.":"No player with that name.",
+"Bu adla bir oyuncu bulunamadı. Adı kayıttaki gibi yazdığından emin ol.":"No player with that name. Check the spelling.","Bu adla oyuncu yok. Yeni oyuncu sekmesinden katıl.":"No player with that name. Join as a new player.",
+"Bu ay kimse kazanamadı":"Nobody won it this month","Bu bölümü yalnızca sen görüyorsun.":"Only you can see this section.","Bu filtrede maç yok.":"No games for this filter.",
+"Bu gece NBA'de maç yok. Oklarla diğer günlere bakabilirsin.":"No NBA games tonight. Use the arrows to see other days.","Bu gece maç yok":"No games tonight","Bu gece oynayanlar":"Playing tonight",
+"Bu gece bir takım 130 ya da daha fazla sayı atar mı?":"Will a team score 130+ tonight?","Bu gece en az bir maç 20 sayı ya da daha fazla farkla biter mi?":"Will at least one game end with a 20+ margin?",
+"Bu gece en az bir maç 3 sayı ya da daha az farkla biter mi?":"Will at least one game end within 3 points?","Bu gece en az bir maç uzatmaya gider mi?":"Will at least one game go to overtime?","Bu gece uzatmaya giden maç olur mu?":"Will any game go to overtime tonight?",
+"Deplasman takımları bu gece ev sahiplerinden daha çok maç kazanır mı?":"Will road teams win more games than home teams tonight?","Gecenin en skoreri 40 ya da daha fazla sayı atar mı?":"Will the night's top scorer get 40+?",
+"Bu gecenin tahminleri":"Tonight's picks","Bu hesap ligden çıkarıldı. Oyunu kuran kişiyle konuş.":"This account was removed from the league. Talk to the organizer.",
+"Bu hesapta güvenlik sorusu yok. Oyunu kuran kişiden yardım iste.":"This account has no security question. Ask the organizer for help.","Bu hesapta onaylı bir mail adresi yok. Güvenlik sorusuyla sıfırlayabilirsin.":"No verified email on this account. Use the security question.",
+"Bu maçın tahmini kilitlendi (maçtan 10 dk önce).":"This game's pick is locked (10 min before tip-off).","Bu maçın tahminleri kilitlendi.":"Picks for this game are locked.","Bu oyuncunun biten bir tahmini henüz yok.":"No finished picks yet.",
+"Bu sezon":"This season","Bu sezon aralarındaki maçlar":"Meetings this season","Bu sezon henüz maçı yok.":"No games yet this season.","Bu sezon maçı yok":"No games this season",
+"Bu sezon, maç başına ortalama. Kaynak: biten maçların kutu skorları.":"This season, per game. Source: box scores of finished games.","Bu takım adı uygun değil. Küfür, argo ya da hakaret içermeyen bir ad seç.":"That team name isn't allowed. Pick one without profanity or insults.",
+"Bu takımın maçlarına tahmin yaptıkça karnen burada oluşacak.":"Your record for this team builds up as you pick its games.","Bu şifre çok kolay tahmin edilir; başka bir şifre seç.":"That PIN is too easy to guess; pick another.",
+"Bulunamadı.":"Not found.","Bütün maçları gezdin.":"You've gone through all games.","Bütün oyuncular":"All players","Bütün takımlar":"All teams","Büyük harfle başlamalı. Küfür, argo ya da hakaret içeremez.":"Must start with a capital letter. No profanity or insults.",
+"CBS Sports'un 2026-27 sezonu ilk 50 oyuncu sıralaması.":"CBS Sports' top 50 players for 2026-27.","Cevabın kaydedildi.":"Answer saved.","Cevabını aldık.":"Got your answer.","Cevap:":"Answer:","DK":"MIN",
+"Davet kodu":"Invite code","Davet kodu alınamadı.":"Couldn't get the invite code.","Davet kodu değişti.":"Invite code changed.","Davet kodu yanlış. Seni davet edenden kontrol etmesini iste.":"Wrong invite code. Ask the person who invited you.",
+"Davet linkin kopyalandı.":"Your invite link was copied.","Devre arası":"Halftime","Değiştirilemedi.":"Couldn't change.","Değiştirmek için dokun.":"Tap to change.","Dk":"Min","Dokun: ilk eksik maça git":"Tap: go to the first missing game",
+"Doğru cevap +1. Gecenin ilk maçından 10 dk önce kilitlenir.":"Correct answer +1. Locks 10 min before the first game.","Doğu":"East","Doğu A":"East A","Doğu B":"East B","Doğu C":"East C",
+"Doğum yılı, 123456 ya da 111111 gibi kolay şifreler seçme.":"Avoid easy PINs like birth years, 123456 or 111111.","Duyuru":"Announcement","Duyuru yayınlandı.":"Announcement published.","Dün gece":"Last night","Dış saha":"Away",
+"E-posta":"Email","E-posta adresi geçerli görünmüyor.":"That email doesn't look valid.","E-posta adresin onaylandı.":"Your email is verified.","ESPN kazanma olasılığı":"ESPN win probability","ESPN'e şu an ulaşılamıyor. Biraz sonra tekrar dene.":"ESPN is unreachable right now. Try again shortly.",
+"ESPN'le başa baş.":"Neck and neck with ESPN.","Ekim-Kasım":"October-November","Ekim–Kasım 2026":"October–November 2026","Eksik tahmin ve sakatlık uyarıları":"Missing pick and injury alerts","Eksik:":"Missing:","El bileği":"Wrist",
+"En fazla 80 karakter. Herkes görür.":"Up to 80 characters. Everyone sees it.","En iyi bildiği takımlar":"Teams they read best","En iyi bildiğin takımlar":"Teams you read best","En iyi gece:":"Best night:","En sevdiğin basketbolcu":"Favorite player","En sevdiğin takım":"Favorite team",
+"En çok":"Most","En çok bildiği skorer":"Most-called scorer","En çok gelişen":"Most improved","En çok puanlı gece":"Highest-scoring night","En çok seçtiği takım":"Most-picked team","En çok yanılan":"Most wrong","En çok yanıldığın":"Where you miss most",
+"Ev sahibi mi, deplasman mı?":"Home or away?","Eylül":"September","Eşit":"Even","Eşitlikler":"Ties","Fark aralıkları":"Margin ranges","Fark doğru":"Margin right","Farkı bilme":"Margin calls","Favori takım":"Favorite team","Favori takımım":"My favorite team",
+"Favori takımını, avatarını ve rengini seç":"Pick your favorite team, avatar and color","Formda olanlar":"In form","GECENİN KAZANANI":"WINNER OF THE NIGHT","Galibiyet-mağlubiyet":"Win-loss","Galibiyet-mağlubiyet NBA Kupası maçlarında.":"Win-loss in NBA Cup games.",
+"Galibiyet-mağlubiyet sezon başından.":"Win-loss since season start.","Gece gece":"Night by night","Gece gece sıralama":"Rank by night","Gece takvimi":"Night calendar","Gece özeti":"Night summary","Gece, hafta, sezon":"Night, week, season",
+"Gecenin en çok puanını tek başına alan, o geceyi kazanır. Haftalar pazartesi başlar, pazar biter. Sezon puanı bütün gecelerin toplamıdır.":"Whoever alone scores the most points in a night wins it. Weeks run Monday to Sunday. Season points are the sum of all nights.",
+"Gecenin manşeti":"Headline of the night","Gecenin sorusu cevaplanmadı":"Question not answered","Gecenin tahmini":"Pick of the night","Geri al":"Undo","Geri dön":"Go back","Geçen haftanın şampiyonu":"Last week's champion",
+"Giriş yapan":"Logging in as","Giriş yapılamadı, tekrar dene.":"Couldn't log in, try again.",
+"Grup maçları cuma geceleri, son grup maçları 24-25 Kasım. Çeyrek finaller 4-5 Aralık, final Indianapolis'te. Kupa maçlarına yapılan tahminler 2 kat puan getirir.":"Group games on Friday nights, last ones Nov 24-25. Quarterfinals Dec 4-5, final in Indianapolis. Picks on Cup games earn double points.",
+"Grup maçı":"Group game","Gönderilemedi, tekrar dene.":"Couldn't send, try again.","Görseli kaldır":"Remove image","Güneybatı":"Southwest","Güneydoğu":"Southeast","Günün bankosu":"Lock pick of the night",
+"Günün oyuncusu ilk maçla birlikte görünecek":"Player of the night shows at the first game","Günün oyuncusu kaydedildi.":"Player of the night saved.","Günün oyuncusu kilitlendi (gecenin ilk maçından 10 dk önce).":"Player of the night is locked (10 min before the first game).",
+"Günün oyuncusu seçildi.":"Player of the night picked.","Günün oyuncusu seçilmedi":"No player of the night","Güvenlik sorusu kaydedildi.":"Security question saved.","Güvenlik sorusunu değiştir":"Change security question",
+"Haftanın ve ayın oyuncusunu, sezon sonu ödüllerini önceden tahmin et. Doğru tahminler ana sıralamaya büyük puan olarak eklenir.":"Predict players of the week and month and the season awards. Correct calls add big points to the main standings.",
+"Hakkında yazın kaldırıldı.":"About text removed.","Henüz farklı taraf tuttuğunuz, biten bir maç yok.":"No finished game where you picked different sides yet.","Henüz kaydedilmedi":"Not saved yet","Henüz kimse katılmadı. Davet linkini paylaş, rakiplerin gelsin.":"Nobody has joined yet. Share your invite link.",
+"Henüz puan yok":"No points yet","Henüz rozeti yok.":"No badges yet.","Henüz yeterli maç oynanmadı.":"Not enough games played yet.","Hep ESPN'in favorisini seçtin.":"You always picked ESPN's favorite.","Hepsi":"All",
+"Her gece bir maçı banko seçersin. O maçta kazananı bilirsen":"Each night you pick one game as your lock. Get the winner right and","Her gece maçlara tahmin yap: kazanan, fark ve en skorer.":"Pick every game each night: winner, margin and top scorer.",
+"Her gece o günün bütün NBA maçları için üç tahmin yaparsın:":"Each night you make three picks for every NBA game:","Her maçın tahmini, o maç başlamadan 10 dakika önce":"Each game's pick locks 10 minutes before tip-off",
+"Hesap bulunamadı. Tekrar katılmayı dene.":"Account not found. Try joining again.","Kadro alınamadı.":"Couldn't load roster.","Kadrolar yükleniyor…":"Loading rosters…","Kaldır":"Remove","Kaldırılamadı.":"Couldn't remove.","Kalça":"Hip",
+"Kartı sağa sola kaydırarak da geçebilirsin.":"You can also swipe the card.","Kasım":"November","Katılınamadı, tekrar dene.":"Couldn't join, try again.","Katılıyorsun…":"Joining…","Kaydedildi, seri başlasın.":"Saved, let the series begin.",
+"Kaydedildi. Mail gelmesi için adresini onaylaman gerekiyor.":"Saved. Verify your address to get emails.","Kaydedildi. Şimdi maçı bekle.":"Saved. Now wait for the game.","Kaydedilecek değişiklik yok":"Nothing to save","Kaydedilemedi, seri başlamış olabilir.":"Couldn't save; the series may have started.",
+"Kaydedilemedi: süre dolmuş olabilir.":"Couldn't save: time may be up.","Kaydediliyor…":"Saving…","Kaydedilmedi":"Not saved","Kaydet ve geç ›":"Save and next ›","Kaydetmeye hazır":"Ready to save","Kaynak: ESPN.":"Source: ESPN.",
+"Kayıtta seçtiğin takım ve oyuncu.":"The team and player you chose at sign-up.","Kazanan doğru":"Winner right",
+"Kazanan sütununa banko dahil. Diğer: günün oyuncusu, gecenin sorusu, playoff serileri ve lig ödülleri. UV: uzun vade tahminleri.":"Winner includes the lock pick. Other: player of the night, question, playoff series and league awards. LT: long-term picks.",
+"Kazanan, fark ve skoreri seç":"Pick winner, margin and scorer","Kazanan:":"Winner:","Kazananla birlikte farkı da bilirsen":"Get the margin right along with the winner",
+"Kazananlar Wikipedia'daki sezon sayfasından saatte bir otomatik çekilir. Burada kaydedersen o tur elle girilmiş sayılır ve artık otomatik değişmez.":"Winners are pulled hourly from Wikipedia. Saving here marks the round as manual; it won't update automatically.",
+"Kazananı bildiğinde farkı tutturma":"Margin hit rate when the winner is right","Kazananı bilirsen":"Get the winner right","Kazananı bilme":"Winner calls","Kazanan…":"Winner…","Kazandığı gece":"Nights won","Kazanılan gece":"Nights won","Kazanılanlar":"Won",
+"Kilide":"Lock in","Kilit ve gizlilik":"Locks and privacy","Kilitten sonra seçim yapılamaz. Eksiklerini şimdi tamamla.":"No picks after the lock. Complete them now.","Kimin şifresi?":"Whose PIN?",
+"Kod 6 rakam olmalı.":"The code must be 6 digits.","Kod gelmedi, tekrar gönder":"No code? Send again","Kod gönderildi":"Code sent","Kod hazırlanıyor, genelde 1 dakika sürer…":"Preparing the code, usually about a minute…",
+"Kod hâlâ hazırlanıyor. Biraz sonra tekrar dene.":"Still preparing the code. Try again shortly.","Kod yanlış ya da süresi dolmuş. Tekrar dene ya da yeni kod iste.":"Wrong or expired code. Try again or request a new one.","Kodun süresi dolmuş. Yeni bir kod iste.":"The code expired. Request a new one.",
+"Koyu moda geç":"Switch to dark mode","Kupa maçı":"Cup game","Kupa çeyrek final":"Cup quarterfinal","Kurulum bekleniyor: config.json içine Firebase bilgileri girilince oyun açılacak.":"Waiting for setup.",
+"Kuzeybatı":"Northwest","Küfür ve hakaret yazılamaz.":"No profanity or insults.","Küfür, argo ya da hakaret içeremez.":"No profanity, slang or insults.","Küçült":"Collapse","Kısmen sonuçlandı":"Partly settled","Lider":"Leader","Lig":"League","Lig sıfırlandı.":"League reset.",
+"Ligde görünecek adın":"Your name in the league","Ligden çıkar":"Remove from league","Lige getirdiği":"Brought to the league","Ligi sıfırla / yeni sezon":"Reset league / new season",
+"Ligin inandığı takımlar":"Teams the league believes in","Link kopyalandı.":"Link copied.","Linkinle katılan herkes profilinde \"Lige getirdiği\" olarak görünür.":"Everyone who joins via your link shows on your profile.",
+"Liste yüklenemedi, sayfayı yenile":"Couldn't load the list, refresh","Mail adresi geçerli görünmüyor.":"That email doesn't look valid.","Mail adresin onaylandı.":"Your email is verified.","Maildeki 6 haneli kod":"6-digit code from the email","Maildeki kod":"Code from the email",
+"Maildeki kod tutmadı. Tekrar deneyebilirsin (3 yanlıştan sonra 1 saat beklenir).":"Wrong code. You can try again (1 hour wait after 3 misses).","Mayıs":"May","Maç başlayınca istatistikler burada görünecek":"Stats appear here once the game starts",
+"Maç öncesi bilgiler yükleniyor…":"Loading pre-game info…","Maç öncesi bilgilere şu an ulaşılamıyor.":"Pre-game info unavailable right now.","Maçlar sürüyor":"Games in progress","Maçlar yükleniyor":"Loading games","Maçlar yükleniyor…":"Loading games…",
+"Maçlara şu an ulaşılamıyor.":"Games unavailable right now.","Maçlara şu an ulaşılamıyor. Biraz sonra tekrar dene.":"Games unavailable right now. Try again shortly.",
+"Maçlar kilitlendikten sonra her maça emoji bırakabilir ya da kısa bir yorum yazabilirsin. Küfür ve hakaret yazılamaz.":"After lock you can react with an emoji or a short comment. No profanity or insults.",
+"Maçın en skorerini bilirsen":"Get the game's top scorer right","NBA Kupası · 2× puan":"NBA Cup · 2× points","NBA Tahmin ligine davet edildin.":"You've been invited to the NBA Tahmin league.","NBA Tahmin · Gece özeti":"NBA Tahmin · Night summary",
+"Noktalı renkleri başka oyuncular da kullanıyor.":"Dotted colors are used by other players too.","O gecenin bütün maçları arasından bir oyuncu seçersin. Gecenin en çok sayı atan oyuncusu o olursa":"Pick one player from all of the night's games. If they're the night's top scorer",
+"Oklarla diğer günlere bakabilirsin.":"Use the arrows to see other days.","Olmadı":"Didn't work","Onaylanmadı":"Not verified","Oynamayacak:":"Out:","Oynanmadı":"Not played",
+"Oyuna devam etmek için mail adresini onaylaman gerekiyor. Şifreni unutursan sıfırlama kodu bu adrese gelir. Adresini yalnızca sen görürsün.":"Verify your email to continue. PIN reset codes go here. Only you see your address.",
+"Oyuncu adı yaz":"Type a player name","Oyuncu adı yaz (ör. Curry)":"Type a player name (e.g. Curry)","Oyuncu ara":"Search players","Oyuncu bulunamadı.":"No player found.","Pazartesi günleri haftalık özet":"Weekly summary on Mondays",
+"Playoff serileri":"Playoff series","Playoff serisi":"Playoff series","Playoff'ta bütün puanlar iki katına çıkar.":"All points double in the playoffs.","Playoff: bütün puanlar iki katı":"Playoffs: all points doubled",
+"Profilinde onayladığın mail adresine 6 haneli bir kod gönderilir. Kod 30 dakika geçerli.":"A 6-digit code goes to your verified email. Valid 30 minutes.","Profilini özelleştir":"Customize your profile","Puan topla, zirveye çık":"Collect points, reach the top",
+"Puanlar":"Points","Puanların nereden geliyor":"Where your points come from","Rakibin":"Your rival","Rakip":"Rival","Rakip analizi":"Rival analysis","Rakip kaldırıldı.":"Rival removed.","Rekorlar":"Records",
+"Renkli çubuklar geceyi kazandığı geceler.":"Colored bars are nights won.","Rib":"Reb","RİB":"REB","SAY":"PTS","Sakat oyuncu yok":"No injured players","Sakat oyuncu yok.":"No injured players.","Sayı":"Points",
+"Sen tek başına":"Only you picked","Sen ve":"You and","Senin karnen":"Your record","Seri":"Streak","Seri tahminin alındı.":"Series pick saved.","Seriyi kim, kaç maçta alır? Kazananı bilirsen +3, maç sayısını da bilirsen +2 daha.":"Who wins the series, in how many? Winner +3, games +2 more.",
+"Sezon ortalamaları":"Season averages","Sezon ödülleri":"Season awards","Seçimin kaydedildi, umarım bu gece şov yapar.":"Pick saved, hope they put on a show.","Seçimler":"Picks","Sil":"Delete","Site renkleri":"Site colors",
+"Skor":"Score","Skor akışı":"Score flow","Skorer":"Scorer","Skorer doğru":"Scorer right","Skorer seçimini değiştirmen iyi olur.":"You'd better change your scorer pick.","Son":"Final","Son 10 maç":"Last 10 games","Son gece":"Last night","Son gecenin kazananı":"Last night's winner",
+"Son maçlar":"Recent games","Sonuç:":"Result:","Soru kilitlendi (gecenin ilk maçından 10 dk önce).":"Question locked (10 min before the first game).","Sürüm":"Version","Sıradaki maç:":"Next game:","Sıradaki maçlar":"Upcoming games","Sıradakiler":"Up next",
+"Tahmin geçmişi":"Pick history","Tahmin geçmişin":"Your pick history","Tahmin yapmayan:":"No pick:","Tahmin yaptığı":"Picked","Tahmin yaptığın ilk maçlar bitince istatistiklerin burada birikmeye başlayacak.":"Your stats build up here once your first picked games end.",
+"Tahminin alındı.":"Pick saved.","Tahminin eksik kalınca ya da seçtiğin oyuncu sakatlanınca haber verelim.":"We'll let you know when picks are missing or your player is hurt.","Tahminlerin kapanmasına kalan süre":"Time until picks close",
+"Takım adı en az 3 karakter olmalı.":"Team name needs at least 3 characters.","Takım adı en fazla 40 karakter olabilir.":"Team name can be at most 40 characters.","Takım adın kaldırıldı.":"Team name removed.",
+"Takım adında yalnızca harf, rakam, boşluk ve . - ' & ! olabilir.":"Team names can only contain letters, digits, spaces and . - ' & !","Takım karnesi":"Team record","Takım sayfası ›":"Team page ›","Takım seç":"Pick a team","Takım ve avatar":"Team and avatar",
+"Takım ya da oyuncu tutmadı. Tekrar deneyebilirsin (3 yanlıştan sonra 1 saat beklenir).":"Team or player didn't match. You can try again (1 hour wait after 3 misses).","Takımlar yükleniyor…":"Loading teams…","Takımı seç ve listeden bir oyuncuya dokun.":"Pick a team and tap a player in the list.",
+"Tamamdır, tahminin kaydedildi.":"Done, pick saved.","Tercihin değişti.":"Your pick changed.","Tercihini değiştir":"Change your pick","Tercihleri kaydet":"Save preferences","Teşekkürler, bildirimin iletildi.":"Thanks, your report was sent.","Top kaybı":"Turnovers",
+"Türkiye saati":"Turkey time","UV":"LT","Uygulama gibi tek dokunuşla açılır.":"Opens like an app with one tap.","Uzun vade sonuçları":"Long-term results","Uzun vade tahminleri için giriş yap.":"Log in for long-term picks.","Uzun vadeyi kaçırma":"Don't miss long term",
+"Varsayılan":"Default","Veriler ESPN'den alınır. Maç varken 30 saniyede bir yenilenir.":"Data from ESPN. Refreshes every 30 seconds during games.","Yapılamadı, tekrar dene.":"Didn't work, try again.","Yarı final":"Semifinal",
+"Yarın geceden":"From tomorrow night","Yayınla":"Publish","Yayınlanamadı.":"Couldn't publish.","Yediği sayı":"Points allowed","Yediği sayı (ort.)":"Points allowed (avg)","Yeni cevabın eskisinin yerine geçer.":"Your new answer replaces the old one.",
+"Yeni hafta başladı":"New week started","Yeni oyuncular bu kodla katılır. Kodu değiştirince eski kod ve eski link çalışmaz.":"New players join with this code. Changing it disables the old code and link.","Yeni rozet!":"New badge!",
+"Yeni şifre 6 rakam olmalı.":"New PIN must be 6 digits.","Yeni şifren genelde 1-2 dakika içinde geçerli olur. Bu sayfayı açık bırakabilir ya da sonra dönebilirsin, sonuç burada görünür.":"Your new PIN usually works within 1-2 minutes. The result shows here.",
+"Yok":"None","Yorumlar":"Comments","Yorumunu değiştir":"Change your comment","Yükleniyor.":"Loading.","Çar":"Wed","Çeyrek final":"Quarterfinal","Çok fazla yanlış deneme oldu. 1 saat sonra tekrar dene.":"Too many wrong tries. Try again in 1 hour.",
+"Çok fazla yanlış deneme oldu. Birkaç dakika bekle ya da şifreni sıfırla.":"Too many wrong tries. Wait a few minutes or reset your PIN.","Çözüldü, sil":"Solved, delete","Çıkarılanlar":"Removed","Öbür geceden":"From the night after",
+"Önce bir e-posta adresi yaz.":"Type an email first.","Önce bir favori takım seç.":"Pick a favorite team first.","Önce geçerli bir e-posta adresi yaz.":"Type a valid email first.","Önce kazananı seç":"Pick the winner first",
+"Önce kim olduğunu seç ya da adını yaz.":"Pick who you are or type your name first.","Önce kim olduğunu seç.":"Pick who you are first.","Üst alan ve vurgu renkleri takımının renklerine geçer. Yalnızca sende görünür.":"Header and accent colors switch to your team's. Only you see it.",
+"Üst üste kazanılan gece:":"Nights won in a row:","Üçlük":"3PT","Üçünü de bildikleri":"All three right","İki şifre aynı değil.":"The PINs don't match.","İlk 6: doğrudan play-off":"Top 6: straight to playoffs",
+"İlk gece bitince puan tablosu burada dolmaya başlayacak.":"The leaderboard fills in after the first night.","İlk kez:":"First time:","İlk kilit":"First lock","İnternet bağlantısı yok gibi görünüyor.":"Looks like you're offline.","İsabet":"FG",
+"İstatistikler":"Stats","İstatistikler ›":"Stats ›","İstatistiklere şu an ulaşılamıyor.":"Stats unavailable right now.","İstek gönderilemedi, tekrar dene.":"Couldn't send the request, try again.","İstek gönderiliyor…":"Sending request…",
+"İstek işlenemedi, tekrar dene.":"Request failed, try again.","İstek işlenemedi. Tekrar dene.":"Request failed. Try again.","İsteğe bağlı, sonra Ayarlar'dan değiştirebilirsin.":"Optional; change later in Settings.","İsteğin alındı":"Request received","İç saha":"Home",
+"Şifre 6 rakam olmalı.":"PIN must be 6 digits.","Şifre yanlış.":"Wrong PIN.","Şifren":"Your PIN","Şifreni unutursan bu ikisiyle de sıfırlayabilirsin. Kimseye söyleme.":"If you forget your PIN you can reset it with these two. Don't tell anyone.",
+"Şifreni unutursan sıfırlayabilmen için bir kez seçmen gerekiyor.":"Pick once so you can reset a forgotten PIN.","Şifresi sıfırlanacak oyuncu":"Player to reset","Şifreyi tekrar yaz":"Type the PIN again","Şimdilik ESPN önde.":"ESPN is ahead for now.",
+"Şu an berabere":"Tied right now","Şu an en skorer":"Top scorer right now","Şu anki fark":"Current margin","Şu anki lig":"Current league","Şu anki seri:":"Current streak:","Şubat":"February","şampiyon":"champion","şu an":"now","şu an önde":"leading now","şu anki seri":"current streak",
+"‹ Geri":"‹ Back","‹ Önceki":"‹ Previous","★ Banko":"★ Lock","✓ Kaydedildi":"✓ Saved","✓ Onaylı":"✓ Verified","✓ Tahmin yaptı":"✓ Picked","✓ Şifreler aynı.":"✓ PINs match.",
+"🏀 NBA Tahmin'e hoş geldin! Her gece maçlara tahmin yap, puanları topla.":"🏀 Welcome to NBA Tahmin! Pick games every night and collect points.","🔒 Uzun vade kilidi":"🔒 Long-term lock",
+"alırsın, bilemezsen":"points; miss it and you lose","banko":"lock","bekleniyor":"waiting","bugün":"today","cevaplamadı":"didn't answer","dokun, o geceye git":"tap to open that night","en uzun seri":"longest streak",
+"en çok seçilen ve gerçek durumu":"most picked and how they're really doing","fark":"margin","fark aralığı":"margin range","farklı tahmin ettiğiniz maçlar":"games you picked differently","favorinin tersine bildi":"beat the favorite",
+"gece gece toplam puan":"total points by night","gecenin ilk maçından 10 dakika önce":"10 minutes before the night's first game","gecenin ilk maçıyla":"at the first game","hangi takımın maçlarında ne kadar bildin":"how well you read each team's games",
+"hayır":"no","henüz puan yok":"no points yet","henüz sahibi yok":"no owner yet","her ay sonu, puana eklenir":"each month end, added to points","her gecenin sonunda kaçıncıydın":"your rank after each night","her kare bir gece":"each square is a night",
+"herkes aynı tarafta":"everyone on the same side","hoş geldin":"welcome","kazanan":"winner","kazanan takım":"winning team","kimse seçmedi":"nobody picked","maç":"games","maç başına ortalama":"per game","maç bu gece":"games tonight","maçtan 10 dk önce":"10 min before the game",
+"maçın en skoreri":"the game's top scorer","oyuncu":"player","puan":"pts","puanlar sıralamaya eklenir":"points count in the standings","sayı":"pts","sayı ort.":"ppg","sayı ortalamasına göre":"by points per game","sen":"you","seni NBA Tahmin ligine davet etti.":"invited you to the NBA Tahmin league.",
+"sezon başından":"since season start","seçmedi":"no pick","skorer":"scorer","son":"last","son 5 maç":"last 5 games","son gece":"last night","tahmin yapmadı":"no pick","tahmin yok":"no pick","takım":"team","takım adı yok":"no team name","taraftarı":"fan",
+"tutma %":"hit %","ve":"and","yerine":"instead","· Kilitli":"· Locked","· Seçimler kilitten sonra herkese açılır.":"· Picks are revealed to everyone after the lock.",
+"Çıkarılan oyuncu sitede görünmez, puanları sayılmaz ve davet koduyla yeniden katılamaz.":"A removed player disappears from the site, their points don't count and they can't rejoin.",
+"Ligi sıfırlarsan bütün puanlar, rozetler ve istatistikler seçtiğin geceden itibaren sıfırdan sayılır. Şu anki puan durumu \"Geçmiş ligler\"e kaydedilir, tahminler silinmez.":"Resetting restarts all points, badges and stats from the chosen night. Current standings are archived; picks aren't deleted.",
+"Siteye girip \"Yeni oyuncu\" sekmesinde adını, güvenlik sorusunun cevabını, 6 haneli şifreni ve davet kodunu girerek katılırsın.":"Join via \"New player\" with your name, security answer, 6-digit PIN and invite code.",
+"Ödüller yarışma programı gibi bir tören ekranıyla tek tek açılır; Sıralama sekmesinden tekrar izlenebilir.":"Awards are revealed one by one in a game-show ceremony; rewatch it from Standings.",
+"Ocak":"January","Mart":"March","Nisan":"April","Haziran":"June","Temmuz":"July","Ekim":"October","Pzt":"Mon","Sal":"Tue","Per":"Thu","Cum":"Fri","Cmt":"Sat","Paz":"Sun",
+"Takım adın":"Your team name","Şu an önde":"Leading now","Son 5 maçta sayı":"Points in last 5","Kazanan +1 · Fark +1 · En skorer +1 · Banko +2 / -1 · Günün oyuncusu +2 · Gecenin sorusu +1":"Winner +1 · Margin +1 · Top scorer +1 · Lock +2 / -1 · Player of the night +2 · Question +1","Sezon grafiği":"Season chart","Rakip bekleniyor":"Waiting for a rival",
+});
+EN_RX.push(
+  [/^(.+) \(ABD\)$/, "$1 (US)"], [/^(.+) önde$/, "$1 leads"], [/^Haftanın lideri (.+)$/, "Week leader $1"], [/^(\d+) gündür yok$/, "away $1 days"],
+  [/^mail onaylı$/, "email verified"], [/^mail onaysız$/, "email not verified"], [/^mail yok$/, "no email"], [/^hiç oynamadı$/, "never played"],
+  [/^Kilide (\d+) sa (\d+) dk var · (.+)'de, (.+) kilitlenir$/, "$1 h $2 min to lock · locks at $3"], [/^(.+)'de, maçtan 10 dk önce kilitlenir$/, "Locks at $1, 10 min before tip-off"],
+  [/^(\d+) maç eksik$/, "$1 games missing"], [/^(\d+)\/(\d+) seçim$/, "$1/$2 picks"], [/^(\d+) biten maç\.?$/, "$1 finished games."], [/^(\d+) biten maç \(bu lig\)\.$/, "$1 finished games (this league)."],
+  [/^Rakibin (.+)$/, "Your rival $1"], [/^Sezonda (\d+) puan öndesin · bu hafta (.+)$/, "$1 pts ahead this season · this week $2"], [/^Sezonda (\d+) puan gerisindesin · bu hafta (.+)$/, "$1 pts behind this season · this week $2"],
+  [/^(\d+) puan · gece (\d+)\.(.*)$/, "$1 pts · #$2$3 that night"], [/^Kilit: (.+)\. O zamana kadar değiştirebilirsin; seçimler kilitten sonra herkese açılır\.$/, "Lock: $1. You can change until then; picks are revealed after the lock."],
+  [/^Sen tek başına (.+) dedin$/, "Only you picked $1"], [/^Azınlıktasın \((.+)\)$/, "You're in the minority ($1)"], [/^(\d+) kez$/, "$1 times"], [/^(\d+)\/(\d+) tuttu$/, "$1/$2 hit"],
+  [/^(\d+) oyuncunun seçimi$/, "picks of $1 players"], [/^Bu gece (\d+) maç var\.(.*)$/, "$1 games tonight.$2"], [/^Takım (\d+)-(\d+)$/, "Team $1-$2"], [/^takım (\d+)-(\d+)$/, "team $1-$2"],
+  [/^(\d+) sayı$/, "$1 pts"], [/^(.+) baremi$/, "$1 range"], [/^Lige getirdiği: (.+)$/, "Brought in: $1"],
+);
+// tarih ve saatler İngilizce yazılsın
+
+EN_RX.push(
+  [/^🏀 Zirvede (.+) var: (\d+) puan\. (.+) (\d+) puan geride\.$/, "🏀 $1 leads with $2 pts. $3 is $4 behind."],
+  [/^🏀 Zirvede ortalık karışık: (.+) ve (.+) (\d+) puanla berabere\.?$/, "🏀 It's tight at the top: $1 and $2 tied on $3 pts."],
+  [/^📆 Bu haftanın lideri (.+): (\d+) puan\.$/, "📆 This week's leader $1: $2 pts."],
+  [/^🔥 (.+) üst üste (\d+) gecedir kazanıyor\. Durduran çıkacak mı\?$/, "🔥 $1 has won $2 nights in a row. Can anyone stop them?"],
+  [/^⏳ Henüz tahmin yapmayanlar: (.+)\.$/, "⏳ No picks yet from: $1."],
+  [/^❓ Gecenin sorusu: (.+)$/, (m,q)=>"❓ Question of the night: "+(EN[q]||q)],
+  [/^👋 Ligimize hoş geldin, (.+)! Bol puanlı geceler\.$/, "👋 Welcome to the league, $1! Many high-scoring nights."],
+  [/^👋 Ligimize hoş geldiniz: (.+) ve (.+)! Bol puanlı geceler\.$/, "👋 Welcome to the league: $1 and $2! Many high-scoring nights."],
+  [/^📅 Bu gece (\d+) maç var\. Her maç başlamadan 10 dk önce kilitleniyor; ilk kilit (.+)\.$/, "📅 $1 games tonight. Each locks 10 min before tip-off; first lock $2."],
+  [/^📅 Bu gece (\d+) maç var\. Tahminler (.+) itibarıyla kapanıyor\.$/, "📅 $1 games tonight. Picks close at $2."],
+  [/^🏁 Bu gecenin (\d+) maçı bitti\. Skorlar sekmesine bir göz at\.$/, "🏁 All $1 games are over tonight. Check the Scores tab."],
+  [/^📺 Bu gecenin maçları başladı\. Tahminler kapandı, herkesin seçimi artık görünüyor\.$/, "📺 Tonight's games have started. Picks are closed and everyone's choices are visible."],
+  [/^🌙 Dün gece — (.+)$/, "🌙 Last night — $1"], [/^🌙 (.+) gecesi — (.+)$/, "🌙 Night of $1 — $2"],
+);
 function trText(t){
   const k=t.trim(); if(!k || !/[a-zçğıöşüİ]/i.test(k)) return null;
   if(EN[k]) return t.replace(k, EN[k]);
@@ -1679,7 +1836,7 @@ function userRecs(u){
 const pickW = (u, gid) => S.arch.scores.games?.[gid]?.[u]?.pick?.w ?? Object.values(S.days).find(D=>D.picks?.[gid])?.picks[gid]?.[u]?.winner ?? null;
 function nightsOf(){ return [...allDays()].reverse().map(d=>({d, w:dayWinner(d), p:dayPoints(d)})).filter(x=>x.w && x.w.st!=="live"); }
 const monthKey = d => d.slice(0,6);
-const monthName = k => parseYmd(k+"01").toLocaleDateString("tr-TR",{timeZone:"UTC",month:"long",year:"numeric"});
+const monthName = k => parseYmd(k+"01").toLocaleDateString(LOC,{timeZone:"UTC",month:"long",year:"numeric"});
 function monthTable(){
   const m={};
   for(const d of allDays()){ const p=dayPoints(d), k=monthKey(d); m[k] ||= {pts:{}, live:false}; for(const u of S.order) m[k].pts[u]=(m[k].pts[u]||0)+(p[u]?.pts||0); if(S.order.some(u=>p[u] && !p[u].final)) m[k].live=true; }
@@ -2038,6 +2195,17 @@ const pick = a => a[Math.floor(Math.random()*a.length)];
 function headlineOf(d){
   const w=dayWinner(d); if(!w || w.st==="live") return "";
   const p=dayPoints(d), played=S.order.filter(u=>p[u]?.n);
+  if(UI_EN){
+    if(w.st==="t"){ const ws=played.filter(u=>p[u].pts===w.pts).map(pname); return ws.length===played.length ? `The night ended level: everyone on ${w.pts} pts.` : `${ws.join(" and ")} shared the night with ${w.pts} pts.`; }
+    const n=pname(w.u), recs=userRecs(w.u).filter(x=>x.day===d), ok=recs.filter(x=>x.r.w>0).length;
+    const second=Math.max(...played.filter(u=>u!==w.u).map(u=>p[u].pts), -99), diff=second>-99 ? w.pts-second : 0;
+    const full=recs.filter(x=>x.r.w>0&&x.r.m>0&&x.r.s>0).length;
+    const extra = p[w.u].dp>0 ? " Also called the player of the night." : full ? ` Got winner, margin and scorer all right in ${full} game${full>1?"s":""}.` : "";
+    if(recs.length && ok===recs.length && recs.length>=3) return `${n}'s night: called all ${recs.length} winners, ${w.pts} pts.${extra}`;
+    if(diff>=5) return `${n} owned the night: ${w.pts} pts, ${diff} ahead of the next.${extra}`;
+    if(diff===1) return `${n} edged the night: ${w.pts} pts, by just 1.${extra}`;
+    return `${n}'s night: ${recs.length?`${ok} of ${recs.length} winners right, `:""}${w.pts} pts.${extra}`;
+  }
   if(w.st==="t"){ const ws=played.filter(u=>p[u].pts===w.pts).map(pname);
     return ws.length===played.length ? `Gece berabere bitti: herkes ${w.pts} puanda kaldı.` : `${ws.slice(0,-1).join(", ")} ve ${ws.at(-1)} geceyi ${w.pts} puanla paylaştı.`; }
   const n=pname(w.u), recs=userRecs(w.u).filter(x=>x.day===d), ok=recs.filter(x=>x.r.w>0).length;
@@ -2305,8 +2473,8 @@ async function openTeam(abbr){
   $("#tmRec").textContent=[sch?.team?.recordSummary?`${sch.team.recordSummary} (G-M)`:"", stand].filter(Boolean).join(" · ");
   $("#tmBody").innerHTML=`
     <div class="sec-title"><h2 style="font-size:20px">Son maçlar</h2></div>
-    ${done.length?`<div class="tm-list">${done.map(e=>{ const {me,op}=side(e); const w=me?.winner; return `<div class="tm-g"><span class="tm-r ${w?"W":"L"}">${w?"G":"M"}</span><img src="${LOGO_SMALL(op?.team?.abbreviation||"")}" alt=""><span>${me?.homeAway==="home"?"":"@ "}${esc(op?.team?.shortDisplayName||op?.team?.abbreviation||"")}</span><b>${sc(me?.score)}–${sc(op?.score)}</b><small>${new Date(e.date).toLocaleDateString("tr-TR",{timeZone:TZ,day:"numeric",month:"short"})}</small></div>`; }).join("")}</div>`:'<div class="note">Bu sezon henüz maçı yok.</div>'}
-    ${next.length?`<div class="sec-title"><h2 style="font-size:20px">Sıradaki maçlar</h2></div><div class="tm-list">${next.map(e=>{ const {me,op}=side(e); return `<div class="tm-g"><span class="tm-r"></span><img src="${LOGO_SMALL(op?.team?.abbreviation||"")}" alt=""><span>${me?.homeAway==="home"?"":"@ "}${esc(op?.team?.shortDisplayName||"")}</span><small>${new Date(e.date).toLocaleString("tr-TR",{timeZone:TZ,day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}</small></div>`; }).join("")}</div>`:""}
+    ${done.length?`<div class="tm-list">${done.map(e=>{ const {me,op}=side(e); const w=me?.winner; return `<div class="tm-g"><span class="tm-r ${w?"W":"L"}">${w?"G":"M"}</span><img src="${LOGO_SMALL(op?.team?.abbreviation||"")}" alt=""><span>${me?.homeAway==="home"?"":"@ "}${esc(op?.team?.shortDisplayName||op?.team?.abbreviation||"")}</span><b>${sc(me?.score)}–${sc(op?.score)}</b><small>${new Date(e.date).toLocaleDateString(LOC,{timeZone:TZ,day:"numeric",month:"short"})}</small></div>`; }).join("")}</div>`:'<div class="note">Bu sezon henüz maçı yok.</div>'}
+    ${next.length?`<div class="sec-title"><h2 style="font-size:20px">Sıradaki maçlar</h2></div><div class="tm-list">${next.map(e=>{ const {me,op}=side(e); return `<div class="tm-g"><span class="tm-r"></span><img src="${LOGO_SMALL(op?.team?.abbreviation||"")}" alt=""><span>${me?.homeAway==="home"?"":"@ "}${esc(op?.team?.shortDisplayName||"")}</span><small>${new Date(e.date).toLocaleString(LOC,{timeZone:TZ,day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}</small></div>`; }).join("")}</div>`:""}
     <div class="sec-title"><h2 style="font-size:20px">Sakatlar</h2></div>
     ${inj.length?`<div class="tm-list">${inj.map(p=>`<div class="tm-g"><span class="tm-r ${/out/i.test(p.inj)?"L":"T"}"></span><span>${esc(p.name)}</span><small>${/out/i.test(p.inj)?"Oynamıyor":"Belirsiz"}</small></div>`).join("")}</div>`:'<div class="note">Sakat oyuncu yok.</div>'}
     <div class="sec-title"><h2 style="font-size:20px">Senin karnen</h2></div>
@@ -2567,7 +2735,7 @@ async function openAthlete(id, hint={}){
         return `<div class="agl-r"><span>${esc(m.atVs||"")} <img src="${LOGO_SMALL(m.opponent?.abbreviation||"")}" alt="">${esc(m.opponent?.abbreviation||"")}</span><span class="${m.gameResult==="W"?"w":"l"}">${m.gameResult==="W"?"G":"M"} ${esc(m.score||"")}</span><b>${e.stats[ix("points")]}</b><span>${e.stats[ix("totalRebounds")]}</span><span>${e.stats[ix("assists")]}</span><span>${e.stats[ix("minutes")]}</span></div>`; }).join("")}</div>` : "";
     }
     const ng=ov.nextGame?.events?.[0] || ov.nextGame;
-    const next = ng?.date ? `<div class="note">Sıradaki maç: ${new Date(ng.date).toLocaleString("tr-TR",{timeZone:TZ,weekday:"long",day:"numeric",month:"long",hour:"2-digit",minute:"2-digit"})}</div>` : "";
+    const next = ng?.date ? `<div class="note">Sıradaki maç: ${new Date(ng.date).toLocaleString(LOC,{timeZone:TZ,weekday:"long",day:"numeric",month:"long",hour:"2-digit",minute:"2-digit"})}</div>` : "";
     $("#athBody").innerHTML = `<div class="sec-title"><h2 style="font-size:20px">Bu sezon</h2><span class="aside">maç başına ortalama</span></div>${kp}${last}${next}<small class="muted">Kaynak: ESPN.</small>`;
   }catch(e){ if($("#athBody")) $("#athBody").innerHTML=`<div class="note">Bilgilere şu an ulaşılamıyor.</div>`; }
 }
@@ -2705,7 +2873,7 @@ function openLT(k){ if(!S.inj) loadInj().then(()=>{ if($("#ltBox") && !S.ltCat) 
 function paintLT(){
   const box=$("#ltBox"); if(!box) return;
   const k=S.ltKey, st=ltStatus(k), cats=LT_CATS[ltType(k)], res=S.lt.res[k]||{}, mine=S.lt.all[k]?.[S.uid];
-  let h=`<h3 id="shTitle">${ltTitle(k)}</h3><p class="muted">${st.open?`Kilit: ${new Date(ltLock(k)).toLocaleString("tr-TR",{timeZone:TZ,day:"numeric",month:"long",weekday:"long",hour:"2-digit",minute:"2-digit"})}. O zamana kadar değiştirebilirsin; seçimler kilitten sonra herkese açılır.`:st.txt}</p>`;
+  let h=`<h3 id="shTitle">${ltTitle(k)}</h3><p class="muted">${st.open?`Kilit: ${new Date(ltLock(k)).toLocaleString(LOC,{timeZone:TZ,day:"numeric",month:"long",weekday:"long",hour:"2-digit",minute:"2-digit"})}. O zamana kadar değiştirebilirsin; seçimler kilitten sonra herkese açılır.`:st.txt}</p>`;
   if(st.open){
     if(S.ltCat){ h += ltPicker(k, S.ltCat); box.innerHTML=h; bindLTPicker(); return; }
     h += `<div class="lt-cats">${cats.map(([c,l,p,cf])=>{ const v=S.ltDraft[c], nm=S.ltNames[c];
@@ -2877,7 +3045,7 @@ function updateFeed(){
 function renderFeed(){
   const el=$("#liveFeed"); if(!el) return;
   if(!S.feed.length || S.tab!=="tahmin"){ el.innerHTML=""; return; }
-  el.innerHTML=`<div class="feed"><span class="feed-h"><i></i>Canlı</span><div class="feed-s">${S.feed.slice(0,8).map(x=>`<span class="feed-i"><small>${new Date(x.at).toLocaleTimeString("tr-TR",{timeZone:TZ,hour:"2-digit",minute:"2-digit"})}</small>${esc(x.t)}</span>`).join("")}</div></div>`;
+  el.innerHTML=`<div class="feed"><span class="feed-h"><i></i>Canlı</span><div class="feed-s">${S.feed.slice(0,8).map(x=>`<span class="feed-i"><small>${new Date(x.at).toLocaleTimeString(LOC,{timeZone:TZ,hour:"2-digit",minute:"2-digit"})}</small>${esc(x.t)}</span>`).join("")}</div></div>`;
 }
 function render(){
   if(!S.uid) return;
@@ -3621,7 +3789,7 @@ async function openAdmin(){
         return `<div class="adm-s"><span><b style="color:${col(u)}">${esc(pname(u))}</b><small>${esc(S.players[u].club||"takım adı yok")}</small></span>
           <span class="${gap==null||gap>3?"bad":gap>1?"warn":"ok"}">${gap==null?"hiç oynamadı":gap===0?"bu gece":gap===1?"dün":gap+" gündür yok"}</span>
           <span class="${c?.verified?"ok":"bad"}">${c?.verified?"mail onaylı":c?.email?"mail onaysız":"mail yok"}</span></div>`; }).join("")}</div></div>
-    <div class="pf-sec"><h4>Sorun bildirimleri ${reports.length?`<span class="pill-n">${reports.length}</span>`:""}</h4>${reports.length?reports.map(r=>`<div class="adm-rep"><div><b style="color:${col(r.uid)}">${esc(pname(r.uid))}</b> <small class="muted">${r.at?.toDate?r.at.toDate().toLocaleString("tr-TR",{timeZone:TZ,day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}):""} · ${esc(r.v||"")} · ${esc(r.tab||"")}</small></div><p>${esc(r.text||"")}</p><small class="muted">${esc(r.ua||"")}</small><button class="btn sm danger" data-repdel="${r.id}" type="button">Çözüldü, sil</button></div>`).join(""):'<small class="muted">Bildirim yok.</small>'}</div>`;
+    <div class="pf-sec"><h4>Sorun bildirimleri ${reports.length?`<span class="pill-n">${reports.length}</span>`:""}</h4>${reports.length?reports.map(r=>`<div class="adm-rep"><div><b style="color:${col(r.uid)}">${esc(pname(r.uid))}</b> <small class="muted">${r.at?.toDate?r.at.toDate().toLocaleString(LOC,{timeZone:TZ,day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}):""} · ${esc(r.v||"")} · ${esc(r.tab||"")}</small></div><p>${esc(r.text||"")}</p><small class="muted">${esc(r.ua||"")}</small><button class="btn sm danger" data-repdel="${r.id}" type="button">Çözüldü, sil</button></div>`).join(""):'<small class="muted">Bildirim yok.</small>'}</div>`;
   $("#adm").innerHTML = summary + `
     <div class="pf-sec"><h4>Lig</h4>
       <p class="muted" style="margin:0 0 8px">Şu anki lig <b>${dayNice(st,{day:"numeric",month:"long"})}</b> gecesinden beri sayılıyor${hist.length?`, ${hist.length} geçmiş lig var`:""}.</p>
@@ -3630,7 +3798,7 @@ async function openAdmin(){
       <input type="date" id="admDate" class="adm-in hide"></div>
       <input id="admSeason" class="adm-in" maxlength="40" placeholder="Biten dönemin adı (ör. 2026 sonbaharı)" style="margin:8px 0">
       <button class="btn danger" id="admReset" type="button">Ligi sıfırla / yeni sezon</button><small class="muted" id="admResetMsg"></small></div>
-    <div class="pf-sec"><h4>Oyuncular</h4><div class="adm-pl">${S.order.map(u=>`<div class="adm-p">${avatar(u,"sm")}<span><b>${esc(pname(u))}</b><small>${tot[u]??0} puan · ${new Date(S.players[u].joined).toLocaleDateString("tr-TR",{timeZone:TZ,day:"numeric",month:"long"})} katıldı</small></span>
+    <div class="pf-sec"><h4>Oyuncular</h4><div class="adm-pl">${S.order.map(u=>`<div class="adm-p">${avatar(u,"sm")}<span><b>${esc(pname(u))}</b><small>${tot[u]??0} puan · ${new Date(S.players[u].joined).toLocaleDateString(LOC,{timeZone:TZ,day:"numeric",month:"long"})} katıldı</small></span>
       ${u===S.uid?'<small class="muted">sen</small>':`<button class="btn danger sm" data-kick="${u}" type="button">Ligden çıkar</button>`}</div>`).join("")}</div>
       ${banned.length?`<h4 style="margin-top:12px">Çıkarılanlar</h4><div class="adm-pl">${banned.map(b=>`<div class="adm-p"><span class="av sm empty">?</span><span><b>${esc(b.name||"?")}</b><small>tekrar katılamaz</small></span><button class="btn sm" data-unban="${b.uid}" type="button">Geri al</button></div>`).join("")}</div>`:""}
       <small class="muted">Çıkarılan oyuncu sitede görünmez, puanları sayılmaz ve davet koduyla yeniden katılamaz.</small></div>

@@ -49,7 +49,8 @@ jobs:
           while [ "$(date +%s)" -lt "$end" ]; do
             # yeni betikler ve veriler görev yeniden başlamadan da gelsin (5 dakikada bir)
             if [ $(( $(date +%s) - last_pull )) -ge 300 ]; then
-              git pull -q --ff-only origin main || true
+              # checkout tek bir commit'te (dal dışı) durur; pull çalışmaz. En güncel main'i çekip ona geç.
+              git fetch -q --depth=1 origin main && git reset -q --hard FETCH_HEAD || true
               last_pull=$(date +%s)
             fi
             python scripts/verify.py || true
