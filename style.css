@@ -1699,3 +1699,24 @@ button,a,[data-act],.plr,.pf-av,.pf-emo{touch-action:manipulation;-webkit-tap-hi
 .hs-x{display:block;color:var(--muted);font-size:12px;margin-top:4px;line-height:1.4}
 .hs-up{color:#b98a1e}
 .ob-skip{display:block;margin:12px auto 0;font-size:14px;color:var(--muted)}
+
+/* 1.8.0 Takımım + formda olanlar kategorileri */
+.nav-team{display:flex;width:23px;height:23px;align-items:center;justify-content:center}
+.nav-team img{width:23px;height:23px;object-fit:contain;filter:saturate(.75);opacity:.85}
+.nav a[aria-current="page"] .nav-team img{filter:none;opacity:1}
+.nav-team svg{width:22px;height:22px}
+.tk-ch{margin-left:auto;font-size:13px;align-self:center}
+.fm-cat{margin:0 0 10px}
+.tl-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+@media (min-width:640px){.tl-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.tl-c{display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:8px 10px;color:var(--ink);cursor:pointer;text-align:left;min-width:0}
+.tl-c img{width:40px;height:40px;border-radius:50%;object-fit:cover;background:var(--bg);flex:none}
+.tl-c span{display:flex;flex-direction:column;min-width:0;flex:1}
+.tl-c small{font-size:11.5px;color:var(--muted)}
+.tl-c b{font-size:14.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tl-c em{font:800 20px "Barlow Condensed";font-style:normal}
+.lot{padding:6px 12px;margin-top:8px}
+.lot-r{display:grid;grid-template-columns:1fr auto 52px 70px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line);font-size:14px}
+.lot-r:last-child{border-bottom:0}
+.lot-r b{text-align:right}.lot-p{text-align:right;color:var(--muted);font-size:12.5px}
+@media (max-width:420px){.nav a{font-size:10px}}

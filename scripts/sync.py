@@ -76,6 +76,18 @@ def espn_today() -> date:
     return us_east.date()
 
 
+RULES2_FROM = "20261104"   # 5 barem, günün oyuncusu +3, yanan banko katlanmaz, yeni soru havuzu
+MARGINS2 = [(1, 3, "1-3"), (4, 7, "4-7"), (8, 12, "8-12"), (13, 19, "13-19"), (20, 999, "20+")]
+MARGINS2_LABELS = {x[2] for x in MARGINS2}
+
+
+def margin_bucket2(m):
+    for lo, hi, label in MARGINS2:
+        if lo <= m <= hi:
+            return label
+    return MARGINS2[-1][2]
+
+
 def margin_bucket(m):
     for lo, hi, label in MARGINS:
         if lo <= m <= hi:
@@ -328,7 +340,7 @@ def league_awards(sc, games, players, today, league_start):
 
         lst = []
         w, v = best(lambda x: x["pts"])
-        lst.append({"k": "top", "i": "👑", "t": "Ayın tahmincisi", "d": "Ayın en çok puan toplayanı", "u": w, "v": f"{v} puan", "pts": 3})
+        lst.append({"k": "top", "i": "👑", "t": "Ayın tahmincisi", "d": "Ayın en çok puan toplayanı", "u": w, "v": f"{v} puan", "pts": 1})
         w, v = best(lambda x: round(x["bok"] / x["bn"] * 100), 1, lambda x: x["bn"] >= 4)
         lst.append({"k": "banko", "i": "★", "t": "Banko ustası", "d": "En yüksek banko isabeti (en az 4 banko)", "u": w, "v": f"%{v}", "pts": 2})
         w, v = best(lambda x: x["sur"])
@@ -396,13 +408,14 @@ def score_game(g, pick, conf, top_ids):
     won = pick.get("winner") == g["winner"]
     if won:
         r["w"] = 2 if conf else 1
-        if pick.get("margin") == g["bucket"]:
+        lab = pick.get("margin")
+        if (margin_bucket2(g["margin"]) == lab) if lab in MARGINS2_LABELS else (lab == g["bucket"]):
             r["m"] = 1
     elif conf:
         r["w"] = -1
     if pick.get("scorerId") in top_ids:
         r["s"] = 1
-    r["pts"] = (r["w"] + r["m"] + r["s"]) * mult
+    r["pts"] = (max(r["w"], 0) + r["m"] + r["s"]) * mult + min(r["w"], 0)   # yanan banko katlanmaz
     return r
 
 
@@ -425,7 +438,40 @@ QUESTIONS = [
 ]
 
 
+def top(gs):
+    return max(max((t["pts"] for t in g["top"]), default=0) for g in gs)
+
+
+# 4 Kasım 2026'dan itibaren: app.js'teki QUESTIONS2 ile birebir aynı sıra (1970'ten beri geçen gün % soru sayısı)
+QUESTIONS2 = [
+    lambda gs: top(gs) >= 33,  # Bu gece biri 33 ya da daha fazla sayı atar mı?
+    lambda gs: max(g['margin'] for g in gs) >= 25,  # Bu gece en az bir maç 25 sayı ya da daha fazla farkla biter mi?
+    lambda gs: any(g.get('ot') for g in gs),  # Bu gece en az bir maç uzatmaya gider mi?
+    lambda gs: min(min(g['home']['score'], g['away']['score']) for g in gs) <= 95,  # Bu gece bir takım 95 ya da daha az sayıda kalır mı?
+    lambda gs: top(gs) >= 45,  # Bu gece biri 45 ya da daha fazla sayı atar mı?
+    lambda gs: min(g['margin'] for g in gs) <= 2,  # Bu gece en az bir maç 2 sayı ya da daha az farkla biter mi?
+    lambda gs: max(max(g['home']['score'], g['away']['score']) for g in gs) >= 135,  # Bu gece bir takım 135 ya da daha fazla sayı atar mı?
+    lambda gs: sum(g['winner'] == g['away']['abbr'] for g in gs) > sum(g['winner'] == g['home']['abbr'] for g in gs),  # Deplasman takımları bu gece ev sahiplerinden daha çok maç kazanır mı?
+    lambda gs: top(gs) >= 38,  # Bu gece biri 38 ya da daha fazla sayı atar mı?
+    lambda gs: max(g['home']['score'] + g['away']['score'] for g in gs) >= 250,  # Bu gece bir maçta iki takımın toplamı 250 sayıyı geçer mi?
+    lambda gs: sum(g['margin'] >= 15 for g in gs) >= 2,  # Bu gece en az iki maç 15 sayı ya da daha fazla farkla biter mi?
+    lambda gs: sum(bool(g.get('ot')) for g in gs) >= 2,  # Bu gece en az iki maç uzatmaya gider mi?
+    lambda gs: top(gs) >= 50,  # Bu gece biri 50 ya da daha fazla sayı atar mı?
+    lambda gs: all(g['winner'] == g['home']['abbr'] for g in gs),  # Ev sahipleri bu gece bütün maçlarını kazanır mı?
+    lambda gs: max(g['margin'] for g in gs) >= 30,  # Bu gece en az bir maç 30 sayı ya da daha fazla farkla biter mi?
+    lambda gs: max(max(g['home']['score'], g['away']['score']) for g in gs) >= 130,  # Bu gece bir takım 130 ya da daha fazla sayı atar mı?
+    lambda gs: min(g['margin'] for g in gs) <= 5,  # Bu gece en az bir maç 5 sayı ya da daha az farkla biter mi?
+    lambda gs: top(gs) >= 40,  # Gecenin en skoreri 40 ya da daha fazla sayı atar mı?
+    lambda gs: min(g['home']['score'] + g['away']['score'] for g in gs) < 205,  # Bu gece bir maçta iki takımın toplamı 205 sayının altında kalır mı?
+    lambda gs: sum(g['winner'] == g['home']['abbr'] for g in gs) > sum(g['winner'] == g['away']['abbr'] for g in gs),  # Ev sahipleri bu gece deplasman takımlarından daha çok maç kazanır mı?
+    lambda gs: max(max(g['home']['score'], g['away']['score']) for g in gs) >= 140,  # Bu gece bir takım 140 ya da daha fazla sayı atar mı?
+]
+
+
 def question_answer(day, dgames):
+    if day >= RULES2_FROM:
+        n = (datetime(int(day[:4]), int(day[4:6]), int(day[6:]), tzinfo=timezone.utc).date() - datetime(1970, 1, 1).date()).days
+        return "y" if QUESTIONS2[n % len(QUESTIONS2)](dgames) else "n"
     return "y" if QUESTIONS[int(day) % len(QUESTIONS)](dgames) else "n"
 
 
@@ -590,7 +636,7 @@ def main(full=False):
             if daily and daily.get("dayPlayerId") and daily.get("dayAt") and ts(daily["dayAt"]) < ts(first_start) - lock_gap(day):
                 dp_name = daily.get("dayPlayerName")
                 if daily["dayPlayerId"] in night_ids:
-                    dp = 2
+                    dp = 3 if day >= RULES2_FROM else 2
             # gecenin sorusu: gece tamamen bittiyse
             q, qp = None, 0
             if daily and daily.get("q") in ("y", "n") and daily.get("qAt") and ts(daily["qAt"]) < ts(first_start) - lock_gap(day):
