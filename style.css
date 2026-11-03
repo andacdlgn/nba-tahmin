@@ -1827,3 +1827,12 @@ button,a,[data-act],.plr,.pf-av,.pf-emo{touch-action:manipulation;-webkit-tap-hi
 .ath-lg,.ath-inj{padding:10px 12px;font-size:14px;margin-bottom:10px}
 .ath-inj.out{border-color:var(--lose)}
 @media (prefers-reduced-motion:reduce){.rc-r,.rc-b i{transition:none}.lb-row.glow,.nw-card,.nw-pop{animation:none}}
+
+/* 1.11.1 mobil dokunuş: çift dokunuşla yakınlaştırma kapalı (iki parmakla yakınlaştırma açık), basınca görsel geri bildirim */
+html{touch-action:manipulation}
+button:active,a:active,[data-pu]:active,[data-hsu]:active,[data-ath]:active,[data-tp]:active,[data-box]:active,[data-day]:active,[role=button]:active{opacity:.72}
+.nav a:active{opacity:1;transform:scale(.94)}
+body.bars-moving .nav,body.bars-moving .topbar{pointer-events:none}
+body.bars-hidden .nav,body.bars-hidden .topbar{pointer-events:none}
+.bs-t{display:flex;flex-direction:column;gap:2px}
+.bs-nb{font-size:12px;opacity:.9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

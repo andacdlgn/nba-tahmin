@@ -45,10 +45,11 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.11.1";
+const VERSION = "1.11.2";
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.11.2", d:"3 Kasım 2026", items:["Telefonda dokunuşlar düzeldi: canlı veri gelince ekran parmağının altında değişmiyor, çubuklar yanlışlıkla açılıp kapanmıyor, hızlı dokunuşlar yakınlaştırmaya dönüşmüyor.","İnce şeritte önündeki ve arkandaki rakiple puan farkı."]},
   {v:"1.11.1", d:"3 Kasım 2026", items:["Avatar artık yalnızca basketbolcu fotoğrafı olabiliyor; profilde istediğin oyuncuyu arayıp seçebilirsin.","Diğer sekmelerdeki ince puan şeridi daha anlaşılır: lider, senin sıran ve puanın."]},
   {v:"1.11.0", d:"3 Kasım 2026", items:["Gecenin kazananı gece bitince sahneye çıkıyor, puan tablosunda satırı parlıyor.","Sıralama: Sezon yarışı — gece gece puanlarla çubuk yarışı, Oynat'a bas.","Oyuncu kartı: takım logosu, son 10 maçın sayı grafiği, 10 maçlık günlük, sakatlık notu ve ligde kaç kez skorer seçildiği.","Boş ekranlar çizimli ve yönlendiren hale geldi.","Rozetler: ilerleme çubuğu ve ligde kaç kişide olduğu."]},
   {v:"1.10.3", d:"3 Kasım 2026", items:["Takım sayfasındaki son maç tarihleri sitenin geri kalanı gibi ABD tarihine göre.","Gece kazananı yıldızının rengi her avatarda okunur."]},
@@ -732,7 +733,10 @@ function renderBoardStrip(){
   if(!compact) return;
   const tot=seasonTotals(), rk=rankOrder(tot), lead=rk[0], me=rk.indexOf(S.uid);
   el.innerHTML = open ? `<span class="bs-t">Tabloyu küçült</span><span class="bs-c">▴</span>`
-    : `<span class="bs-t">${me===0 ? `👑 <b>Zirvedesin</b> · ${tot[S.uid]||0} puan` : `👑 Lider <b style="color:${col(lead)}">${esc(pname(lead))}</b> ${tot[lead]||0} puan${me>0?` <i>·</i> Sen <b>${me+1}.</b> sıradasın, ${tot[S.uid]||0} puan`:""}`}</span><span class="bs-c">Tabloyu aç ▾</span>`;
+    : (()=>{ const mine=tot[S.uid]||0, up=me>0?rk[me-1]:null, dn=me>=0&&me<rk.length-1?rk[me+1]:null;
+        const nb = me<0 ? "" : `<span class="bs-nb">${up?`▲ Önünde <b style="color:${col(up)}">${esc(pname(up))}</b>, ${(tot[up]||0)-mine} puan fark`:""}${up&&dn?` <i>·</i> `:""}${dn?`▼ Arkanda <b style="color:${col(dn)}">${esc(pname(dn))}</b>, ${mine-(tot[dn]||0)} puan fark`:""}</span>`;
+        const head = me===0 ? `👑 <b>Zirvedesin</b> · ${mine} puan` : `👑 Lider <b style="color:${col(lead)}">${esc(pname(lead))}</b> ${tot[lead]||0} puan${me>0?` <i>·</i> Sen <b>${me+1}.</b> sıradasın, ${mine} puan`:""}`;
+        return `<span class="bs-t"><span class="bs-h">${head}</span>${nb}</span><span class="bs-c">Tabloyu aç ▾</span>`; })();
 }
 function renderBoard(){
   const brk = seasonBreakdown();
@@ -3270,6 +3274,7 @@ function renderFeed(){
 }
 function render(){
   if(!S.uid) return;
+  if(S.touching){ render.pending=true; return; }
   updateFeed(); renderFeed();
   renderBoard(); renderBoardStrip();
   renderTicker();
@@ -3315,13 +3320,21 @@ function movePill(){
   const w=Math.min(64, a.offsetWidth-8); pill.style.width=w+"px"; pill.style.transform=`translateX(${a.offsetLeft+(a.offsetWidth-w)/2}px)`;
 }
 addEventListener("resize", movePill);
+// parmak ekrandayken ve dokunuştan hemen sonra yeniden çizme bekletilir
+addEventListener("pointerdown", ()=>{ S.touching=true; clearTimeout(S.touchT); }, {passive:true, capture:true});
+const touchEnd=()=>{ clearTimeout(S.touchT); S.touchT=setTimeout(()=>{ S.touching=false; if(render.pending){ render.pending=false; render(); } }, 30); };
+addEventListener("pointerup", touchEnd, {passive:true, capture:true}); addEventListener("pointercancel", touchEnd, {passive:true, capture:true});
 $("#boardStrip")?.addEventListener("click", ()=>{ S.boardOpen = S.boardOpen===S.tab ? null : S.tab; renderBoardStrip(); });
 // Mobilde aşağı kaydırınca üst çubuk ve alt menü saklanır, yukarı kaydırınca (ya da sayfanın sonunda) geri gelir
-(()=>{ let last=scrollY;
-  addEventListener("scroll", ()=>{ const y=scrollY, d=y-last; if(Math.abs(d)<8) return; last=y;
+(()=>{ let last=scrollY, acc=0;
+  addEventListener("scroll", ()=>{ const y=scrollY, d=y-last; last=y; acc = (Math.sign(d)===Math.sign(acc)) ? acc+d : d;
+    if(Math.abs(acc)<48) return;   // en az ~50 px aynı yöne kaydırınca karar ver
     const atEnd = innerHeight+y >= document.documentElement.scrollHeight-60;
-    const hide = d>0 && y>160 && !atEnd && innerWidth<=760 && $("#sheet").classList.contains("hide");
-    document.body.classList.toggle("bars-hidden", hide); }, {passive:true});
+    const hide = acc>0 && y>160 && !atEnd && innerWidth<=760 && $("#sheet").classList.contains("hide");
+    acc=0;
+    if(hide===document.body.classList.contains("bars-hidden")) return;
+    document.body.classList.toggle("bars-hidden", hide);
+    document.body.classList.add("bars-moving"); clearTimeout(S.barsT); S.barsT=setTimeout(()=>document.body.classList.remove("bars-moving"), 400); }, {passive:true});
   addEventListener("hashchange", ()=>document.body.classList.remove("bars-hidden"));
 })();
 async function showDay(){
