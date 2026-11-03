@@ -45,10 +45,11 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.9.1";
+const VERSION = "1.9.2";
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.9.2", d:"3 Kasım 2026", items:["1.9.1'deki açılmama hatası düzeltildi."]},
   {v:"1.9.1", d:"3 Kasım 2026", items:["Seçili düğmelerde okunmayan yazı rengi düzeldi.","NBA → Oyuncu ara: istediğin istatistiğe göre sırala; takım, konferans, çaylak ve bu gece oynayanlar filtreleri.","Sezon ödülleri gerçek adlarıyla; finalistler artık Eastern ve Western Conference Champion.","Uzun vadeden konferans sıralaması kaldırıldı.","Kurallar ve açıklamalar son değişikliklere göre güncellendi."]},
   {v:"1.9.0", d:"3 Kasım 2026", items:["Sakatlıklar artık sitenin her yerinde aynı kaynaktan geliyor; ESPN'in notunda \"oynamayacak\" yazan oyuncu da oynamıyor görünür.","Uzun vadeye NBA şampiyonu (+10) ve finalistler (+5) eklendi.","Üstte küçük arama: kişi, takım ya da oyuncu.","Maç kartında oynamayanların adları ve iki takımın son karşılaşması.","Profilde \"Puanların nereden geldi\" ve \"Sezon özeti\".","NBA → Oyuncular: iki oyuncuyu karşılaştır.","Sıralama: Sezon arşivi.","Takımım: kadroyu istediğin istatistiğe göre sırala."]},
   {v:"1.8.0", d:"3 Kasım 2026", items:["Yeni sekme: Takımım. Favori takımının maçları, takvimi, kadrosu, sakatları, takım liderleri ve ligin o takımdaki tahmin karnesi tek yerde.","Formda olanlar: sayı, ribaund, asist ve verimlilik kategorileri.","Takvim NBA sekmesinden Takımım'a taşındı."]},
@@ -2941,7 +2942,7 @@ function bindPlayerSearch(){
     if(S.nba.rookie) list=list.filter(p=>p.r);
     if(q) list=list.filter(p=>slug(p.n).includes(q));
     list.sort((a,b)=>(b.v??-1)-(a.v??-1)); list=list.slice(0, q||S.nba.team?60:30);
-    $("#nbaPl").innerHTML = list.length ? list.map((p,n)=>`<button class="plr" data-ath="${p.id}"><span class="ps-n">${n+1}</span><img src="${FACE(p.id)}" alt="" loading="lazy"><span class="pi"><b>${esc(p.n)}${injBadge(p.id)}</b><small>${esc(p.t)}${p.r?" · çaylak":""}</small></span><span class="ppg">${p.v!=null?fm(p.v):"–"}<small>${esc(lab.toLocaleLowerCase("tr"))}</small></span></button>`).join("") : '<p class="muted">Bu filtrelerde oyuncu yok.</p>';
+    $("#nbaPl").innerHTML = list.length ? list.map((p,n)=>`<button class="plr" data-ath="${p.id}"><span class="ps-n">${n+1}</span><img src="${FACE(p.id)}" alt="" loading="lazy"><span class="pi"><b>${esc(p.n)}${injBadge(p.id)}</b><small>${esc(p.t)}${p.r?" · çaylak":""}</small></span><span class="ppg">${p.v!=null?fm(p.v):"–"}<small>${esc(lab.toLocaleLowerCase("tr"))}</small></span></button>`).join("") : '<p class="muted">Bu filtrelerde oyuncu yok.</p>'; };
   $("#nbaSearch").oninput=e=>{ S.nba.q=e.target.value; paint(); };
   $("#psSort").onchange=e=>{ S.nba.sort=e.target.value; renderNBA(); };
   $("#psTeam").onchange=e=>{ S.nba.team=e.target.value; renderNBA(); };

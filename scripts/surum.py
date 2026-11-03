@@ -12,6 +12,14 @@ from pathlib import Path
 
 root = Path(__file__).resolve().parent.parent
 app = root / "app.js"
+# app.js tarayıcıda modül olarak yüklenir: modül olarak sözdizimi hatası varsa sürüm atlanmasın (site açılmaz)
+import shutil, subprocess, tempfile
+if shutil.which("node"):
+    with tempfile.TemporaryDirectory() as d:
+        t = Path(d) / "app.mjs"; t.write_text(app.read_text("utf-8"), "utf-8")
+        r = subprocess.run(["node", "--check", str(t)], capture_output=True, text=True)
+        if r.returncode:
+            sys.exit("app.js modül olarak açılmıyor, sürüm değişmedi:\n" + (r.stderr or r.stdout)[-600:])
 src = app.read_text("utf-8")
 cur = re.search(r'const VERSION = "([^"]+)";', src).group(1)
 arg = sys.argv[1] if len(sys.argv) > 1 else ""
