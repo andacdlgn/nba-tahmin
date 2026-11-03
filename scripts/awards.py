@@ -176,6 +176,20 @@ def collect(dir_):
         p = dir_.player(name, team)
         if p:
             put("c_2026", "cmvp", p["id"], p["n"])
+    # konferans sıralaması: normal sezon bitince (13 Nisan 2027'den sonra) ESPN puan durumundan ilk 8
+    if datetime.utcnow() >= datetime(2027, 4, 13):
+        try:
+            import json as _j
+            st = _j.loads(_text("https://site.web.api.espn.com/apis/v2/sports/basketball/nba/standings?level=2"))
+            for conf in st.get("children", []):
+                c = "e" if "East" in conf.get("name", "") else "w"
+                for e in conf.get("standings", {}).get("entries", []):
+                    seed = next((int(float(x.get("value", 0))) for x in e.get("stats", []) if x.get("name") == "playoffSeed"), 0)
+                    if 1 <= seed <= 8:
+                        abbr = e["team"]["abbreviation"]
+                        put("k_2027", f"{c}{seed}", abbr, abbr)
+        except Exception as e:
+            print("konferans sıralaması alınamadı:", type(e).__name__)
     return out
 
 
@@ -186,7 +200,7 @@ def auto_awards(db, dry=False):
         print("ödüller alınamadı:", type(e).__name__, e)
         return
     for k, cats in found.items():
-        if not re.match(r"^(w_\d{8}|m_\d{6}|c_2026|s_2027)$", k) or (k[0] == "w" and k < "w_20261102") or (k[0] == "m" and k < "m_202611"):
+        if not re.match(r"^(w_\d{8}|m_\d{6}|c_2026|k_2027|s_2027)$", k) or (k[0] == "w" and k < "w_20261102") or (k[0] == "m" and k < "m_202611"):
             continue
         ref = db.collection("ltResults").document(k)
         cur = ref.get().to_dict() or {}

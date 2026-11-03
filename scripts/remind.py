@@ -324,6 +324,8 @@ def lt_lock(k):
         return datetime(int(k[2:6]), int(k[6:8]), 15, 17, tzinfo=timezone.utc)
     if k[0] == "c":
         return datetime(2026, 12, 4, 17, tzinfo=timezone.utc)
+    if k[0] == "k":
+        return datetime(2026, 12, 1, 17, tzinfo=timezone.utc)
     return datetime(2027, 1, 15, 17, tzinfo=timezone.utc)
 
 
@@ -331,7 +333,7 @@ def lt_alerts(db, mail, inj):
     today = espn_today().strftime("%Y%m%d")
     y, m = int(today[:4]), int(today[4:6])
     mk = "m_202611" if (y, m) in ((2026, 10), (2026, 11)) else f"m_{y}{m:02d}"
-    keys = ["w_" + week_key(today), mk, "c_2026", "s_2027"]
+    keys = ["w_" + week_key(today), mk, "c_2026", "s_2027"]   # k_2027 takım seçimi: sakatlık uyarısı yok
     now = datetime.now(timezone.utc)
     # 65 maç kuralı: takımın oynadığı - oyuncunun oynadığı maç
     games = load("games.json", {})
@@ -388,8 +390,8 @@ def lt_alerts(db, mail, inj):
 
 
 # ---------------------------------------------------------------- 2c) uzun vade kilit hatırlatması
-LT_TITLES = {"w": "Haftanın oyuncusu", "m": "Ayın ödülleri", "c": "NBA Kupası", "s": "Sezon ödülleri"}
-LT_COUNT = {"w": 2, "m": 6, "c": 4, "s": 6}
+LT_TITLES = {"w": "Haftanın oyuncusu", "m": "Ayın ödülleri", "c": "NBA Kupası", "k": "Konferans sıralaması", "s": "Sezon ödülleri"}
+LT_COUNT = {"w": 2, "m": 6, "c": 4, "k": 12, "s": 6}
 
 
 def lt_lock_mail(db, mail):
@@ -399,7 +401,7 @@ def lt_lock_mail(db, mail):
     mk = "m_202611" if (y, m) in ((2026, 10), (2026, 11)) else f"m_{y}{m:02d}"
     nxt = (datetime.strptime(week_key(today), "%Y%m%d") + timedelta(days=7)).strftime("%Y%m%d")
     now = datetime.now(timezone.utc)
-    due = [k for k in ("w_" + week_key(today), "w_" + nxt, mk, "c_2026", "s_2027") if timedelta(0) < lt_lock(k) - now <= timedelta(hours=24)]
+    due = [k for k in ("w_" + week_key(today), "w_" + nxt, mk, "c_2026", "k_2027", "s_2027") if timedelta(0) < lt_lock(k) - now <= timedelta(hours=24)]
     if not due:
         return
     for uid, name, email in people(db, "remind"):
@@ -423,6 +425,30 @@ def lt_lock_mail(db, mail):
         if mail.send(msg) and not mail.dry:
             for ref, _ in rows:
                 ref.set({"at": firestore.SERVER_TIMESTAMP})
+
+
+# ---------------------------------------------------------------- 2d) sorun bildirimleri -> yönetici
+def report_mail(db, mail):
+    """Yeni "sorun bildir" mesajlarını yöneticinin adresine (gönderen Gmail hesabı) bir kez yollar."""
+    to = os.environ.get("GMAIL_USER", "").strip()
+    if not to:
+        return
+    pl = None
+    for r in db.collection("reports").stream():
+        d = r.to_dict() or {}
+        ref = once(db, f"rep_{r.id}")
+        if not ref:
+            continue
+        if pl is None:
+            pl = {x.id: (x.to_dict() or {}).get("name", "?") for x in db.collection("players").stream()}
+        who = pl.get(d.get("uid"), "?")
+        text = f"{who} bir sorun bildirdi (sürüm {d.get('v', '?')}, sekme {d.get('tab', '?')}, ekran {d.get('w', '?')} px):\n\n{d.get('text', '')}\n\n{d.get('ua', '')}"
+        inner = (f'<p style="margin:0 0 10px"><b>{escape(who)}</b> bir sorun bildirdi.</p>'
+                 f'<p style="margin:0 0 10px;padding:10px;background:#f2f4f7;border-radius:8px;white-space:pre-wrap">{escape(d.get("text", ""))}</p>'
+                 f'<p style="margin:0 0 12px;color:#5f6b78;font-size:12px">Sürüm {escape(str(d.get("v", "?")))} · sekme {escape(str(d.get("tab", "?")))} · {escape(str(d.get("ua", "")))}</p>')
+        msg = build(to, f"Sorun bildirimi: {who}", text, card("Sorun bildirimi", "yönetim", inner, "Yönetim paneline git"), "", "bildirim")
+        if mail.send(msg) and not mail.dry:
+            ref.set({"at": firestore.SERVER_TIMESTAMP})
 
 
 # ---------------------------------------------------------------- 3) haftalık özet
@@ -588,6 +614,7 @@ def main():
         print(day, "maç yok ya da gece bitti")
     lt_alerts(db, mail, inj)
     lt_lock_mail(db, mail)
+    report_mail(db, mail)
     # uzun vade sonuçları (Wikipedia) saatte bir
     if force or datetime.now(timezone.utc).minute < 12:
         try:

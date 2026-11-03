@@ -37,6 +37,8 @@ service cloud.firestore {
         // bio: profildeki "Hakkında" satırı (en fazla 60 karakter, bariz küfürler engellenir; ayrıntılı kontrol sitede)
         && (!('bio' in d) || (d.bio is string && d.bio.size() <= 60
             && !d.bio.lower().matches('.*(orospu|siktir|sikerim|sikeyim|yarrak|am[iı]nak|amc[iı]k|ibne|pezevenk|kahpe|[sş]erefsiz|fuck|bitch|nigg|faggot).*')))
+        // rival: rakip olarak seçilen oyuncunun kimliği
+        && (!('rival' in d) || (d.rival is string && d.rival.size() <= 40))
         // club: takım adı (en fazla 40 karakter; bariz küfürler burada, ayrıntılı kontrol sitede)
         && (!('club' in d) || (d.club is string && d.club.size() <= 40
             && !d.club.lower().matches('.*(orospu|siktir|sikerim|sikeyim|sikik|yarrak|yarak|am[iı]nak|amc[iı]k|ibne|pezevenk|kahpe|kaltak|yav[sş]ak|[sş]erefsiz|gerizekal|dalyarak|ta[sş]ak|fuck|shit|bitch|cunt|nigg|faggot|whore|asshole).*')));
@@ -47,6 +49,7 @@ service cloud.firestore {
       return k.matches('^w_[0-9]{8}$') ? timestamp.date(int(k[2:6]), int(k[6:8]), int(k[8:10])) + duration.value(71, 'h')
         : k.matches('^m_[0-9]{6}$') ? timestamp.date(int(k[2:6]), int(k[6:8]), 15) + duration.value(17, 'h')
         : k == 'c_2026' ? timestamp.date(2026, 12, 4) + duration.value(17, 'h')
+        : k == 'k_2027' ? timestamp.date(2026, 12, 1) + duration.value(17, 'h')
         : timestamp.date(2027, 1, 15) + duration.value(17, 'h');
     }
     match /lt/{id} {
@@ -56,9 +59,9 @@ service cloud.firestore {
       allow create, update: if isPlayer()
         && id == request.resource.data.key + '_' + request.auth.uid
         && request.resource.data.uid == request.auth.uid
-        && request.resource.data.key.matches('^(w_[0-9]{8}|m_[0-9]{6}|c_2026|s_2027)$')
+        && request.resource.data.key.matches('^(w_[0-9]{8}|m_[0-9]{6}|c_2026|k_2027|s_2027)$')
         && request.resource.data.keys().hasOnly(['uid', 'key', 'picks', 'names', 'swaps', 'updatedAt'])
-        && request.resource.data.picks is map && request.resource.data.picks.size() <= 6
+        && request.resource.data.picks is map && request.resource.data.picks.size() <= 12
         && request.resource.data.updatedAt == request.time
         && (request.time < ltLock(request.resource.data.key)
           || (resource != null && request.resource.data.key == 's_2027'
@@ -71,6 +74,16 @@ service cloud.firestore {
     match /ltResults/{k} {
       allow read: if true;
       allow write: if isAdmin();
+    }
+
+    // reports/{id}: oyuncuların "sorun bildir" mesajları. Oyuncu yazar, yönetici okur ve siler.
+    match /reports/{id} {
+      allow read, delete: if isAdmin();
+      allow create: if isPlayer() && id.size() >= 10 && id.size() <= 40
+        && request.resource.data.keys().hasOnly(['uid', 'text', 'v', 'tab', 'ua', 'w', 'at'])
+        && request.resource.data.uid == request.auth.uid
+        && str(request.resource.data.text, 1000)
+        && request.resource.data.at == request.time;
     }
 
     match /config/{doc} {
@@ -120,7 +133,7 @@ service cloud.firestore {
             && exists(/databases/$(database)/documents/players/$(request.resource.data.ref))));
       // Profil: ad, renk, emoji, favori takım ve tema değiştirilebilir (listeden seçilir)
       allow update: if signedIn() && request.auth.uid == uid
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'color', 'emoji', 'favTeam', 'theme', 'av', 'bio', 'club'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'color', 'emoji', 'favTeam', 'theme', 'av', 'bio', 'club', 'rival'])
         && (!('name' in request.resource.data.diff(resource.data).affectedKeys()) || validName(request.resource.data.name))
         && profileOk(request.resource.data);
       allow delete: if isAdmin();
@@ -266,7 +279,7 @@ service cloud.firestore {
         && hashing.sha256(get(path).data.salt + d.code) == get(path).data.h;
     }
     match /contacts/{uid} {
-      allow read: if signedIn() && request.auth.uid == uid;
+      allow read: if (signedIn() && request.auth.uid == uid) || isAdmin();
       allow create, update: if isPlayer() && request.auth.uid == uid
         && request.resource.data.keys().hasOnly(['email', 'remind', 'weekly', 'verified', 'code', 'updatedAt'])
         && (!('weekly' in request.resource.data) || request.resource.data.weekly is bool)

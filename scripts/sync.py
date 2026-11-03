@@ -103,8 +103,24 @@ def made_att(v):
         return 0, 0
 
 
+def espn_fav(s):
+    """ESPN'in maç önü favorisi: kazanma olasılığı akışının ilk değeri (yoksa maç önü tahmini)."""
+    try:
+        wp = s.get("winprobability") or []
+        if wp:
+            h = float(wp[0].get("homeWinPercentage"))
+        else:
+            h = float(s["predictor"]["homeTeam"]["gameProjection"]) / 100
+    except (KeyError, TypeError, ValueError):
+        return ""
+    comp = s.get("header", {}).get("competitions", [{}])[0].get("competitors", [])
+    side = {c.get("homeAway"): c.get("team", {}).get("abbreviation", "") for c in comp}
+    return side.get("home", "") if h >= 0.5 else side.get("away", "")
+
+
 def box(event_id: str):
     s = get(f"{ESPN}/summary?event={event_id}")
+    box.last = s
     players = []
     for team in s.get("boxscore", {}).get("players", []):
         abbr = team["team"]["abbreviation"]
@@ -219,6 +235,7 @@ def fs_doc(path):
 LT_PTS = {"w": {"e": 2, "w": 2},
           "m": {"pe": 4, "pw": 4, "re": 3, "rw": 3, "de": 3, "dw": 3},
           "c": {"cw": 8, "cfe": 3, "cfw": 3, "cmvp": 6},
+          "k": {f"{c}{i}": 2 for c in "ew" for i in range(1, 7)},
           "s": {"mvp": 12, "roy": 8, "dpoy": 8, "mip": 8, "smoy": 8, "coy": 8}}
 
 
@@ -249,11 +266,102 @@ def lt_scores(players):
             for c, p in cats.items():
                 sw = swaps.get(c) or {}
                 mine = sw.get("to") or picks.get(c)
-                if r.get(c) and mine and str(mine) == str(r[c]):
+                if not (r.get(c) and mine):
+                    continue
+                if k[0] == "k":   # konferans sıralaması: tam yer +2, bir sıra şaşma +1
+                    slot = next((x for x in r if re.fullmatch(r"[ew]\d+", x) and x[0] == c[0] and str(r[x]) == str(mine)), None)
+                    if slot:
+                        d = abs(int(slot[1:]) - int(c[1:]))
+                        pts += p if d == 0 else 1 if d == 1 else 0
+                elif str(mine) == str(r[c]):
                     pts += p // 2 if sw else p
             if pts:
                 out.setdefault(uid, {})[k] = pts
     return out, days
+
+
+AY = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"]
+
+
+def award_month(day):
+    return "202611" if day < "20261201" else day[:6]
+
+
+def league_awards(sc, games, players, today, league_start):
+    """Biten her ay için 5 ödül. Eşitlikte ödül paylaşılır (hepsi puanı alır). Kimse şartı sağlamazsa ödül boş kalır."""
+    out = {}
+    months = sorted({award_month(d) for d in sc["days"] if d >= (league_start or "")})
+    for mk in months:
+        y, m = int(mk[:4]), int(mk[4:])
+        end = f"{y + (m == 12)}{(m % 12) + 1:02d}01"
+        if today < end:
+            continue  # ay bitmedi
+        days = [d for d in sc["days"] if award_month(d) == mk and d >= (league_start or "")]
+        if not days:
+            continue
+        st = {u: {"pts": 0, "bn": 0, "bok": 0, "sur": 0, "sc": 0, "mg": 0} for u in players}
+        for d in days:
+            for u, v in sc["days"][d].items():
+                if u in st:
+                    st[u]["pts"] += v.get("tot", v.get("pts", 0))
+        for gid, row in sc["games"].items():
+            g = games.get(gid)
+            if not g or award_month(g.get("day", "")) != mk or g.get("day", "") < (league_start or ""):
+                continue
+            for u, r in row.items():
+                if u not in st or not r.get("pick"):
+                    continue
+                if r.get("c"):
+                    st[u]["bn"] += 1
+                    st[u]["bok"] += r.get("w", 0) > 0
+                if g.get("fav") and r["pick"].get("w") and r["pick"]["w"] != g["fav"] and r.get("w", 0) > 0:
+                    st[u]["sur"] += 1
+                st[u]["sc"] += r.get("s", 0) > 0
+                st[u]["mg"] += r.get("m", 0) > 0
+
+        def best(key, minv=1, cond=lambda x: True):
+            vals = {u: key(x) for u, x in st.items() if cond(x)}
+            if not vals:
+                return [], 0
+            top = max(vals.values())
+            return ([u for u, v in vals.items() if v == top], top) if top >= minv else ([], top)
+
+        lst = []
+        w, v = best(lambda x: x["pts"])
+        lst.append({"k": "top", "i": "👑", "t": "Ayın tahmincisi", "d": "Ayın en çok puan toplayanı", "u": w, "v": f"{v} puan", "pts": 3})
+        w, v = best(lambda x: round(x["bok"] / x["bn"] * 100), 1, lambda x: x["bn"] >= 4)
+        lst.append({"k": "banko", "i": "★", "t": "Banko ustası", "d": "En yüksek banko isabeti (en az 4 banko)", "u": w, "v": f"%{v}", "pts": 2})
+        w, v = best(lambda x: x["sur"])
+        lst.append({"k": "surpriz", "i": "🎯", "t": "Sürpriz avcısı", "d": "ESPN'in favorisinin karşısına geçip en çok bilen", "u": w, "v": f"{v} maç", "pts": 2})
+        w, v = best(lambda x: x["sc"])
+        lst.append({"k": "skorer", "i": "🔥", "t": "Skorer ustası", "d": "En skoreri en çok bilen", "u": w, "v": f"{v} maç", "pts": 2})
+        w, v = best(lambda x: x["mg"])
+        lst.append({"k": "fark", "i": "📏", "t": "Fark ustası", "d": "Farkı en çok tutturan", "u": w, "v": f"{v} maç", "pts": 2})
+        title = "Ekim-Kasım ödülleri" if mk == "202611" else f"{AY[m - 1]} ödülleri"
+        out[mk] = {"title": title, "list": lst}
+    return out
+
+
+def backup(players, today):
+    """Haftalık yedek: data/backup/<pazartesi>.json. Herkese açık okunabilen veriler (oyuncular, lig ayarları,
+    uzun vade sonuçları ve kilitlenmiş uzun vade seçimleri). Gece gece tahminler zaten scores.json'da (git geçmişinde) duruyor."""
+    wk = week_key(today.strftime("%Y%m%d"))
+    path = os.path.join(DATA, "backup", f"{wk}.json")
+    if os.path.exists(path):
+        return False
+    res = fs_list("ltResults")
+    lt = {}
+    for k in res:
+        for uid in players:
+            d = fs_doc(f"lt/{k}_{uid}")
+            if d:
+                lt[f"{k}_{uid}"] = d
+    data = {"at": datetime.now(timezone.utc).isoformat(), "players": fs_list("players"), "league": fs_list("league"),
+            "ltResults": res, "lt": lt}
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=1, sort_keys=True)
+    return True
 
 
 def fs_players():
@@ -387,7 +495,7 @@ def main(full=False):
 
     start = datetime.strptime(CONFIG["seasonStart"], "%Y%m%d").date()
     today = espn_today()
-    if any("cup" not in x for x in games.values()):   # NBA Kupası bilgisi eski kayıtlara bir kere eklenir
+    if any("cup" not in x or "fav" not in x for x in games.values()):   # kupa ve ESPN favorisi bilgisi eski kayıtlara bir kere eklenir
         full = True
     first = start if (full or not games) else max(start, today - timedelta(days=3))
 
@@ -404,7 +512,7 @@ def main(full=False):
             g = finished_game(ev)
             if not g or g["seasonType"] == 1:
                 continue
-            if games.get(g["id"], {}).get("top") and g["id"] in counted:
+            if games.get(g["id"], {}).get("top") and g["id"] in counted and "fav" in games[g["id"]]:
                 games[g["id"]]["cup"] = g["cup"]
                 if g.get("cupStage"):
                     games[g["id"]]["cupStage"] = g["cupStage"]
@@ -415,6 +523,7 @@ def main(full=False):
                 print(f"Kutu skoru alınamadı {g['id']}: {exc}", file=sys.stderr)
                 continue
             top = max((p["pts"] for p in bx), default=0)
+            g["fav"] = espn_fav(getattr(box, "last", {}) or {})
             winner = g.get("winner")
             g["day"] = day
             g["top"] = [{"id": p["id"], "name": p["name"], "team": p["team"], "pts": p["pts"]} for p in bx if p["pts"] == top]
@@ -555,6 +664,14 @@ def main(full=False):
                 tot[uid]["dayWins"] += 1
             weeks.setdefault(v["week"], {}).setdefault(uid, 0)
             weeks[v["week"]][uid] += v["tot"]
+    # lig ödülleri: her ay bitince (Ekim, Kasım'la birlikte sayılır) ödüller ve bonus puanları
+    sc["awards"] = league_awards(sc, games, players, today.strftime("%Y%m%d"), league_start)
+    for a in sc["awards"].values():
+        for x in a["list"]:
+            for uid in x["u"]:
+                if uid in tot:
+                    tot[uid]["pts"] += x["pts"]
+                    tot[uid]["aw"] = tot[uid].get("aw", 0) + x["pts"]
     # uzun vade puanları: toplama ve sonucun açıklandığı haftaya eklenir
     try:
         lt, lt_days = lt_scores(players)
@@ -585,6 +702,10 @@ def main(full=False):
     sc["weeks"] = weeks
 
     changed = [save("games.json", games), save("players.json", pstats), save("scores.json", sc), save("nights.json", nights)]
+    try:
+        changed.append(backup(players, today))
+    except Exception as e:
+        print("Yedek alınamadı:", e)
     try:
         changed.append(save_injuries())
     except Exception as e:

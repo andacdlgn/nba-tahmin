@@ -31,7 +31,7 @@
 <script>
 // Açılış ekranı + sürüm kontrolü. Her güncellemede BUILD, version.json, app.js'deki VERSION ve
 // aşağıdaki ?v= numaraları birlikte artırılır (scripts/surum.py hepsini birden yapar).
-window.BUILD = "v33";
+window.BUILD = "1.4.0";
 (function(){
   var t0 = Date.now(), MIN = 1000, MAX = 8000, ready = false, done = false;
   function hide(){ if(done) return; done = true; var s = document.getElementById("splash"); if(!s) return; s.classList.add("out"); setTimeout(function(){ s.remove(); }, 450); }
@@ -49,7 +49,7 @@ window.BUILD = "v33";
   }).catch(function(){});
 })();
 </script>
-<link rel="stylesheet" href="style.css?v=v33">
+<link rel="stylesheet" href="style.css?v=1.4.0">
 </head>
 <body>
 
@@ -114,7 +114,7 @@ window.BUILD = "v33";
         </div>
         <p class="err" id="authErr" role="alert"></p>
         <button class="btn-primary" id="authBtn" type="submit">Giriş yap</button>
-        <div class="auth-links"><button class="linkish forgot" id="forgotBtn" type="button">Şifremi unuttum</button><button class="linkish" id="howBtn" type="button">Nasıl oynanır?</button></div>
+        <div class="auth-links"><button class="linkish forgot" id="forgotBtn" type="button">Şifremi unuttum</button><button class="linkish" id="howBtn" type="button">Nasıl oynanır?</button><button class="linkish" id="authLang" type="button">English</button></div>
       </form>
       <div id="joinBox" class="hide"></div>
       <div id="resetWait" class="hide"></div>
@@ -130,6 +130,7 @@ window.BUILD = "v33";
 
     <div id="banners"></div>
     <div id="alert"></div>
+    <div id="liveFeed"></div>
     <main>
       <!-- TAHMİN -->
       <section id="view-tahmin" data-view>
@@ -209,6 +210,6 @@ window.BUILD = "v33";
 
 <div class="toast hide" id="toast" role="status" aria-live="polite"></div>
 
-<script type="module" src="app.js?v=v33"></script>
+<script type="module" src="app.js?v=1.4.0"></script>
 </body>
 </html>
