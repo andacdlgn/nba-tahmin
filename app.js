@@ -45,10 +45,12 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.11.2";
+const VERSION = "1.12.0";
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.12.0", d:"3 Kasım 2026", items:["Daha hızlı açılış: sitenin kendi dosyaları telefondaki kopyadan anında açılıyor, yeni sürüm arka planda iniyor.","Sakatlık listesi, kadrolar ve oyuncu listesi ilk ekran çizildikten sonra yükleniyor.","Fotoğraf sunucusuna ve sitenin koduna önceden bağlanılıyor."]},
+  {v:"1.11.3", d:"3 Kasım 2026", items:["Görsel hizalar: kürsüde isimler aynı hizada, takım liderleri kartları eşit boyda, oyuncu arama seçicileri ekrandan taşmıyor, filtre düğmeleri alt satıra geçiyor, puan şeridi telefonda kesilmiyor, puan tablosunda takım adları iki satıra kadar görünüyor."]},
   {v:"1.11.2", d:"3 Kasım 2026", items:["Telefonda dokunuşlar düzeldi: canlı veri gelince ekran parmağının altında değişmiyor, çubuklar yanlışlıkla açılıp kapanmıyor, hızlı dokunuşlar yakınlaştırmaya dönüşmüyor.","İnce şeritte önündeki ve arkandaki rakiple puan farkı."]},
   {v:"1.11.1", d:"3 Kasım 2026", items:["Avatar artık yalnızca basketbolcu fotoğrafı olabiliyor; profilde istediğin oyuncuyu arayıp seçebilirsin.","Diğer sekmelerdeki ince puan şeridi daha anlaşılır: lider, senin sıran ve puanın."]},
   {v:"1.11.0", d:"3 Kasım 2026", items:["Gecenin kazananı gece bitince sahneye çıkıyor, puan tablosunda satırı parlıyor.","Sıralama: Sezon yarışı — gece gece puanlarla çubuk yarışı, Oynat'a bas.","Oyuncu kartı: takım logosu, son 10 maçın sayı grafiği, 10 maçlık günlük, sakatlık notu ve ligde kaç kez skorer seçildiği.","Boş ekranlar çizimli ve yönlendiren hale geldi.","Rozetler: ilerleme çubuğu ve ligde kaç kişide olduğu."]},
@@ -734,9 +736,9 @@ function renderBoardStrip(){
   const tot=seasonTotals(), rk=rankOrder(tot), lead=rk[0], me=rk.indexOf(S.uid);
   el.innerHTML = open ? `<span class="bs-t">Tabloyu küçült</span><span class="bs-c">▴</span>`
     : (()=>{ const mine=tot[S.uid]||0, up=me>0?rk[me-1]:null, dn=me>=0&&me<rk.length-1?rk[me+1]:null;
-        const nb = me<0 ? "" : `<span class="bs-nb">${up?`▲ Önünde <b style="color:${col(up)}">${esc(pname(up))}</b>, ${(tot[up]||0)-mine} puan fark`:""}${up&&dn?` <i>·</i> `:""}${dn?`▼ Arkanda <b style="color:${col(dn)}">${esc(pname(dn))}</b>, ${mine-(tot[dn]||0)} puan fark`:""}</span>`;
-        const head = me===0 ? `👑 <b>Zirvedesin</b> · ${mine} puan` : `👑 Lider <b style="color:${col(lead)}">${esc(pname(lead))}</b> ${tot[lead]||0} puan${me>0?` <i>·</i> Sen <b>${me+1}.</b> sıradasın, ${mine} puan`:""}`;
-        return `<span class="bs-t"><span class="bs-h">${head}</span>${nb}</span><span class="bs-c">Tabloyu aç ▾</span>`; })();
+        const nb = me<0 ? "" : `<span class="bs-nb">${up?`<span>▲ <b style="color:${col(up)}">${esc(pname(up))}</b> ${(tot[up]||0)-mine} puan önde</span>`:""}${dn?`<span>▼ <b style="color:${col(dn)}">${esc(pname(dn))}</b> ${mine-(tot[dn]||0)} puan geride</span>`:""}</span>`;
+        const head = me===0 ? `👑 <b>Zirvedesin</b> · ${mine} puan` : `<span>👑 <b style="color:${col(lead)}">${esc(pname(lead))}</b> ${tot[lead]||0}</span>${me>0?`<span>Sen <b>${me+1}.</b> sırada · ${mine} puan</span>`:""}`;
+        return `<span class="bs-t"><span class="bs-h">${head}</span>${nb}</span><span class="bs-c">Tablo ▾</span>`; })();
 }
 function renderBoard(){
   const brk = seasonBreakdown();
@@ -1032,7 +1034,7 @@ function lastMeetHTML(g){
   const m=ms[0]; return `<small class="ib-meet">Son karşılaşma (${dayNice(m.day,{day:"numeric",month:"short"})}): <b>${esc(m.away.abbr)} ${m.away.score}–${m.home.score} ${esc(m.home.abbr)}</b>${ms.length>1?` · bu sezon ${ms.filter(x=>x.winner===g.away.abbr).length}-${ms.filter(x=>x.winner===g.home.abbr).length}`:""}</small>`;
 }
 function infoBox(g){
-  if(!S.inj && !loadInj.p) loadInj().then(()=>render()).catch(()=>{});
+  if(!S.inj && !loadInj.p && !infoBox.wait){ infoBox.wait=true; later(()=>loadInj().then(()=>render()).catch(()=>{}), Math.max(0, 2000-(Date.now()-S.bootAt))); }
   const s = S.sums[g.id]?.data;
   let inner = `<span class="ib-loading">Maç öncesi bilgiler yükleniyor…</span>`;
   if(s){
@@ -1313,8 +1315,12 @@ function openTalk(g){
 /* ====================================================== sakatlık uyarısı */
 // Seçtiğin skorer ya da günün oyuncusu ESPN'e göre oynamıyorsa / belirsizse uyar
 S.rosterAt = {};
+// Açılışta acil olmayan işler: ilk ekran çizildikten sonra, tarayıcı boşalınca
+S.bootAt = Date.now();
+const later = (fn, ms=1500) => setTimeout(()=>{ if("requestIdleCallback" in window) requestIdleCallback(()=>fn(), {timeout:1500}); else fn(); }, ms);
 async function refreshInjuries(D){
   if(refreshInjuries.busy) return;
+  if(Date.now()-S.bootAt < 2500){ if(!refreshInjuries.wait){ refreshInjuries.wait=true; later(()=>{ refreshInjuries.wait=false; refreshInjuries(D); }, 2500); } return; }
   const open=D.games.filter(g=>!started(g)); if(!open.length) return;
   const teams=open.flatMap(g=>[g.away,g.home]).filter(t=>!S.rosterAt[t.id] || Date.now()-S.rosterAt[t.id]>20*60e3);
   if(!teams.length) return;
@@ -1965,7 +1971,7 @@ function renderPuan(){
   // podyum: ilk üç (puan varsa)
   const rk=ranked;
   const pod = rk.length>=2 && tot[rk[0]]>0 ? `<div class="podium">${[1,0,2].filter(i=>rk[i]).map(i=>{ const u=rk[i];
-    return `<div class="pd pd${i+1}" data-pu="${u}" style="--pc:${col(u)}">${avatar(u, i===0?"lg":"")}${S.players[u]?.club?`<b class="pd-club" style="color:${col(u)}">${esc(S.players[u].club)}</b><small class="pd-name">${esc(pname(u))}</small>`:`<b style="color:${col(u)}">${esc(pname(u))}</b>`}<span class="pd-pts tnum">${tot[u]}</span><div class="pd-step"><span>${i+1}</span></div></div>`; }).join("")}</div>` : "";
+    return `<div class="pd pd${i+1}" data-pu="${u}" style="--pc:${col(u)}">${avatar(u, i===0?"lg":"")}<span class="pd-nm">${S.players[u]?.club?`<b class="pd-club" style="color:${col(u)}">${esc(S.players[u].club)}</b><small class="pd-name">${esc(pname(u))}</small>`:`<b class="pd-club" style="color:${col(u)}">${esc(pname(u))}</b>`}</span><span class="pd-pts tnum">${tot[u]}</span><div class="pd-step"><span>${i+1}</span></div></div>`; }).join("")}</div>` : "";
   const rv=S.players[S.uid]?.rival; let rivalBox="";
   if(rv && S.players[rv] && tot[rv]!=null){ const d=tot[S.uid]-tot[rv], wk=weekKey(S.today), wkP=u=>dayRows.filter(x=>weekKey(x.d)===wk).reduce((s,x)=>s+(x.pts[u]?.pts||0),0), wd=wkP(S.uid)-wkP(rv);
     rivalBox=`<div class="rival-card" style="--pc:${col(rv)}">${avatar(S.uid,"sm")}<span class="rv-vs">VS</span>${avatar(rv,"sm")}<span class="rv-t"><b>Rakibin ${esc(pname(rv))}</b><small>${d>0?`Sezonda ${d} puan öndesin`:d<0?`Sezonda ${-d} puan gerisindesin`:"Sezonda puanlar eşit"} · bu hafta ${wd>0?`+${wd}`:wd}</small></span><button class="linkish" data-pu="${rv}" type="button">Profil</button></div>`; }
@@ -4172,8 +4178,9 @@ if("serviceWorker" in navigator && location.protocol==="https:") navigator.servi
     if(S.onboard){ if(S.joinP) await S.joinP.catch(()=>{}); await loadPlayers().catch(()=>{}); allPlayers().catch(()=>{}).finally(()=>openOnboard(4)); }
     else checkRecovery();
     loadLT(); setTimeout(installBanner, 6000); maybeNews(); maybeCeremony();
-    getDoc(doc(S.db,"config","admin")).then(()=>{ S.isAdmin=true; }).catch(()=>{ S.isAdmin=false; });
-    getDoc(doc(S.db,"config","secret")).then(r=>{ S.invite=r.data()?.invite||""; }).catch(()=>{});
+    later(()=>{ getDoc(doc(S.db,"config","admin")).then(()=>{ S.isAdmin=true; }).catch(()=>{ S.isAdmin=false; });
+      getDoc(doc(S.db,"config","secret")).then(r=>{ S.invite=r.data()?.invite||""; }).catch(()=>{});
+      allPlayers().catch(()=>{}); }, 2000);
     getDoc(doc(S.db,"contacts",S.uid)).then(r=>{ S.contact = r.exists() ? r.data() : {email:"",remind:false}; }).catch(()=>{}).finally(()=>{ S.contactLoaded=true; renderBanners(); maybeAskMail(); });
   });
 })();

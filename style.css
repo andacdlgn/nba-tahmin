@@ -1836,3 +1836,19 @@ body.bars-moving .nav,body.bars-moving .topbar{pointer-events:none}
 body.bars-hidden .nav,body.bars-hidden .topbar{pointer-events:none}
 .bs-t{display:flex;flex-direction:column;gap:2px}
 .bs-nb{font-size:12px;opacity:.9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* 1.11.3 hizalar ve simetri */
+.pd-nm{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;min-height:48px;max-width:100%}
+.pd .pd-club{-webkit-line-clamp:2;max-width:100%}
+.tl-grid{grid-auto-rows:1fr}
+.tl-c{height:100%}
+.tl-c small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tl-c em{flex:none;min-width:48px;text-align:right}
+.ps-sel{min-width:0}.ps-sel select{width:100%;min-width:0}
+.ps-c{flex-wrap:wrap;overflow:visible}
+.bs-t{white-space:normal}
+.bs-t>.bs-h,.bs-nb{display:flex;flex-wrap:wrap;column-gap:10px;row-gap:1px}
+.bs-nb{font-size:12px;white-space:normal}
+.board-strip{align-items:center}
+.pn-club{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.2}
+@media (max-width:520px){ .t-lb{grid-template-columns:20px 1fr 42px 34px 36px 28px;gap:6px;padding:9px 10px} }
