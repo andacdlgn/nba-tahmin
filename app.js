@@ -45,10 +45,11 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.14.0";
+const VERSION = "1.14.1";
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.14.1", d:"4 Kasım 2026", items:["Puanlama rehberi: bütün puan kuralları örnekleriyle tek yerde (Kurallar'dan da açılır).","Fark kaydırıcısı boşken de diğerleriyle aynı görünüyor."]},
   {v:"1.14.0", d:"4 Kasım 2026", items:["Sürpriz kademesi: ESPN'in şans vermediği takımı bilirsen kazanan puanı +2 (%33 ve altı) ya da +3 (%20 ve altı). Banko 2 kat, kazanan puanı en fazla 4.","Takım düğmelerinde ESPN'in maç önü kazanma şansı ve sürpriz puanı görünüyor."]},
   {v:"1.13.0", d:"3 Kasım 2026", items:["Fark artık kaydırıcıyla sayı olarak seçiliyor; gerçek farka 3 sayı ya da daha yakınsan +1.","Yedek tahmin (isteğe bağlı): unuttuğun gecede ESPN favorileri girer, her 2 doğru kazanan 1 puan.","Devamlılık bonusu: haftada en az 4 gece oynayana +2.","Hiç tahmin yapmamış oyunculara ilk maçta adım adım rehber.","Yönetim paneli: her oyuncunun oynadığı gece sayısı ve son girişi."]},
   {v:"1.12.0", d:"3 Kasım 2026", items:["Daha hızlı açılış: sitenin kendi dosyaları telefondaki kopyadan anında açılıyor, yeni sürüm arka planda iniyor.","Sakatlık listesi, kadrolar ve oyuncu listesi ilk ekran çizildikten sonra yükleniyor.","Fotoğraf sunucusuna ve sitenin koduna önceden bağlanılıyor."]},
@@ -1418,10 +1419,10 @@ async function saveSeries(g){
 // Fark kaydırıcısı: 1-40 (40 = 40 ve üstü)
 function marginCtl(g, d, ctx){
   const v = /^\d+$/.test(d.margin||"") ? +d.margin : null;
-  return `<div class="mslide ${v==null?"empty":""}"><input type="range" min="1" max="${MARGIN_MAX}" step="1" value="${v??8}" data-ms="${g.id}" data-ctx="${ctx}" aria-label="Fark">
+  return `<div class="mslide ${v==null?"ms-none":""}"><input type="range" min="1" max="${MARGIN_MAX}" step="1" value="${v??8}" data-ms="${g.id}" data-ctx="${ctx}" aria-label="Fark">
     <output>${v==null?"Kaydır":v>=MARGIN_MAX?`${MARGIN_MAX}+ sayı`:`${v} sayı`}</output></div><small class="ms-hint">Gerçek farka ${MARGIN_TOL} sayı ya da daha yakınsan +1</small>`;
 }
-document.addEventListener("input", e=>{ const r=e.target.closest?.("[data-ms]"); if(!r) return; const v=+r.value; const o=r.parentElement.querySelector("output"); if(o) o.textContent = v>=MARGIN_MAX?`${MARGIN_MAX}+ sayı`:`${v} sayı`; r.parentElement.classList.remove("empty"); });
+document.addEventListener("input", e=>{ const r=e.target.closest?.("[data-ms]"); if(!r) return; const v=+r.value; const o=r.parentElement.querySelector("output"); if(o) o.textContent = v>=MARGIN_MAX?`${MARGIN_MAX}+ sayı`:`${v} sayı`; r.parentElement.classList.remove("ms-none"); });
 document.addEventListener("change", e=>{ const r=e.target.closest?.("[data-ms]"); if(!r) return; const D=S.days[S.day]; const g=D?.games.find(x=>x.id===r.dataset.ms); if(!g) return;
   if(started(g)){ toast(lockedMsg(g)); return; } const d=draftFor(g); d.margin=String(r.value); d.autoM=false;
   if(r.dataset.ctx==="sw") paintSwipe(); else if(r.dataset.ctx==="qk") paintQuick(); else renderGames(); });
@@ -1634,8 +1635,86 @@ document.addEventListener("keydown", e => { if(e.key==="Escape") closeSheet(); }
 
 
 /* ====================================================== Kurallar */
+// Puanlama rehberi: 1.14.0'da herkese bir kez açılır; Kurallar'dan da açılır
+function openScoringGuide(){
+  openSheet(`<div class="rules pg">${UI_EN ? `
+<h3 id="shTitle">Scoring guide</h3>
+<p class="pg-lead">Points come from three places: <b>each game's pick</b>, <b>nightly extras</b> and <b>long-term picks</b>. Everything is explained below with examples.</p>
+<h4>1. Every game: winner, margin, top scorer</h4>
+<div class="pg-t"><span>Correct winner</span><b>+1</b><span>Correct margin (with the winner)</span><b>+1</b><span>Correct top scorer</span><b>+1</b></div>
+<p><b>Margin:</b> pick the point difference with the slider. Within <b>3 points</b> of the real margin counts. Example: you pick 9, the game ends by 6 to 12 → +1. "40+" covers 37 and above.</p>
+<p><b>Top scorer:</b> the game's leading scorer; on a tie, anyone who picked one of them gets it.</p>
+<h4>2. Upset tier</h4>
+<p>Each team button shows ESPN's pregame win chance. Correctly picking an unlikely winner pays more:</p>
+<div class="pg-t"><span>Your team's chance 34% or more</span><b>+1</b><span>21% – 33%</span><b>+2</b><span>20% or less</span><b>+3</b></div>
+<p>The expected value of picking the underdog never beats picking the favorite, so nobody gains by picking upsets at random — only by being right.</p>
+<h4>3. Lock pick</h4>
+<p>One game per night: the winner points are <b>doubled</b> (+2 normally, +4 for a 33% upset). A miss costs <b>-1</b>. Margin and scorer are unaffected.</p>
+<h4>4. NBA Cup and playoffs</h4>
+<p>Cup games (gold band) and playoff games give <b>double points</b>. A missed lock is still -1. <b>Cap:</b> winner points from one game are at most <b>4</b> (upset, lock and cup combined).</p>
+<h4>5. Nightly extras</h4>
+<div class="pg-t"><span>Player of the night: the night's top scorer</span><b>+3</b><span>Question of the night</span><b>+1</b></div>
+<p>Lock, player of the night and question lock 10 minutes before the first game; each game's pick locks 10 minutes before that game.</p>
+<h4>6. Consistency bonus and backup picks</h4>
+<p><b>Consistency:</b> pick on at least <b>4 nights</b> in a week (Mon–Sun) → <b>+2</b>. It doesn't decide the night's winner.</p>
+<p><b>Backup picks:</b> turn on in your profile. On a night you skip, ESPN favorites are entered for you; <b>every 2 correct winners = 1 point</b>.</p>
+<h4>7. Monthly league awards</h4>
+<div class="pg-t"><span>Predictor of the month</span><b>+1</b><span>Lock master, Upset hunter, Scorer master, Margin master</span><b>+2 each</b></div>
+<h4>8. Long-term</h4>
+<div class="pg-t"><span>Player of the week (East and West)</span><b>+2</b><span>Player / rookie / defender of the month</span><b>+4 / +3 / +3</b><span>NBA Cup champion / finalists / Cup MVP</span><b>+8 / +3 / +6</b><span>Most Valuable Player</span><b>+12</b><span>Other season awards</span><b>+8 each</b><span>NBA Champion / Conference Champions</span><b>+10 / +5</b></div>
+<h4>9. Playoff series</h4>
+<p>Series winner <b>+3</b>, plus <b>+2</b> for the right number of games.</p>
+<h4>10. Standings and ties</h4>
+<p>Season points add up nights, bonuses, monthly awards and long-term picks. Ties: more night wins first, then more winner points.</p>
+<button class="btn-primary" id="pgOk" type="button">Got it</button>` : `
+<h3 id="shTitle">Puanlama rehberi</h3>
+<p class="pg-lead">NBA Tahmin'de puanlar üç yerden gelir: <b>her maçın tahmini</b>, <b>her gecenin ekstraları</b> ve <b>uzun vadeli tahminler</b>. Aşağıda hepsini örnekleriyle anlattık.</p>
+
+<h4>1. Her maç: kazanan, fark, en skorer</h4>
+<p>Her maç için üç şey seçersin. Her biri ayrı puan getirir.</p>
+<div class="pg-t"><span>Kazananı bilirsen</span><b>+1</b><span>Farkı bilirsen (kazananı da bildiysen)</span><b>+1</b><span>Maçın en skorerini bilirsen</span><b>+1</b></div>
+<p><b>Fark:</b> Kaydırıcıyla iki takım arasındaki sayı farkını seçersin. Gerçek farka <b>3 sayı ya da daha yakınsan</b> tuttu sayılır. Örnek: 9 dedin, maç 6 ile 12 arasında bir farkla bittiyse +1. "40+" seçersen 37 ve üstü farklar tutar.</p>
+<p><b>En skorer:</b> Maçta en çok sayı atan oyuncu. Eşitlik olursa eşit atanlardan birini seçen herkes bilmiş sayılır. Sakat ya da oynamayacak oyuncular listede işaretlidir.</p>
+
+<h4>2. Sürpriz kademesi</h4>
+<p>Her takım düğmesinde ESPN'in maç önü kazanma şansı yazar (örneğin %28). Şansı az olan takımı doğru bilirsen kazanan puanı artar:</p>
+<div class="pg-t"><span>Seçtiğin takımın şansı %34 ve üstü</span><b>+1</b><span>%21 – %33 arası</span><b>+2</b><span>%20 ve altı</span><b>+3</b></div>
+<p>Bu oranlar rastgele seçilmedi: sürpriz takımı seçmenin ortalama getirisi favoriyi seçmenin getirisini hiç geçmez. Yani kimse sırf kat için sürpriz seçerek öne geçemez; ama sürprize gerçekten inanıp haklı çıkan ödüllendirilir. Şans maç önü tahminidir, maç başlayınca değişmez.</p>
+
+<h4>3. Banko</h4>
+<p>Her gece bir maçı banko seçersin. Bankoda kazanan puanın <b>2 katına</b> çıkar: normal maçta +2, %33'lük sürprizde +4. Bilemezsen <b>-1</b> puan kaybedersin. Fark ve skorer puanları bankodan etkilenmez. Bankoyu başka maça taşıyabilirsin ama kaldıramazsın.</p>
+
+<h4>4. NBA Kupası ve playoff</h4>
+<p>NBA Kupası maçları (altın şeritli kartlar) ve playoff maçları <b>2 kat puan</b> getirir; kazanan, fark ve skorer puanlarının hepsi katlanır. Yanan banko yine -1'dir.</p>
+<p><b>Üst sınır:</b> Bir maçtan alınan <b>kazanan puanı en fazla 4</b>'tür (sürpriz, banko ve kupa katı birlikte). Örnek: kupa maçında %25'lik sürprize banko yaptın ve tuttu → kazanan puanı 2×2×2=8 değil <b>4</b>; fark ve skorer de tutarsa onlar 2'şer gelir, toplam 8.</p>
+
+<h4>5. Her gece: günün oyuncusu ve gecenin sorusu</h4>
+<div class="pg-t"><span>Günün oyuncusu: gecenin bütün maçlarındaki en skoreri bilirsen</span><b>+3</b><span>Gecenin sorusu: evet/hayır sorusunu bilirsen</span><b>+1</b></div>
+<p>Banko, günün oyuncusu ve gecenin sorusu gecenin ilk maçından 10 dakika önce kilitlenir. Maç tahminleri ise her maçın kendi başlama saatinden 10 dakika önce kilitlenir.</p>
+
+<h4>6. Devamlılık bonusu ve yedek tahmin</h4>
+<p><b>Devamlılık:</b> Bir haftada (pazartesi–pazar) en az <b>4 gece</b> kendin tahmin yaparsan <b>+2</b>. Bu bonus haftanın toplamına girer, gecenin kazananını belirlemez.</p>
+<p><b>Yedek tahmin:</b> Profilinden açabilirsin. Bir gece hiç tahmin yapmazsan her maçta ESPN'in favorisi senin yerine seçilir; doğru çıkan <b>her 2 kazanan 1 puan</b> eder. Fark, skorer ve banko yedekte yoktur.</p>
+
+<h4>7. Aylık lig ödülleri</h4>
+<div class="pg-t"><span>Ayın tahmincisi (ayın en çok puanı)</span><b>+1</b><span>Banko ustası, Sürpriz avcısı, Skorer ustası, Fark ustası</span><b>+2'şer</b></div>
+<p>Ay bitince hesaplanır, eşitlikte ödülü paylaşan herkes puanı alır. Ekim ve Kasım tek ay sayılır.</p>
+
+<h4>8. Uzun vade</h4>
+<div class="pg-t"><span>Haftanın oyuncusu (Doğu ve Batı ayrı)</span><b>+2</b><span>Ayın oyuncusu / ayın çaylağı / ayın savunmacısı</span><b>+4 / +3 / +3</b><span>NBA Kupası şampiyonu / finalistler / kupa MVP'si</span><b>+8 / +3 / +6</b><span>Most Valuable Player</span><b>+12</b><span>Diğer sezon ödülleri (ROY, DPOY, MIP, 6MOY, COY)</span><b>+8'er</b><span>NBA Champion / Eastern ve Western Conference Champion</span><b>+10 / +5</b></div>
+<p>Kilit tarihleri Uzun Vade sekmesinde yazar. Seçimler kilitten sonra herkese açılır.</p>
+
+<h4>9. Playoff serileri</h4>
+<p>Her seri başlamadan kazananı ve kaç maçta biteceğini tahmin edersin: kazanan <b>+3</b>, maç sayısı da doğruysa <b>+2</b> daha.</p>
+
+<h4>10. Sıralama ve eşitlik</h4>
+<p>Sezon puanı bütün gecelerin, bonusların, aylık ödüllerin ve uzun vade tahminlerinin toplamıdır. Toplam eşitse önce daha çok gece birinciliği, o da eşitse daha çok kazanan puanı olan öne geçer. Gecenin en çok puanını tek başına alan o geceyi kazanır.</p>
+<button class="btn-primary" id="pgOk" type="button">Anladım</button>`}</div>`);
+  $("#pgOk").onclick=()=>closeSheet();
+}
+function maybeScoringGuide(){ if(lsGet("pg1141") || S.onboard) return; if(!$("#sheet").classList.contains("hide")){ return setTimeout(maybeScoringGuide, 4000); } lsSet("pg1141","1"); openScoringGuide(); }
 function openRules(){
-  openSheet(`<div class="rules"><h3 id="shTitle">Kurallar</h3>
+  openSheet(`<div class="rules"><h3 id="shTitle">Kurallar</h3><button class="btn pg-open" id="pgOpen" type="button">📖 Puanlama rehberi: bütün puanlar örnekleriyle</button>
     <p>Her gece o günün bütün NBA maçları için üç tahmin yaparsın: <b>kazanan takım</b>, <b>fark aralığı</b> ve <b>maçın en skoreri</b>. Üçünü de doldurup "Tahmini kaydet"e basman gerekir.</p>
     <h4>Puanlar</h4>
     <div class="pt"><span>Kazananı bilirsen</span><b>+1</b><span>Kazananla birlikte farkı da bilirsen</span><b>+1</b><span>Maçın en skorerini bilirsen</span><b>+1</b><span>Sürpriz kazananı bilirsen (ESPN şansı %33 / %20 altı)</span><b>+2 / +3</b></div>
@@ -1674,6 +1753,7 @@ function openRules(){
     <p class="muted" style="margin-top:18px;font-size:12px;text-align:center">Sürüm ${VERSION}</p></div>`);
 }
 $("#rulesBtn").onclick = openRules;
+document.addEventListener("click", e=>{ if(e.target.closest("#pgOpen")) openScoringGuide(); });
 
 /* ====================================================== SONUÇLAR */
 // Sonuçlar sekmesi açılınca: bu gecenin maçları başladıysa bugün, başlamadıysa oynanmış son gece (dün)
@@ -4246,7 +4326,7 @@ if("serviceWorker" in navigator && location.protocol==="https:") navigator.servi
     route(); showDay(); Promise.resolve(refresh()).catch(()=>{}).finally(()=>dispatchEvent(new Event("app-ready")));
     if(S.onboard){ if(S.joinP) await S.joinP.catch(()=>{}); await loadPlayers().catch(()=>{}); allPlayers().catch(()=>{}).finally(()=>openOnboard(4)); }
     else checkRecovery();
-    loadLT(); setTimeout(installBanner, 6000); maybeNews(); maybeCeremony(); later(markSeen, 3000); setTimeout(()=>later(maybeAskAuto, 0), 9000);
+    loadLT(); setTimeout(installBanner, 6000); maybeNews(); maybeCeremony(); later(markSeen, 3000); setTimeout(()=>later(maybeScoringGuide,0), 4500); setTimeout(()=>later(maybeAskAuto, 0), 9000);
     later(()=>{ getDoc(doc(S.db,"config","admin")).then(()=>{ S.isAdmin=true; }).catch(()=>{ S.isAdmin=false; });
       getDoc(doc(S.db,"config","secret")).then(r=>{ S.invite=r.data()?.invite||""; }).catch(()=>{});
       allPlayers().catch(()=>{}); }, 2000);

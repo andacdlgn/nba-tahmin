@@ -1857,7 +1857,8 @@ body.bars-hidden .nav,body.bars-hidden .topbar{pointer-events:none}
 .mslide{display:flex;align-items:center;gap:12px;margin:2px 0 2px}
 .mslide input{flex:1;accent-color:var(--amber);height:32px}
 .mslide output{flex:none;min-width:70px;text-align:right;font:800 20px "Barlow Condensed";color:var(--ink)}
-.mslide.empty output{color:var(--muted);font-size:16px}
+.mslide.ms-none output{color:var(--muted)}
+.mslide.ms-none input{opacity:.75}
 .ms-hint{display:block;font-size:12px;color:var(--muted);margin:0 0 6px}
 .qk .mslide output{font-size:17px;min-width:58px}
 .fp-guide{border:2px solid var(--amber);border-radius:16px;padding:12px 14px;margin:0 0 12px;background:var(--amber-soft)}
@@ -1874,3 +1875,11 @@ body.bars-hidden .nav,body.bars-hidden .topbar{pointer-events:none}
 .tbtn[aria-pressed="true"] .odds{background:rgba(0,0,0,.22);border-color:transparent}.tbtn[aria-pressed="true"] .odds b{color:#fff}
 .sw-team .odds{margin:6px auto 0}
 .qk-t .odds{margin-left:6px;padding:1px 5px}
+
+/* 1.14.0 puanlama rehberi */
+.pg .pg-lead{font-size:15px}
+.pg-t{display:grid;grid-template-columns:1fr auto;gap:6px 12px;background:var(--panel-2);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:6px 0 10px;font-size:14px;align-items:center}
+.pg-t b{font-family:"Barlow Condensed";font-size:18px;text-align:right;white-space:nowrap}
+.pg h4{margin:18px 0 6px}
+.pg-open{width:100%;margin:4px 0 10px}
+#pgOk{width:100%;margin-top:16px}
