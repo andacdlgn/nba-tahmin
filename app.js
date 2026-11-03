@@ -45,10 +45,11 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.15.0";
+const VERSION = "1.16.0";
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.16.0", d:"4 Kasım 2026", items:["Üst çubukta Kurallar'ın yanında ayrı bir Puanlama düğmesi: puan rehberi tek dokunuşla açılıyor.","Gecenin sorusu yenilendi (5 Kasım'dan itibaren): sorudaki sayı gecenin maç sayısına göre seçiliyor, cevap yaklaşık yarı yarıya. \"Ev sahipleri bütün maçlarını kazanır mı?\" gibi neredeyse kesin sorular kalktı."]},
   {v:"1.15.0", d:"4 Kasım 2026", items:["Profil analizi: sayıyla fark tahmininde ±3 tutturma oranı, ortalama şaşma ve farkı az mı çok mu tahmin ettiğin.","Puanların nereden geldi ve sezon özeti: sürpriz ekini, devamlılık bonusunu ve yedek tahmini ayrı gösteriyor.","Tahminler'de gece özeti: Gecenin sürprizi ve onu bilenler.","Alt bilgideki puan özeti güncellendi, puanlama rehberine bağlantı."]},
   {v:"1.14.1", d:"4 Kasım 2026", items:["Puanlama rehberi: bütün puan kuralları örnekleriyle tek yerde (Kurallar'dan da açılır).","Fark kaydırıcısı boşken de diğerleriyle aynı görünüyor."]},
   {v:"1.14.0", d:"4 Kasım 2026", items:["Sürpriz kademesi: ESPN'in şans vermediği takımı bilirsen kazanan puanı +2 (%33 ve altı) ya da +3 (%20 ve altı). Banko 2 kat, kazanan puanı en fazla 4.","Takım düğmelerinde ESPN'in maç önü kazanma şansı ve sürpriz puanı görünüyor."]},
@@ -255,6 +256,7 @@ EN_RX.push(
   [/^(\d+) puan · gece (\d+)\.(.*)$/, "$1 pts · #$2$3 that night"], [/^Kilit: (.+)\. O zamana kadar değiştirebilirsin; seçimler kilitten sonra herkese açılır\.$/, "Lock: $1. You can change until then; picks are revealed after the lock."],
   [/^Sen tek başına (.+) dedin$/, "Only you picked $1"], [/^Azınlıktasın \((.+)\)$/, "You're in the minority ($1)"], [/^(\d+) kez$/, "$1 times"], [/^(\d+)\/(\d+) tuttu$/, "$1/$2 hit"],
   [/^(\d+) oyuncunun seçimi$/, "picks of $1 players"], [/^Bu gece (\d+) maç var\.(.*)$/, "$1 games tonight.$2"], [/^Takım (\d+)-(\d+)$/, "Team $1-$2"], [/^takım (\d+)-(\d+)$/, "team $1-$2"],
+  [/^(\d+) maçlık gece; eşik, cevap yarı yarıya olsun diye maç sayısına göre seçildi\.$/, "$1-game night; the number is set by tonight's game count so the answer is roughly 50/50."],
   [/^(\d+) sayı$/, "$1 pts"], [/^(.+) baremi$/, "$1 range"], [/^Lige getirdiği: (.+)$/, "Brought in: $1"],
 );
 // tarih ve saatler İngilizce yazılsın
@@ -1282,8 +1284,58 @@ const QUESTIONS2 = [
   {t:"Ev sahipleri bu gece deplasman takımlarından daha çok maç kazanır mı?", f:gs=>gs.filter(g=>(g.home.score??0)>(g.away.score??0)).length > gs.filter(g=>(g.away.score??0)>(g.home.score??0)).length},
   {t:"Bu gece bir takım 140 ya da daha fazla sayı atar mı?", f:gs=>Math.max(...gs.map(g=>Math.max(g.home.score??0,g.away.score??0)))>=140, mono:true},
 ];
+/* Q3 START */
+// 5 Kasım 2026'dan itibaren: eşikler gecenin maç sayısına göre seçilir, cevap yaklaşık yarı yarıya olsun diye.
+// Oranlar sezonun ilk maçlarından; scripts/sync.py'deki QUESTIONS3 ile birebir aynı sıra ve aynı hesap.
+const Q3_FROM = "20261105";
+const qpw = (x,i) => { let r=1; for(let j=0;j<i;j++) r*=x; return r; };
+const qAny = (q,n) => 1-qpw(1-q,n);
+function qAtLeast(p,n,k){ let s=0; for(let i=k;i<=n;i++){ let c=1; for(let j=0;j<i;j++) c=c*(n-j)/(j+1); s+=c*qpw(p,i)*qpw(1-p,n-i); } return s; }
+const qH = g => g.home.score??0, qA = g => g.away.score??0;
+const qC = (k,n) => k===n ? (n===1 ? "Bu geceki tek maçta" : "Bu gece bütün maçlarda") : k===1 ? "Bu gece en az bir maçta" : `Bu gece en az ${k} maçta`;
+const qE = (k,n) => k===n ? (n===1 ? "in tonight's only game" : "in every game tonight") : k===1 ? "in at least one game tonight" : `in at least ${k} games tonight`;
+const QK = (p, ev, tr, en, mono=false) => ({kind:"k", p, ev, tr, en, mono});
+const QX = (tab, ev, tr, en, mono=false) => ({kind:"x", tab, ev, tr, en, mono});
+const QUESTIONS3 = [
+  QX([[30,.505],[32,.421],[34,.355],[36,.252],[38,.196],[40,.14],[42,.103],[44,.056],[46,.03],[50,.012]], (g,x)=>topPts(g)>=x, x=>`Bu gece biri ${x} ya da daha fazla sayı atar mı?`, x=>`Will anyone score ${x}+ tonight?`, true),
+  QK(.514, g=>qH(g)>qA(g), c=>`${c} ev sahibi kazanır mı?`, e=>`Will the home team win ${e}?`),
+  QX([[10,.542],[15,.355],[20,.252],[25,.131],[30,.075],[35,.04],[40,.025]], (g,x)=>gMargin(g)>=x, x=>`Bu gece en az bir maç ${x} sayı ya da daha fazla farkla biter mi?`, x=>`Will a game end with a ${x}+ point margin tonight?`),
+  QK(.449, g=>qH(g)+qA(g)>=230, c=>`${c} iki takımın toplamı 230 sayı ya da daha fazla olur mu?`, e=>`Will the combined score reach 230+ ${e}?`, true),
+  QX([[10,.495],[8,.421],[7,.346],[6,.252],[5,.206],[4,.131],[3,.075],[2,.04],[1,.028]], (g,x)=>gMargin(g)<=x, x=>`Bu gece en az bir maç ${x} sayı ya da daha az farkla biter mi?`, x=>`Will a game be decided by ${x} points or fewer tonight?`),
+  QK(.505, g=>topPts(g)>=30, c=>`${c} 30 ya da daha fazla sayı atan bir oyuncu çıkar mı?`, e=>`Will someone score 30+ ${e}?`, true),
+  QX([[115,.682],[120,.561],[125,.374],[130,.196],[135,.084],[140,.025],[145,.01]], (g,x)=>Math.max(qH(g),qA(g))>=x, x=>`Bu gece bir takım ${x} ya da daha fazla sayı atar mı?`, x=>`Will a team score ${x}+ tonight?`, true),
+  QK(.542, g=>gMargin(g)>=10, c=>`${c} fark 10 sayı ya da daha fazla olur mu?`, e=>`Will the margin be 10+ points ${e}?`),
+  QX([[110,.598],[105,.477],[100,.308],[95,.187],[90,.084],[85,.04]], (g,x)=>Math.min(qH(g),qA(g))<=x, x=>`Bu gece bir takım ${x} ya da daha az sayıda kalır mı?`, x=>`Will a team score ${x} or fewer tonight?`),
+  QK(.561, g=>Math.max(qH(g),qA(g))>=120, c=>`${c} bir takım 120 sayıya ulaşır mı?`, e=>`Will a team reach 120 points ${e}?`, true),
+  QX([[220,.636],[230,.449],[240,.262],[250,.121],[260,.05],[270,.02]], (g,x)=>qH(g)+qA(g)>=x, x=>`Bu gece bir maçta iki takımın toplamı ${x} sayı ya da daha fazla olur mu?`, x=>`Will a game total ${x}+ points tonight?`, true),
+  QK(.346, g=>gMargin(g)<=7, c=>`${c} fark 7 sayı ya da daha az olur mu?`, e=>`Will the margin be 7 points or fewer ${e}?`),
+  QK(.486, g=>qA(g)>qH(g), c=>`${c} deplasman takımı kazanır mı?`, e=>`Will the road team win ${e}?`),
+  QX([[230,.55],[225,.439],[220,.393],[215,.318],[210,.206],[205,.131],[200,.093],[195,.075]], (g,x)=>qH(g)+qA(g)<=x, x=>`Bu gece bir maçta iki takımın toplamı ${x} sayı ya da daha az olur mu?`, x=>`Will a game total ${x} points or fewer tonight?`),
+  QK(.308, g=>Math.min(qH(g),qA(g))<=100, c=>`${c} kaybeden takım 100 ya da daha az sayıda kalır mı?`, e=>`Will the losing team score 100 or fewer ${e}?`),
+  QK(.28, g=>topPts(g)>=35, c=>`${c} 35 ya da daha fazla sayı atan bir oyuncu çıkar mı?`, e=>`Will someone score 35+ ${e}?`, true),
+  QK(.355, g=>gMargin(g)>=15, c=>`${c} fark 15 sayı ya da daha fazla olur mu?`, e=>`Will the margin be 15+ points ${e}?`),
+  QK(.374, g=>Math.max(qH(g),qA(g))>=125, c=>`${c} bir takım 125 sayıya ulaşır mı?`, e=>`Will a team reach 125 points ${e}?`, true),
+  QK(.43, g=>Math.min(qH(g),qA(g))>=110, c=>`${c} iki takım da 110 sayıya ulaşır mı?`, e=>`Will both teams reach 110 points ${e}?`, true),
+  QK(.262, g=>qH(g)+qA(g)>=240, c=>`${c} iki takımın toplamı 240 sayı ya da daha fazla olur mu?`, e=>`Will the combined score reach 240+ ${e}?`, true),
+  QK(.318, g=>qH(g)+qA(g)<=215, c=>`${c} iki takımın toplamı 215 sayı ya da daha az olur mu?`, e=>`Will the combined score be 215 or fewer ${e}?`),
+];
+// Eşik (x) ya da maç sayısı (k): "evet" ihtimali %50'ye en yakın olan; eşitlikte listedeki ilki
+function q3Param(def, n){
+  let best=null, bd=9;
+  if(def.kind==="x"){ for(const [v,q] of def.tab){ const d=Math.abs(qAny(q,n)-0.5); if(d<bd-1e-9){ bd=d; best=v; } } }
+  else for(let k=1;k<=n;k++){ const d=Math.abs(qAtLeast(def.p,n,k)-0.5); if(d<bd-1e-9){ bd=d; best=k; } }
+  return best;
+}
+function q3Build(def, n){
+  n=Math.max(1,n||0); const v=q3Param(def,n);
+  if(def.kind==="x") return {t:UI_EN?def.en(v):def.tr(v), f:gs=>gs.some(g=>def.ev(g,v)), mono:def.mono, n};
+  return {t:UI_EN?def.en(qE(v,n)):def.tr(qC(v,n)), f:gs=>gs.filter(def.ev).length>=v, mono:def.mono, n};
+}
+/* Q3 END */
 const dayNum = d => Math.round(Date.UTC(+d.slice(0,4), +d.slice(4,6)-1, +d.slice(6,8))/864e5);
-const questionOf = day => String(day)>=RULES2_FROM ? QUESTIONS2[dayNum(String(day)) % QUESTIONS2.length] : QUESTIONS[Number(day) % QUESTIONS.length];
+const questionOf = day => { day=String(day);
+  if(day>=Q3_FROM) return q3Build(QUESTIONS3[dayNum(day) % QUESTIONS3.length], S.days[day]?.games?.length);
+  return day>=RULES2_FROM ? QUESTIONS2[dayNum(day) % QUESTIONS2.length] : QUESTIONS[Number(day) % QUESTIONS.length]; };
 // {final, ans:'y'|'n', early:true (gece bitmeden kesinleşti)}
 function questionResult(day){
   const D=S.days[day]; if(!D?.games.length) return null;
@@ -1299,7 +1351,7 @@ function questionCard(){
   const lbl = v => v==="y" ? "Evet" : "Hayır";
   if(!locked) return `<div class="qcard"><span class="ico">${ICON.question}</span><span class="tx"><b>Gecenin sorusu</b><span class="qt">${q.t}</span>
     <span class="qbtns"><button data-q="y" aria-pressed="${mine==="y"}">Evet</button><button data-q="n" aria-pressed="${mine==="n"}">Hayır</button></span>
-    <small>Doğru cevap +1. Gecenin ilk maçından 10 dk önce kilitlenir.</small></span></div>`;
+    <small>Doğru cevap +1. Gecenin ilk maçından 10 dk önce kilitlenir.</small>${q.n?`<small>${q.n} maçlık gece; eşik, cevap yarı yarıya olsun diye maç sayısına göre seçildi.</small>`:""}</span></div>`;
   const r=questionResult(S.day);
   const qNo=S.order.filter(u=>!D.daily[u]?.q);
   const rows=S.order.filter(u=>D.daily[u]?.q).map(u=>{ const a=D.daily[u].q; const st=r?.final?(a===r.ans?'<span class="ok">+1</span>':'<span class="no">0</span>'):"";
@@ -1721,7 +1773,7 @@ function openRules(){
     <h4>Günün oyuncusu</h4>
     <p>O gecenin bütün maçları arasından bir oyuncu seçersin. Gecenin en çok sayı atan oyuncusu o olursa <b>+3</b>.</p>
     <h4>Gecenin sorusu</h4>
-    <p>Her gece evet ya da hayır diye cevaplanan bir soru gelir (ör. "Bu gece biri 45 sayı atar mı?"). Doğru cevap <b>+1</b>. Sorular 21 soruluk bir havuzdan sırayla gelir, aynı soru 21 gün içinde tekrar etmez. Sonuç, gecenin maçları bitince (bazı sorularda koşul gerçekleştiği anda) belli olur.</p>
+    <p>Her gece evet ya da hayır diye cevaplanan bir soru gelir (ör. "Bu gece biri 45 sayı atar mı?"). Doğru cevap <b>+1</b>. Sorular 21 soruluk bir havuzdan sırayla gelir, aynı soru 21 gün içinde tekrar etmez. 5 Kasım'dan itibaren sorudaki sayı (eşik ya da maç sayısı) gecenin maç sayısına göre ayarlanır; böylece cevap ne neredeyse kesin evet ne de neredeyse kesin hayır olur, ikisi de yaklaşık yarı yarıya. Sonuç, gecenin maçları bitince (bazı sorularda koşul gerçekleştiği anda) belli olur.</p>
     <h4>Sürpriz kademesi</h4>
     <p>4 Kasım'dan itibaren kazanan puanı, ESPN'in maç önü kazanma şansına göre değişir; şans her takım düğmesinde yazar. Seçtiğin takımın şansı <b>%33 ve altındaysa +2</b>, <b>%20 ve altındaysa +3</b>, üstündeyse +1. Banko bunu 2 katına çıkarır (sürpriz bankoda +4 ya da +6 olur), yanan banko yine -1. Bir maçtan alınan kazanan puanı kupa ve playoff katıyla birlikte <b>en fazla 4</b> olur. Fark ve skorer puanları değişmez. Şans, maç önündeki ESPN tahminidir ve maç başladıktan sonra değişmez.</p>
     <h4>NBA Kupası</h4>
@@ -1751,6 +1803,7 @@ function openRules(){
     <p class="muted" style="margin-top:18px;font-size:12px;text-align:center">Sürüm ${VERSION}</p></div>`);
 }
 $("#rulesBtn").onclick = openRules;
+$("#scoreBtn").onclick = openScoringGuide;
 document.addEventListener("click", e=>{ if(e.target.closest("#pgOpen, #pgFoot")) openScoringGuide(); });
 
 /* ====================================================== SONUÇLAR */

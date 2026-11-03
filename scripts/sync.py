@@ -519,9 +519,103 @@ QUESTIONS2 = [
 ]
 
 
+# 5 Kasım 2026'dan itibaren: eşik gecenin maç sayısına göre (app.js'teki QUESTIONS3 / q3Param ile birebir aynı)
+Q3_FROM = "20261105"
+
+
+def _qpw(x, i):
+    r = 1.0
+    for _ in range(i):
+        r *= x
+    return r
+
+
+def _q_any(q, n):
+    return 1 - _qpw(1 - q, n)
+
+
+def _q_at_least(p, n, k):
+    s = 0.0
+    for i in range(k, n + 1):
+        c = 1.0
+        for j in range(i):
+            c = c * (n - j) / (j + 1)
+        s += c * _qpw(p, i) * _qpw(1 - p, n - i)
+    return s
+
+
+def _gtop(g):
+    return max((t["pts"] for t in g["top"]), default=0)
+
+
+def _hi(g):
+    return max(g["home"]["score"], g["away"]["score"])
+
+
+def _lo(g):
+    return min(g["home"]["score"], g["away"]["score"])
+
+
+def _tot(g):
+    return g["home"]["score"] + g["away"]["score"]
+
+
+QUESTIONS3 = [
+    ("x", [(30, .505), (32, .421), (34, .355), (36, .252), (38, .196), (40, .14), (42, .103), (44, .056), (46, .03), (50, .012)], lambda g, x: _gtop(g) >= x),
+    ("k", .514, lambda g: g["winner"] == g["home"]["abbr"]),
+    ("x", [(10, .542), (15, .355), (20, .252), (25, .131), (30, .075), (35, .04), (40, .025)], lambda g, x: g["margin"] >= x),
+    ("k", .449, lambda g: _tot(g) >= 230),
+    ("x", [(10, .495), (8, .421), (7, .346), (6, .252), (5, .206), (4, .131), (3, .075), (2, .04), (1, .028)], lambda g, x: g["margin"] <= x),
+    ("k", .505, lambda g: _gtop(g) >= 30),
+    ("x", [(115, .682), (120, .561), (125, .374), (130, .196), (135, .084), (140, .025), (145, .01)], lambda g, x: _hi(g) >= x),
+    ("k", .542, lambda g: g["margin"] >= 10),
+    ("x", [(110, .598), (105, .477), (100, .308), (95, .187), (90, .084), (85, .04)], lambda g, x: _lo(g) <= x),
+    ("k", .561, lambda g: _hi(g) >= 120),
+    ("x", [(220, .636), (230, .449), (240, .262), (250, .121), (260, .05), (270, .02)], lambda g, x: _tot(g) >= x),
+    ("k", .346, lambda g: g["margin"] <= 7),
+    ("k", .486, lambda g: g["winner"] == g["away"]["abbr"]),
+    ("x", [(230, .55), (225, .439), (220, .393), (215, .318), (210, .206), (205, .131), (200, .093), (195, .075)], lambda g, x: _tot(g) <= x),
+    ("k", .308, lambda g: _lo(g) <= 100),
+    ("k", .28, lambda g: _gtop(g) >= 35),
+    ("k", .355, lambda g: g["margin"] >= 15),
+    ("k", .374, lambda g: _hi(g) >= 125),
+    ("k", .43, lambda g: _lo(g) >= 110),
+    ("k", .262, lambda g: _tot(g) >= 240),
+    ("k", .318, lambda g: _tot(g) <= 215),
+]
+
+
+def q3_param(qd, n):
+    best, bd = None, 9.0
+    if qd[0] == "x":
+        for v, q in qd[1]:
+            d = abs(_q_any(q, n) - 0.5)
+            if d < bd - 1e-9:
+                bd, best = d, v
+    else:
+        for k in range(1, n + 1):
+            d = abs(_q_at_least(qd[1], n, k) - 0.5)
+            if d < bd - 1e-9:
+                bd, best = d, k
+    return best
+
+
+def q3_answer(qd, dgames):
+    v = q3_param(qd, max(1, len(dgames)))
+    if qd[0] == "x":
+        return any(qd[2](g, v) for g in dgames)
+    return sum(1 for g in dgames if qd[2](g)) >= v
+
+
+def day_num(day):
+    return (datetime(int(day[:4]), int(day[4:6]), int(day[6:]), tzinfo=timezone.utc).date() - datetime(1970, 1, 1).date()).days
+
+
 def question_answer(day, dgames):
+    if day >= Q3_FROM:
+        return "y" if q3_answer(QUESTIONS3[day_num(day) % len(QUESTIONS3)], dgames) else "n"
     if day >= RULES2_FROM:
-        n = (datetime(int(day[:4]), int(day[4:6]), int(day[6:]), tzinfo=timezone.utc).date() - datetime(1970, 1, 1).date()).days
+        n = day_num(day)
         return "y" if QUESTIONS2[n % len(QUESTIONS2)](dgames) else "n"
     return "y" if QUESTIONS[int(day) % len(QUESTIONS)](dgames) else "n"
 

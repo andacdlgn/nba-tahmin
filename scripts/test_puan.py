@@ -130,9 +130,71 @@ def lock_cases():
     return bad
 
 
+def question_cases():
+    """Gecenin sorusu (5 Kasım'dan itibaren): site ve arka plan aynı eşiği seçip aynı cevabı veriyor mu; cevaplar dengeli mi?"""
+    import random
+    m = re.search(r"/\* Q3 START \*/(.*?)/\* Q3 END \*/", APP, re.S)
+    if not m:
+        return ["app.js içinde Q3 bloğu bulunamadı"]
+    rnd = random.Random(7)
+    nights = []
+    for n in range(1, 17):
+        for _ in range(12):
+            gs = []
+            for i in range(n):
+                h, a = rnd.randint(88, 140), rnd.randint(88, 140)
+                if h == a:
+                    h += 1
+                gs.append({"home": {"abbr": f"H{i}", "score": h}, "away": {"abbr": f"A{i}", "score": a}, "top": [{"pts": rnd.randint(18, 52)}]})
+            nights.append(gs)
+    src = "\n".join([
+        "const UI_EN = false; const S = {days:{}};",
+        "const topPts = g => Math.max(0, ...g.top.map(t=>t.pts)); const gMargin = g => Math.abs((g.home.score??0)-(g.away.score??0));",
+        m.group(1),
+        "const nights = JSON.parse(require('fs').readFileSync(process.argv[2], 'utf8'));",
+        "const par = QUESTIONS3.map(d => Array.from({length:16}, (_, i) => q3Param(d, i+1)));",
+        "const ans = nights.map(gs => QUESTIONS3.map(d => q3Build(d, gs.length).f(gs) ? 'y' : 'n'));",
+        "const txt = QUESTIONS3.map(d => [1,4,15].map(n => q3Build(d, n).t));",
+        "console.log(JSON.stringify({par, ans, txt}));",
+    ])
+    with tempfile.TemporaryDirectory() as d:
+        js, data = os.path.join(d, "q.cjs"), os.path.join(d, "n.json")
+        open(js, "w").write(src)
+        open(data, "w").write(json.dumps(nights))
+        out = json.loads(subprocess.check_output(["node", js, data]))
+    bad = []
+    if len(sync.QUESTIONS3) != len(out["par"]):
+        return [f"soru sayısı farklı: python {len(sync.QUESTIONS3)}, site {len(out['par'])}"]
+    for i, qd in enumerate(sync.QUESTIONS3):
+        py = [sync.q3_param(qd, n) for n in range(1, 17)]
+        if py != out["par"][i]:
+            bad.append(f"soru {i}: eşik farklı python {py} site {out['par'][i]}")
+        for n in range(2, 17):   # dengeli mi: seçilen eşikte evet ihtimali
+            v = py[n - 1]
+            pr = sync._q_any(qd[1][[x for x, _ in qd[1]].index(v)][1], n) if qd[0] == "x" else sync._q_at_least(qd[1], n, v)
+            if not 0.25 <= pr <= 0.75:
+                bad.append(f"soru {i}, {n} maç: evet ihtimali %{round(pr * 100)} (dengesiz)")
+    for gs, a in zip(nights, out["ans"]):
+        for g in gs:
+            g["margin"] = abs(g["home"]["score"] - g["away"]["score"])
+            g["winner"] = g["home"]["abbr"] if g["home"]["score"] > g["away"]["score"] else g["away"]["abbr"]
+        py = ["y" if sync.q3_answer(qd, gs) else "n" for qd in sync.QUESTIONS3]
+        if py != a:
+            bad.append(f"{len(gs)} maçlık gece: cevap farklı")
+            break
+    print("Örnek sorular (1 / 4 / 15 maç):")
+    for t in out["txt"]:
+        print("  ·", " | ".join(t))
+    return bad
+
+
 def main():
     js = js_scores()
     bad = 0
+    qb = question_cases()
+    for x in qb:
+        print("SORU:", x)
+    bad += len(qb)
     for c, a in zip(CASES, js):
         p = py_score(c)
         if p != a:

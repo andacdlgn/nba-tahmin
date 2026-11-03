@@ -1894,3 +1894,7 @@ body.bars-hidden .nav,body.bars-hidden .topbar{pointer-events:none}
   .tbtn .odds{position:absolute;right:6px;bottom:5px;margin:0;padding:1px 6px}
   .tbtn .odds b{font-size:13px}
 }
+
+/* 1.16.0 Puanlama düğmesi: dar ekranda iki metin düğmesi sığsın */
+@media (max-width:430px){ .rules-btn{padding:0 9px;font-size:13px} .tb-right{gap:6px} }
+@media (max-width:370px){ .topbar .brand{font-size:19px} .rules-btn{padding:0 7px} }
