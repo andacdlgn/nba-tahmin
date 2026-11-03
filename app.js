@@ -45,10 +45,11 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.16.0";
+const VERSION = "1.16.1";
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.16.1", d:"4 Kasım 2026", items:["Üst çubukta Davet et düğmesi: sana özel davet linkini gösteriyor; tek dokunuşla kopyala, WhatsApp'ta gönder ya da paylaş."]},
   {v:"1.16.0", d:"4 Kasım 2026", items:["Üst çubukta Kurallar'ın yanında ayrı bir Puanlama düğmesi: puan rehberi tek dokunuşla açılıyor.","Gecenin sorusu yenilendi (5 Kasım'dan itibaren): sorudaki sayı gecenin maç sayısına göre seçiliyor, cevap yaklaşık yarı yarıya. \"Ev sahipleri bütün maçlarını kazanır mı?\" gibi neredeyse kesin sorular kalktı."]},
   {v:"1.15.0", d:"4 Kasım 2026", items:["Profil analizi: sayıyla fark tahmininde ±3 tutturma oranı, ortalama şaşma ve farkı az mı çok mu tahmin ettiğin.","Puanların nereden geldi ve sezon özeti: sürpriz ekini, devamlılık bonusunu ve yedek tahmini ayrı gösteriyor.","Tahminler'de gece özeti: Gecenin sürprizi ve onu bilenler.","Alt bilgideki puan özeti güncellendi, puanlama rehberine bağlantı."]},
   {v:"1.14.1", d:"4 Kasım 2026", items:["Puanlama rehberi: bütün puan kuralları örnekleriyle tek yerde (Kurallar'dan da açılır).","Fark kaydırıcısı boşken de diğerleriyle aynı görünüyor."]},
@@ -4034,6 +4035,27 @@ async function shareInvite(msgEl){
   try{ await navigator.clipboard.writeText(url); if(msgEl) msgEl.textContent="Link kopyalandı."; else toast("Davet linkin kopyalandı."); }catch(e){ if(msgEl) msgEl.textContent=url; }
 }
 
+// Üst çubuktaki Davet et: kişisel davet linkini gösterir, tek dokunuşla kopyala / WhatsApp / paylaş
+async function inviteUrl(){
+  if(!S.invite){ try{ const r=await getDoc(doc(S.db,"config","secret")); S.invite=r.data()?.invite||""; }catch(e){} }
+  return S.invite ? `${location.origin}${location.pathname}?davet=${encodeURIComponent(S.invite)}&ref=${S.uid}` : "";
+}
+async function openInvite(){
+  openSheet(`<div class="rules inv-sh"><h3 id="shTitle">Arkadaşını davet et</h3><p class="muted">Link hazırlanıyor…</p></div>`);
+  const url=await inviteUrl(), box=$("#sheet .inv-sh"); if(!box) return;
+  if(!url){ box.innerHTML=`<h3 id="shTitle">Arkadaşını davet et</h3><p>Davet linki şu an alınamadı. Biraz sonra tekrar dene.</p>`; return; }
+  const text=`${pname(S.uid)} seni NBA Tahmin'e davet ediyor! Her gece maçlara tahmin yapıyoruz: ${url}`, mine=invitedBy(S.uid);
+  box.innerHTML=`<h3 id="shTitle">Arkadaşını davet et</h3>
+    <p>Bu link sana özel. Linkle gelen kişiye davet kodu sorulmaz, birkaç adımda lige katılır ve profilinde "Lige getirdiği" olarak senin adınla görünür.</p>
+    <div class="inv-row"><input id="invUrl" readonly value="${esc(url)}" aria-label="Davet linki"><button class="btn" id="invCopy" type="button">${ICON.link}Kopyala</button></div>
+    <div class="inv-acts"><a class="btn" id="invWa" href="https://wa.me/?text=${encodeURIComponent(text)}" target="_blank" rel="noopener">WhatsApp'ta gönder</a>${navigator.share?`<button class="btn" id="invShare" type="button">Başka bir uygulamayla paylaş</button>`:""}</div>
+    <small class="muted" id="invMsg">${mine.length?`Şimdiye kadar ${mine.length} kişiyi getirdin: ${mine.map(x=>esc(pname(x))).join(", ")}.`:"Henüz linkinle kimse katılmadı."}</small>`;
+  $("#invUrl").onclick=e=>e.target.select();
+  $("#invCopy").onclick=async()=>{ try{ await navigator.clipboard.writeText(url); $("#invMsg").textContent="Link kopyalandı. Şimdi istediğin yere yapıştırabilirsin."; }catch(e){ $("#invUrl").select(); $("#invMsg").textContent="Kopyalanamadı; linki seçtim, elle kopyalayabilirsin."; } };
+  const sh=$("#invShare"); if(sh) sh.onclick=async()=>{ try{ await navigator.share({title:"NBA Tahmin", text, url}); }catch(e){} };
+}
+$("#invBtn").onclick=()=>openInvite();
+
 // Şifre sıfırlama isteğinin sonucunu bekle (GitHub görevi birkaç dakikada bir çalışır)
 const RESET_MSG = {
   ok:      ["ok",   "Şifren değişti. Yeni şifrenle giriş yapabilirsin."],
@@ -4360,7 +4382,7 @@ if("serviceWorker" in navigator && location.protocol==="https:") navigator.servi
   { const last=lsGet("lastUser"); if(last && S.players[last]){ S.lgUser=last; $("#inName").value=pname(last); } }
   setAuthMode(Q.get("davet") ? "join" : "login"); paintAuthInvite(); renderAuthLive();
   onAuthStateChanged(S.auth, async user=>{
-    if(!user){ S.uid=null; $("#app").classList.add("hide"); $("#me").classList.add("hide"); $("#srch").classList.add("hide"); $("#auth").classList.remove("hide"); paintLgPick(); showResetWait(); dispatchEvent(new Event("app-ready")); return; }
+    if(!user){ S.uid=null; $("#app").classList.add("hide"); $("#me").classList.add("hide"); $("#srch").classList.add("hide"); $("#invBtn").classList.add("hide"); $("#auth").classList.remove("hide"); paintLgPick(); showResetWait(); dispatchEvent(new Event("app-ready")); return; }
     S.uid=user.uid;
     if(S.joinP) await S.joinP.catch(()=>{});
     if(S.players?.[S.uid]) S.order=[S.uid, ...S.order.filter(u=>u!==S.uid)];
@@ -4373,7 +4395,7 @@ if("serviceWorker" in navigator && location.protocol==="https:") navigator.servi
         await signOut(S.auth); return; }
     }
     $("#auth").classList.add("hide"); $("#app").classList.remove("hide");
-    $("#me").classList.remove("hide"); $("#srch").classList.remove("hide"); paintMe(); applyTheme();
+    $("#me").classList.remove("hide"); $("#srch").classList.remove("hide"); $("#invBtn").classList.remove("hide"); paintMe(); applyTheme();
     S.statFor=S.uid;
     $("#foot").innerHTML=`Kazanan +1 (sürprizde +2 / +3) · Fark ±3 +1 · En skorer +1 · Banko 2 kat / -1 · Günün oyuncusu +3 · Gecenin sorusu +1 · Haftada 4 gece +2<br><button class="linkish ver" id="pgFoot" type="button">📖 Puanlama rehberi</button><br>Veriler ESPN'den alınır. Maç varken 30 saniyede bir yenilenir.<br><button class="linkish ver" id="verBtn" type="button">Sürüm ${VERSION} · Yenilikler</button> · <button class="linkish ver" id="repBtn" type="button">Sorun bildir</button> · <button class="linkish ver" id="langBtn" type="button">${LANG==="en"?"Türkçe":"English"}</button>`;
     $("#verBtn").onclick=()=>openNews(true); $("#repBtn").onclick=()=>openReport(); $("#langBtn").onclick=()=>setLang(LANG==="en"?"tr":"en");

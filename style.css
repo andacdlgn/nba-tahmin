@@ -1896,5 +1896,15 @@ body.bars-hidden .nav,body.bars-hidden .topbar{pointer-events:none}
 }
 
 /* 1.16.0 Puanlama düğmesi: dar ekranda iki metin düğmesi sığsın */
-@media (max-width:430px){ .rules-btn{padding:0 9px;font-size:13px} .tb-right{gap:6px} }
-@media (max-width:370px){ .topbar .brand{font-size:19px} .rules-btn{padding:0 7px} }
+@media (max-width:430px){ .rules-btn{padding:0 8px;font-size:13px} .tb-right{gap:5px} .topbar .icon-btn{width:34px;height:34px} }
+@media (max-width:375px){ .topbar .brand{font-size:18px;letter-spacing:0} .rules-btn{padding:0 6px;font-size:12.5px} .tb-right{gap:4px} .topbar .wrap{gap:6px} }
+@media (max-width:345px){ .topbar .brand{display:none} }
+/* Davet et düğmesi ve penceresi */
+.inv-btn{display:inline-flex;align-items:center;gap:6px}.inv-btn svg{width:18px;height:18px;flex:none}
+.inv-btn.hide{display:none}
+@media (max-width:560px){ .inv-btn span{display:none} .inv-btn{width:38px;padding:0;justify-content:center} }
+@media (max-width:430px){ .inv-btn{width:34px;height:34px} }
+@media (max-width:480px){ .topbar:has(#invBtn:not(.hide)) .brand{display:none} }
+.inv-row{display:flex;gap:8px;margin:12px 0 10px}.inv-row input{flex:1;min-width:0;height:42px;border-radius:10px;border:1px solid var(--line);background:var(--panel-2);color:var(--ink);padding:0 10px;font-size:13.5px}
+.inv-row .btn{flex:none}
+.inv-acts{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}.inv-acts .btn{text-decoration:none;color:var(--ink)}
