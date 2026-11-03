@@ -10,7 +10,7 @@ import re
 import subprocess
 import sys
 import tempfile
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -73,6 +73,42 @@ def js_scores():
         return json.loads(subprocess.check_output(["node", js, data]))
 
 
+def extra_cases():
+    """Yedek tahmin ve devamlılık bonusu (yalnızca arka plan görevinde hesaplanır)."""
+    bad = []
+    gs = [{"fav": "A", "winner": "A"}, {"fav": "B", "winner": "C"}, {"fav": "D", "winner": "D"}, {"fav": "E", "winner": "E"}, {"winner": "F"}]
+    if sync.auto_points(gs) != 1:
+        bad.append("yedek: 3 favori kazandı -> 1 puan olmalı")
+    if sync.auto_points(gs[:1]) != 0:
+        bad.append("yedek: 1 favori -> 0 puan olmalı")
+    wk = "20261109"
+    days = {d: {"u": {"n": n, "week": wk, "pts": 0}} for d, n in (("20261109", 3), ("20261110", 0), ("20261111", 2), ("20261112", 1), ("20261113", 4), ("20261114", 2))}
+    sync.streak_bonus(days)
+    got = {d: v["u"].get("bon", 0) for d, v in days.items()}
+    if got != {"20261109": 0, "20261110": 0, "20261111": 0, "20261112": 0, "20261113": 2, "20261114": 0}:
+        bad.append(f"devamlılık: 4. gecede +2 bekleniyordu, çıkan {got}")
+    sync.streak_bonus(days)   # ikinci kez çalışınca iki kat olmamalı
+    if sum(v["u"].get("bon", 0) for v in days.values()) != 2:
+        bad.append("devamlılık: tekrar hesaplamada bonus birikti")
+    old = {"20261103": {"u": {"n": 1, "week": "20261102"}}, "20261102": {"u": {"n": 1, "week": "20261102"}}}
+    sync.streak_bonus(old)
+    if any(v["u"].get("bon") for v in old.values()):
+        bad.append("devamlılık: 4 Kasım öncesi sayılmamalı")
+    # NBA Finali: Doğu-Batı serisi konferans şampiyonlarını ve şampiyonu verir
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    try:
+        import awards
+        G = {}
+        for i, (h, a_, wins, st) in enumerate((("BOS", "NY", {"BOS": 4, "NY": 1}, "2027-05-20"), ("OKC", "BOS", {"OKC": 3, "BOS": 4}, "2027-06-15"), ("OKC", "BOS", {"OKC": 3, "BOS": 3}, "2027-06-12"))):
+            G[str(i)] = {"seasonType": 3, "start": st, "home": {"abbr": h}, "away": {"abbr": a_}, "series": {"key": "2027-" + "-".join(sorted((h, a_))), "wins": wins, "need": 4}}
+        got = sorted(awards.finals_results(G))
+        if got != [("s_2027", "champ", "BOS"), ("s_2027", "fe", "BOS"), ("s_2027", "fw", "OKC")]:
+            bad.append(f"final: beklenmeyen sonuç {got}")
+    except ImportError as e:
+        print("awards testi atlandı:", e)
+    return bad
+
+
 def lock_cases():
     """Kilit: sync.valid_before ile app.js kuralının aynı anı kullanması."""
     bad = 0
@@ -104,7 +140,11 @@ def main():
             if bad <= 10:
                 print("FARK:", c, "python", p, "site", a)
     bad += lock_cases()
-    print(f"{len(CASES)} puan durumu + kilit kontrolleri: {'hepsi aynı ✓' if not bad else str(bad) + ' fark ✗'}")
+    ex = extra_cases()
+    for x in ex:
+        print("HATA:", x)
+    bad += len(ex)
+    print(f"{len(CASES)} puan durumu + kilit, yedek tahmin ve devamlılık kontrolleri: {'hepsi doğru ✓' if not bad else str(bad) + ' fark ✗'}")
     return 1 if bad else 0
 
 

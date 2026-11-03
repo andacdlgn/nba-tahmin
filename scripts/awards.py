@@ -14,11 +14,11 @@ Oyuncu adları data/allplayers.json ile ESPN kimliğine çevrilir. Yönetim pane
 """
 import re
 import urllib.parse
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from firebase_admin import firestore
 
-from sync import get, load, week_key
+from sync import load, week_key
 
 SEASON_PAGE = "2026–27 NBA season"
 CUP_PAGE = "2026 NBA Cup"
@@ -117,6 +117,28 @@ def month_round(label, year_start=2026):
     return f"m_{year}{mon:02d}"
 
 
+def finals_results(games):
+    """[(tur, kategori, takım)]: 2027 playoff'larında Doğu ile Batı takımının oynadığı seri NBA Finali'dir."""
+    series = {}
+    for g in games.values():
+        sr = g.get("series")
+        if g.get("seasonType") == 3 and sr and g.get("start", "") >= "2027-04":
+            series.setdefault(sr["key"], []).append(g)
+    out = []
+    for key, sg in series.items():
+        teams = {sg[0]["home"]["abbr"], sg[0]["away"]["abbr"]}
+        east = [t for t in teams if t in EAST]
+        if len(teams) != 2 or len(east) != 1:
+            continue
+        west = (teams - set(east)).pop()
+        out += [("s_2027", "fe", east[0]), ("s_2027", "fw", west)]
+        last = max(sg, key=lambda g: g["start"])["series"]
+        champ = next((t for t, w in last.get("wins", {}).items() if w >= last.get("need", 4)), None)
+        if champ:
+            out.append(("s_2027", "champ", champ))
+    return out
+
+
 def collect(dir_):
     """{tur: {kategori: (kimlik, ad)}}"""
     out = {}
@@ -176,6 +198,10 @@ def collect(dir_):
         p = dir_.player(name, team)
         if p:
             put("c_2026", "cmvp", p["id"], p["n"])
+    # NBA Finali: Doğu ve Batı takımı karşılaşan playoff serisi (data/games.json'dan). Final başlayınca konferans
+    # şampiyonları (fe / fw), seri bitince NBA şampiyonu (champ) yazılır.
+    for k, c, ident in finals_results(load("games.json", {})):
+        put("s_2027", c, ident, ident)
     # konferans sıralaması: normal sezon bitince (13 Nisan 2027'den sonra) ESPN puan durumundan ilk 8
     if False:   # konferans sıralaması turu 1.9.1'de kaldırıldı
         try:

@@ -135,6 +135,25 @@ def espn_hp(s):
 TIER_FROM, WIN_CAP = "20261104", 4   # sürpriz kademesi; app.js'teki tierOf ile aynı
 
 
+def auto_points(dgames):
+    """Yedek tahmin: ESPN favorisinin kazandığı her 2 maç 1 puan."""
+    return sum(1 for g in dgames if g.get("fav") and g["fav"] == g["winner"]) // 2
+
+
+def streak_bonus(days):
+    """Devamlılık bonusu: haftanın 4. kendi tahminli gecesine +2. Her çalışmada baştan hesaplanır (gün satırına "bon")."""
+    seen = {}
+    for day in sorted(days):
+        for uid, v in days[day].items():
+            v.pop("bon", None)
+            if day < AUTO_FROM or not v.get("n"):
+                continue
+            k = (v.get("week") or week_key(day), uid)
+            seen[k] = seen.get(k, 0) + 1
+            if seen[k] == STREAK_NIGHTS:
+                v["bon"] = STREAK_BONUS
+
+
 def tier_of(g, abbr):
     if g.get("day", "") < TIER_FROM or g.get("hp") is None:
         return 1
@@ -707,10 +726,10 @@ def main(full=False):
                 n += 1 if pick else 0
                 sc["games"].setdefault(g["id"], {})[uid] = r
                 total += r["pts"]
-            auto = 0
             night_done = nights.get(day, {}).get("done") and nights[day]["n"] == len(dgames)
+            auto = 0
             if n == 0 and not q and not dp_name and not conf_game and players[uid].get("autoPick") and day >= AUTO_FROM and night_done:
-                auto = sum(1 for g in dgames if g.get("fav") and g["fav"] == g["winner"]) // 2
+                auto = auto_points(dgames)
                 total += auto
             sc["days"][day][uid] = {"pts": total, "n": n + (1 if q else 0), "dp": dp, "dpName": dp_name, "conf": conf_game,
                                     "q": q, "qp": qp, "week": week_key(day), **({"auto": auto} if auto else {})}
@@ -747,17 +766,7 @@ def main(full=False):
         for uid, v in row.items():
             v["sr"] = sum(x["row"].get(uid, {}).get("pts", 0) for x in sc["series"].values() if x["day"] == day)
 
-    # devamlılık bonusu: haftanın 4. kendi tahminli gecesine +2 (her çalışmada baştan hesaplanır)
-    seen_nights = {}
-    for day in sorted(sc["days"]):
-        for uid, v in sc["days"][day].items():
-            v.pop("bon", None)
-            if day < AUTO_FROM or not v.get("n"):
-                continue
-            k = (v.get("week") or week_key(day), uid)
-            seen_nights[k] = seen_nights.get(k, 0) + 1
-            if seen_nights[k] == STREAK_NIGHTS:
-                v["bon"] = STREAK_BONUS
+    streak_bonus(sc["days"])
     # toplamlar (gün puanı + o gece biten serilerin puanı + devamlılık bonusu)
     for row in sc["days"].values():
         for v in row.values():

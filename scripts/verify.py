@@ -17,7 +17,7 @@ from datetime import datetime, timedelta, timezone
 from html import escape
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from remind import Mailer, build, card, firestore, init  # noqa: E402
+from remind import Mailer, build, card, init  # noqa: E402
 
 VALID = timedelta(hours=3)
 

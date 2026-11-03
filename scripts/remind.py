@@ -43,7 +43,7 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from sync import CONFIG, ESPN, PERGAME_FROM, inj_out, espn_today, get, load, lock_gap, scoreboard, week_key  # noqa: E402
+from sync import CONFIG, PERGAME_FROM, inj_out, espn_today, get, load, lock_gap, scoreboard, week_key  # noqa: E402
 
 TR = ZoneInfo("Europe/Istanbul")
 REMIND_AT = CONFIG.get("remindAt", "21:00")                       # her akşam bu saatte (Türkiye)
