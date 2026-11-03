@@ -41,10 +41,11 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.6.0";
+const VERSION = "1.6.1";
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.6.1", d:"3 Kasım 2026", items:["NBA sekmesindeki aylık takvimin bozuk görünümü düzeldi."]},
   {v:"1.6.0", d:"3 Kasım 2026", items:["Mail onayı artık zorunlu değil; onaylamadan da oynayabilirsin, ama site ara ara hatırlatır.","Onay ve şifre sıfırlama kodları 3 saat geçerli.","Mailler sadeleşti ve azaldı: günde en fazla bir özet maili gelir (gerekirse bir de acil sakatlık uyarısı)."]},
   {v:"1.5.2", d:"3 Kasım 2026", items:["Puan durumunda takım adları üstte ve büyük, gerçek isimler altta.","Grafiklerde berabere olanların isimleri ve puanları artık üst üste binmiyor."]},
   {v:"1.5.1", d:"3 Kasım 2026", items:["İngilizce arayüz büyük ölçüde tamamlandı: tarihler, kayan şerit, gecenin manşeti, hata mesajları ve açıklamalar da çevriliyor."]},
@@ -2601,7 +2602,7 @@ async function calendarHTML(){
     cells+=`<div class="cal-c${k===S.today?" today":""}${cup?" cup":""}"><span class="cal-d">${d}</span>${g?`<span class="cal-g" title="${g.home?"Evde":"Deplasmanda"} ${g.op}"><img src="${LOGO_SMALL(g.op)}" alt="">${g.res?`<small class="${g.res[0]==="G"?"w":"l"}">${g.res.split(" ")[0]}</small>`:`<small>${g.home?"ev":"dep"}</small>`}</span>`:""}${cup?`<i class="cal-cup" title="${cup}">${ICON.cup}</i>`:""}${lk?`<i class="cal-lk" title="Uzun vade kilidi: ${esc(lk.join(", "))}">🔒</i>`:""}</div>`; }
   const mn=MONTHS_TR[m-1]+" "+y;
   return `<div class="cal-nav"><button class="btn sm" data-calm="-1" type="button">‹</button><b>${mn}</b><button class="btn sm" data-calm="1" type="button">›</button></div>
-    <div class="cal">${["Pzt","Sal","Çar","Per","Cum","Cmt","Paz"].map(x=>`<div class="cal-w">${x}</div>`).join("")}${cells}</div>
+    <div class="mcal">${["Pzt","Sal","Çar","Per","Cum","Cmt","Paz"].map(x=>`<div class="cal-w">${x}</div>`).join("")}${cells}</div>
     <div class="cal-key">${team?`<span><img src="${LOGO_SMALL(fav)}" alt="">${esc(team.n)} maçları (ABD tarihi; G/M sonuç)</span>`:`<span>Favori takımını seçersen maçları burada görünür (Profil → Ayarlar).</span>`}<span>${ICON.cup} NBA Kupası gecesi</span><span>🔒 Uzun vade kilidi</span></div>`;
 }
 function bindCalendar(){ $$("[data-calm]").forEach(b=>b.onclick=()=>{ const y=+S.calM.slice(0,4), m=+S.calM.slice(4,6)+ +b.dataset.calm; const d=new Date(Date.UTC(y,m-1,1)); S.calM=`${d.getUTCFullYear()}${String(d.getUTCMonth()+1).padStart(2,"0")}`; renderNBA(); }); }
