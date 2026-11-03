@@ -31,7 +31,7 @@
 <script>
 // Açılış ekranı + sürüm kontrolü. Her güncellemede BUILD, version.json, app.js'deki VERSION ve
 // aşağıdaki ?v= numaraları birlikte artırılır (scripts/surum.py hepsini birden yapar).
-window.BUILD = "v26";
+window.BUILD = "v27";
 (function(){
   var t0 = Date.now(), MIN = 1000, MAX = 8000, ready = false, done = false;
   function hide(){ if(done) return; done = true; var s = document.getElementById("splash"); if(!s) return; s.classList.add("out"); setTimeout(function(){ s.remove(); }, 450); }
@@ -49,7 +49,7 @@ window.BUILD = "v26";
   }).catch(function(){});
 })();
 </script>
-<link rel="stylesheet" href="style.css?v=v26">
+<link rel="stylesheet" href="style.css?v=v27">
 </head>
 <body>
 
@@ -80,35 +80,45 @@ window.BUILD = "v26";
 <div class="pickbar" id="pickBar" aria-hidden="true"></div>
 
 <!-- GİRİŞ -->
-<section id="auth" class="wrap hide" aria-labelledby="authTitle">
-  <div class="auth-card">
-    <h1 id="authTitle" class="cond">Oyuna gir</h1>
-    <p class="muted">Her gecenin maçlarına tahmin yap: kazanan, fark ve en skorer.</p>
-    <div class="chips" role="tablist" id="authMode">
-      <button class="chip" data-v="login" aria-pressed="true">Giriş</button>
-      <button class="chip" data-v="join" aria-pressed="false">Yeni oyuncu</button>
+<section id="auth" class="hide" aria-labelledby="authTitle">
+  <div class="auth-bg" aria-hidden="true"><div class="auth-logos" id="authLogos"></div></div>
+  <div class="wrap auth-wrap">
+    <div class="auth-hero">
+      <img src="icons/icon-192.png" alt="" class="auth-logo" width="72" height="72">
+      <h1 id="authTitle" class="cond">NBA Tahmin</h1>
+      <p class="auth-tag">Her gece maçlara tahmin yap: kazanan, fark ve en skorer.</p>
+      <div id="authLive" class="auth-live"></div>
     </div>
-    <form id="authForm" autocomplete="on">
-      <label class="fld" id="fName"><span>Adın</span>
-        <input id="inName" list="playerNames" autocomplete="username" maxlength="40" required placeholder="ör. Andaç">
-        <datalist id="playerNames"></datalist>
-        <small class="hint hide" id="nameHint">Büyük harfle başlamalı. Küfür, argo ya da hakaret içeremez.</small>
-      </label>
-      <div class="sec-q hide" id="fSec">
-        <div class="sec-head" id="secHead">Güvenlik sorusu <small>Şifreni unutursan bu ikisiyle sıfırlarsın.</small></div>
-        <div id="secPick"></div>
+    <div class="auth-card">
+      <div id="authInvite" class="auth-invite hide"></div>
+      <div class="chips" role="tablist" id="authMode">
+        <button class="chip" data-v="login" aria-pressed="true">Giriş</button>
+        <button class="chip" data-v="join" aria-pressed="false">Yeni oyuncu</button>
       </div>
-      <label class="fld"><span id="pinLbl">Şifre (6 hane)</span>
-        <input id="inPin" type="password" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" autocomplete="current-password" required placeholder="••••••">
-      </label>
-      <label class="fld hide" id="fInvite"><span>Davet kodu</span>
-        <input id="inInvite" autocomplete="off" maxlength="40" placeholder="Oyunu kuran kişiden al">
-      </label>
-      <p class="err" id="authErr" role="alert"></p>
-      <button class="btn-primary" id="authBtn" type="submit">Giriş yap</button>
-      <button class="linkish forgot" id="forgotBtn" type="button">Şifremi unuttum</button>
-    </form>
-    <div id="resetWait" class="hide"></div>
+      <form id="authForm" autocomplete="on">
+        <h2 class="auth-h" id="authH">Kimsin?</h2>
+        <div id="lgPick" class="lg-pick"></div>
+        <div id="lgWho" class="lg-who hide"></div>
+        <label class="fld hide" id="fName"><span>Adın</span>
+          <input id="inName" list="playerNames" autocomplete="username" maxlength="40" placeholder="ör. Andaç">
+          <datalist id="playerNames"></datalist>
+        </label>
+        <div id="rsMethod" class="seg2 hide" style="margin-top:12px"><button type="button" data-rm="mail" aria-pressed="true">Mailime kod gelsin</button><button type="button" data-rm="sec" aria-pressed="false">Güvenlik sorusu</button></div>
+        <div class="sec-q hide" id="fSec">
+          <div class="sec-head" id="secHead">Güvenlik sorusu <small>Kayıtta seçtiğin takım ve oyuncu.</small></div>
+          <div id="secPick"></div>
+        </div>
+        <div id="rsMail" class="hide"></div>
+        <div class="fld" id="fPin"><span id="pinLbl">Şifre (6 hane)</span>
+          <input id="inPin" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="current-password" aria-label="Şifre">
+        </div>
+        <p class="err" id="authErr" role="alert"></p>
+        <button class="btn-primary" id="authBtn" type="submit">Giriş yap</button>
+        <div class="auth-links"><button class="linkish forgot" id="forgotBtn" type="button">Şifremi unuttum</button><button class="linkish" id="howBtn" type="button">Nasıl oynanır?</button></div>
+      </form>
+      <div id="joinBox" class="hide"></div>
+      <div id="resetWait" class="hide"></div>
+    </div>
   </div>
 </section>
 
@@ -199,6 +209,6 @@ window.BUILD = "v26";
 
 <div class="toast hide" id="toast" role="status" aria-live="polite"></div>
 
-<script type="module" src="app.js?v=v26"></script>
+<script type="module" src="app.js?v=v27"></script>
 </body>
 </html>

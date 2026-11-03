@@ -72,9 +72,13 @@ service cloud.firestore {
     match /config/{doc} {
       allow read, write: if false;
     }
-    // Davet kodunu yalnızca yönetici görür ve değiştirir
-    match /config/secret {
+    // Yönetici belgesini yalnızca yönetici okur (sitedeki yönetim paneli buna bakar)
+    match /config/admin {
       allow read: if isAdmin();
+    }
+    // Davet kodunu oyuncular görür (her biri kendi davet linkini paylaşır); yalnızca yönetici değiştirir
+    match /config/secret {
+      allow read: if isPlayer();
       allow write: if isAdmin() && request.resource.data.keys().hasOnly(['invite'])
         && str(request.resource.data.invite, 40);
     }
@@ -104,9 +108,12 @@ service cloud.firestore {
       allow create: if signedIn() && request.auth.uid == uid
         && existsAfter(/databases/$(database)/documents/joins/$(uid))
         && !exists(/databases/$(database)/documents/banned/$(uid))
-        && request.resource.data.keys().hasOnly(['name', 'joined'])
+        && request.resource.data.keys().hasOnly(['name', 'joined', 'ref'])
         && validName(request.resource.data.name)
-        && request.resource.data.joined == request.time;
+        && request.resource.data.joined == request.time
+        // ref: davet eden oyuncu (davet linkinden gelir)
+        && (!('ref' in request.resource.data) || (request.resource.data.ref is string
+            && exists(/databases/$(database)/documents/players/$(request.resource.data.ref))));
       // Profil: ad, renk, emoji, favori takım ve tema değiştirilebilir (listeden seçilir)
       allow update: if signedIn() && request.auth.uid == uid
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'color', 'emoji', 'favTeam', 'theme', 'av', 'bio'])
@@ -219,14 +226,23 @@ service cloud.firestore {
 
     // resets/{id}: "şifremi unuttum" isteği. Girişsiz oluşturulur, kimse okuyamaz;
     // GitHub görevi birkaç dakikada bir işler ve siler.
+    // İki yol: güvenlik sorusu (team + playerId) ya da maile gelen kod (code).
     match /resets/{id} {
       allow read, update, delete: if false;
       allow create: if id.size() >= 16 && id.size() <= 40
-        && request.resource.data.keys().hasOnly(['name', 'team', 'playerId', 'pin', 'at'])
+        && request.resource.data.keys().hasOnly(['name', 'team', 'playerId', 'code', 'pin', 'at'])
         && str(request.resource.data.name, 40)
-        && str(request.resource.data.team, 6)
-        && str(request.resource.data.playerId, 20)
+        && ((str(request.resource.data.get('team', ''), 6) && str(request.resource.data.get('playerId', ''), 20))
+            || (request.resource.data.get('code', '') is string && request.resource.data.get('code', '').matches('^[0-9]{6}$')))
         && request.resource.data.pin is string && request.resource.data.pin.matches('^[0-9]{6}$')
+        && request.resource.data.at == request.time;
+    }
+    // mailReset/{id}: "mailime kod gelsin" isteği. Girişsiz oluşturulur, kimse okuyamaz; görev onaylı adrese kod yollar.
+    match /mailReset/{id} {
+      allow read, update, delete: if false;
+      allow create: if id.size() >= 16 && id.size() <= 40
+        && request.resource.data.keys().hasOnly(['name', 'at'])
+        && str(request.resource.data.name, 40)
         && request.resource.data.at == request.time;
     }
 

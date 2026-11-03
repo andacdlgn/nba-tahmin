@@ -39,7 +39,7 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "v26";
+const VERSION = "v27";
 const LOGO_SMALL = a => `logos/${String(a).toLowerCase()}.png`;
 const LOGO_FULL  = a => `https://a.espncdn.com/i/teamlogos/nba/500/${String(a).toLowerCase()}.png`;
 document.addEventListener("error", e => {
@@ -271,7 +271,7 @@ async function loadPlayers(){
   S.players = {};
   // katılma saati henüz sunucudan gelmediyse "en yeni" say (renk sırası kaymasın)
   snap.forEach(d => { const x=d.data({serverTimestamps:"estimate"});
-    S.players[d.id] = {name:x.name, joined:x.joined?.toMillis?.()||Date.now(), color:x.color||"", emoji:x.emoji||"", favTeam:x.favTeam||"", theme:x.theme||"default", av:x.av||"", bio:x.bio||""}; });
+    S.players[d.id] = {name:x.name, joined:x.joined?.toMillis?.()||Date.now(), color:x.color||"", emoji:x.emoji||"", favTeam:x.favTeam||"", theme:x.theme||"default", av:x.av||"", bio:x.bio||"", ref:x.ref||""}; });
   S.order = Object.keys(S.players).sort((a,b) => (S.players[a].joined-S.players[b].joined) || pname(a).localeCompare(pname(b),"tr"));
   S.colorOrder = [...S.order];
   // giriş yapan oyuncu her zaman ilk sırada (iki kişide solda)
@@ -1865,6 +1865,7 @@ function paintProf(){
   else body=`<div id="prof"></div>`;
   box.innerHTML = profCover(u) + `<div class="pc-head on-cover">${avatar(u,"lg")}<div style="min-width:0"><h3 id="shTitle" style="margin:0;color:${col(u)}">${esc(pname(u))}</h3>
       ${p.bio?`<div class="pf-bio">“${esc(p.bio)}”</div>`:""}
+      ${(inv=>inv.length?`<div class="pf-inv">${ICON.link}Lige getirdiği: ${inv.map(x=>`<b style="color:${col(x)}">${esc(pname(x))}</b>`).join(", ")}</div>`:"")(invitedBy(u))}
       <small class="muted">${st.rank}. sırada · ${st.tot} puan${p.favTeam?` · <span data-tp="${p.favTeam}" class="linkish" style="font-size:13px">${esc(fav?.n||p.favTeam)}</span> taraftarı`:""} · Ligde ${daysIn}. günü</small></div></div>
     <div class="seg2 prof-tabs" style="grid-template-columns:repeat(${tabs.length},1fr)">${tabs.map(([k,l])=>`<button data-ptab="${k}" aria-pressed="${tab===k}">${l}</button>`).join("")}</div>
     <div class="prof-body">${body}</div>`;
@@ -2597,78 +2598,308 @@ async function checkRecovery(){
 }
 
 /* ====================================================== giriş */
-let authMode="login", authSec=null;
+// Şifre kutucukları: gerçek input görünmez şekilde 6 kutunun üstünde durur (şifre yöneticileri de çalışır)
+function pinBoxes(inp, onFull){
+  if(inp.closest(".pinb")) return inp._paint;
+  const w=document.createElement("div"); w.className="pinb"; inp.parentNode.insertBefore(w, inp); w.appendChild(inp);
+  const cells=document.createElement("div"); cells.className="pinb-cells"; cells.setAttribute("aria-hidden","true"); cells.innerHTML="<i></i>".repeat(6); w.appendChild(cells);
+  const paint=()=>{ const v=inp.value.replace(/\D/g,"").slice(0,6); if(v!==inp.value) inp.value=v; const n=v.length, f=document.activeElement===inp;
+    [...cells.children].forEach((c,i)=>{ c.className = i<n ? "on" : (i===n && f ? "cur" : ""); c.textContent = i<n ? (inp.dataset.show ? v[i] : "●") : ""; }); };
+  inp.addEventListener("input", ()=>{ paint(); if(inp.value.length===6 && onFull) onFull(); });
+  inp.addEventListener("focus", paint); inp.addEventListener("blur", paint);
+  inp._paint=paint; paint(); return paint;
+}
+const WEAK_PINS = new Set(["123456","654321","012345","543210","123123","121212","112233","098765","987654","456789","147258","159753"]);
+const weakPin = p => /^(\d)\1{5}$/.test(p) || /^(\d\d)\1\1$/.test(p) || /^(\d{3})\1$/.test(p) || WEAK_PINS.has(p);
+const nameTaken = n => S.order.some(u=>slug(pname(u))===slug(n));
+
+let authMode="login", authSec=null, resetM="mail";
+S.lgUser = null;
+function paintLgPick(){
+  const box=$("#lgPick"); if(!box) return;
+  const show = authMode!=="join" && !S.lgUser && S.order.length && !S.lgType;
+  box.classList.toggle("hide", !show);
+  $("#fName").classList.toggle("hide", !(authMode!=="join" && !S.lgUser && (S.lgType || !S.order.length)));
+  $("#authH").classList.toggle("hide", !show);
+  if(show) box.innerHTML = S.order.map(u=>`<button type="button" class="lg-card" data-lgu="${u}" style="--pc:${col(u)}">${avatar(u,"lg")}<b>${esc(pname(u))}</b></button>`).join("")
+    + `<button type="button" class="lg-card lg-other" data-lgu=""><span class="av lg">+</span><b>Adımı yazayım</b></button>`;
+  const who=$("#lgWho");
+  who.classList.toggle("hide", !S.lgUser);
+  if(S.lgUser) who.innerHTML = `${avatar(S.lgUser,"lg")}<span><small>${authMode==="reset"?"Şifresi sıfırlanacak oyuncu":"Giriş yapan"}</small><b>${esc(pname(S.lgUser))}</b></span><button type="button" class="linkish" id="lgChange">Değiştir</button>`;
+}
+$("#lgPick").addEventListener("click", e=>{ const b=e.target.closest("[data-lgu]"); if(!b) return;
+  if(!b.dataset.lgu){ S.lgType=true; paintLgPick(); $("#inName").focus(); return; }
+  S.lgUser=b.dataset.lgu; $("#inName").value=pname(S.lgUser); paintLgPick(); $("#authErr").textContent="";
+  if(authMode==="login") setTimeout(()=>$("#inPin").focus(), 50); });
+$("#lgWho").addEventListener("click", e=>{ if(e.target.closest("#lgChange")){ S.lgUser=null; S.lgType=false; $("#inName").value=""; $("#inPin").value=""; $("#inPin")._paint?.(); paintLgPick(); } });
+
 function setAuthMode(m){
+  if(m==="join"){ authMode="join"; $$("#authMode .chip").forEach(x=>x.setAttribute("aria-pressed", x.dataset.v==="join")); $("#authForm").classList.add("hide"); $("#joinBox").classList.remove("hide"); paintJoin(); return; }
+  $("#joinBox").classList.add("hide"); $("#authForm").classList.remove("hide");
   authMode=m;
-  $$("#authMode .chip").forEach(x=>x.setAttribute("aria-pressed", x.dataset.v===(m==="reset"?"login":m)));
-  $("#fInvite").classList.toggle("hide", m!=="join");
-  $("#nameHint").classList.toggle("hide", m!=="join");
-  $("#fSec").classList.toggle("hide", m==="login");
-  $("#secHead").innerHTML = m==="reset" ? `Güvenlik sorusu <small>Kayıtta seçtiğin takım ve oyuncu.</small>` : `Güvenlik sorusu <small>Şifreni unutursan bu ikisiyle sıfırlarsın.</small>`;
-  if(m!=="login" && !authSec) authSec = secPicker($("#secPick"));
-  $("#pinLbl").textContent = m==="reset" ? "Yeni şifre (6 hane)" : "Şifre (6 hane)";
-  $("#inPin").autocomplete = m==="login" ? "current-password" : "new-password";
-  $("#authBtn").textContent = {login:"Giriş yap", join:"Oyuna katıl", reset:"Şifremi sıfırla"}[m];
-  $("#forgotBtn").textContent = m==="reset" ? "Girişe dön" : "Şifremi unuttum";
-  $("#forgotBtn").classList.toggle("hide", m==="join");
-  $("#authTitle").textContent = m==="reset" ? "Şifreni sıfırla" : "Oyuna gir";
+  $$("#authMode .chip").forEach(x=>x.setAttribute("aria-pressed", x.dataset.v==="login"));
+  const rs = m==="reset";
+  $("#rsMethod").classList.toggle("hide", !rs);
+  $$("#rsMethod [data-rm]").forEach(b=>b.setAttribute("aria-pressed", b.dataset.rm===resetM));
+  $("#fSec").classList.toggle("hide", !(rs && resetM==="sec"));
+  $("#rsMail").classList.toggle("hide", !(rs && resetM==="mail"));
+  if(rs && resetM==="sec" && !authSec) authSec = secPicker($("#secPick"));
+  if(rs && resetM==="mail") paintRsMail();
+  const needPin = !rs || resetM==="sec" || S.rsSent;
+  $("#fPin").classList.toggle("hide", !needPin);
+  $("#authBtn").classList.toggle("hide", rs && resetM==="mail" && !S.rsSent);
+  $("#pinLbl").textContent = rs ? "Yeni şifre (6 hane)" : "Şifre (6 hane)";
+  $("#inPin").autocomplete = rs ? "new-password" : "current-password";
+  $("#authBtn").textContent = rs ? "Şifremi sıfırla" : "Giriş yap";
+  $("#forgotBtn").textContent = rs ? "Girişe dön" : "Şifremi unuttum";
+  $("#authH").textContent = rs ? "Kimin şifresi?" : "Kimsin?";
   $("#authErr").textContent="";
+  paintLgPick();
 }
 $("#authMode").addEventListener("click", e=>{ const c=e.target.closest(".chip"); if(c) setAuthMode(c.dataset.v); });
-$("#forgotBtn").onclick = () => setAuthMode(authMode==="reset" ? "login" : "reset");
-$("#inName").addEventListener("input", () => {
-  if(authMode!=="join") return;
-  const p = $("#inName").value.trim() ? nameProblem($("#inName").value.trim()) : null;
-  $("#nameHint").textContent = p || "Büyük harfle başlamalı. Küfür, argo ya da hakaret içeremez.";
-  $("#nameHint").classList.toggle("bad", !!p);
-});
+$("#forgotBtn").onclick = () => { S.rsSent=null; setAuthMode(authMode==="reset" ? "login" : "reset"); };
+$("#rsMethod").addEventListener("click", e=>{ const b=e.target.closest("[data-rm]"); if(b){ resetM=b.dataset.rm; setAuthMode("reset"); } });
+$("#howBtn").onclick = () => openHow();
+pinBoxes($("#inPin"), () => { if(authMode==="login" && $("#inName").value.trim()) $("#authForm").requestSubmit(); });
+
+// Mail ile sıfırlama: 1) ad -> mailReset/{id}; görev onaylı adrese kod yollar  2) kod + yeni şifre -> resets/{id}
+function paintRsMail(){
+  const box=$("#rsMail");
+  if(!S.rsSent){ box.innerHTML = `<p class="muted" style="margin:10px 0 0">Profilinde onayladığın mail adresine 6 haneli bir kod gönderilir. Kod 30 dakika geçerli.</p>
+      <button class="btn-primary" id="rsSend" type="button">Kod gönder</button><p class="muted" id="rsMsg" style="margin:8px 0 0"></p>`;
+    $("#rsSend").onclick = sendResetCode; return; }
+  box.innerHTML = `<div class="reset-box ok" style="margin-top:12px"><b>Kod gönderildi</b><p>${esc(S.rsSent.m||"Mail adresine")} adresine bakmayı unutma; gereksiz klasörüne de düşebilir.</p></div>
+    <div class="fld"><span>Maildeki kod</span><input id="rsCode" inputmode="numeric" maxlength="6" autocomplete="one-time-code" data-show="1" aria-label="Maildeki kod"></div>
+    <button class="linkish" id="rsAgain" type="button">Kod gelmedi, tekrar gönder</button>`;
+  pinBoxes($("#rsCode"), ()=>$("#inPin").focus());
+  $("#rsAgain").onclick = () => { S.rsSent=null; setAuthMode("reset"); };
+}
+async function sendResetCode(){
+  const name=$("#inName").value.trim(), msg=$("#rsMsg");
+  if(!slug(name)){ $("#authErr").textContent="Önce kim olduğunu seç."; return; }
+  const id=randHex(12); $("#rsSend").disabled=true; msg.textContent="İstek gönderiliyor…";
+  try{ await setDoc(doc(S.db,"mailReset",id), {name, at:serverTimestamp()}); }
+  catch(e){ msg.textContent="İstek gönderilemedi, tekrar dene."; $("#rsSend").disabled=false; return; }
+  msg.innerHTML=`<span class="spin sm"></span> Kod hazırlanıyor, genelde 1 dakika sürer…`;
+  const t0=Date.now();
+  const poll=async()=>{
+    try{ const r=await getDoc(doc(S.db,"resetStatus",id)); if(r.exists()){ const d=r.data();
+      if(d.state==="sent"){ S.rsSent={id, m:d.m, name}; setAuthMode("reset"); return; }
+      msg.textContent = {nomail:"Bu hesapta onaylı bir mail adresi yok. Güvenlik sorusuyla sıfırlayabilirsin.", nouser:"Bu adla bir oyuncu bulunamadı.", wait:"Az önce kod gönderildi; 2 dakika sonra tekrar dene.", locked:"Çok fazla yanlış deneme oldu. 1 saat sonra tekrar dene."}[d.state] || "İstek işlenemedi, tekrar dene.";
+      if(d.state==="nomail"){ resetM="sec"; setTimeout(()=>setAuthMode("reset"), 2500); }
+      $("#rsSend") && ($("#rsSend").disabled=false); return; } }catch(e){}
+    if(Date.now()-t0 > 6*6e4){ msg.textContent="Kod hâlâ hazırlanıyor. Biraz sonra tekrar dene."; $("#rsSend").disabled=false; return; }
+    setTimeout(poll, 5000);
+  };
+  setTimeout(poll, 4000);
+}
 const AUTH_ERR = {
-  "auth/invalid-credential":"Ad ya da şifre yanlış.", "auth/wrong-password":"Ad ya da şifre yanlış.", "auth/user-not-found":"Bu adla oyuncu yok. Yeni oyuncu sekmesinden katıl.",
-  "auth/email-already-in-use":"Bu ad alınmış. Giriş sekmesinden gir ya da başka bir ad seç.", "auth/too-many-requests":"Çok fazla deneme oldu. Birkaç dakika sonra tekrar dene.",
+  "auth/invalid-credential":"Şifre yanlış.", "auth/wrong-password":"Şifre yanlış.", "auth/user-not-found":"Bu adla oyuncu yok. Yeni oyuncu sekmesinden katıl.",
+  "auth/email-already-in-use":"Bu ad alınmış. Giriş sekmesinden gir ya da başka bir ad seç.", "auth/too-many-requests":"Çok fazla yanlış deneme oldu. Birkaç dakika bekle ya da şifreni sıfırla.",
   "auth/network-request-failed":"İnternet bağlantısı yok gibi görünüyor."
 };
 $("#authForm").addEventListener("submit", async e=>{
   e.preventDefault();
-  const name=$("#inName").value.trim(), pin=$("#inPin").value.trim(), inv=$("#inInvite").value.trim();
+  if($("#authBtn").disabled) return;
+  const name=$("#inName").value.trim(), pin=$("#inPin").value.trim();
   const err=t=>{$("#authErr").textContent=t;};
-  if(!slug(name)) return err("Adında en az bir harf ya da rakam olmalı.");
-  if(authMode==="join"){ const p=nameProblem(name); if(p) return err(p); }
+  if(!slug(name)) return err("Önce kim olduğunu seç ya da adını yaz.");
   if(!/^\d{6}$/.test(pin)) return err(authMode==="reset" ? "Yeni şifre 6 rakam olmalı." : "Şifre 6 rakam olmalı.");
-  const sec = authMode==="login" ? null : authSec.value();
-  if(authMode!=="login" && !sec) return err("Takımı seç ve listeden bir oyuncuya dokun.");
-  if(authMode==="join" && !inv) return err("Davet kodunu gir.");
   const email=`${slug(name)}@${S.cfg.authEmailDomain}`;
   $("#authBtn").disabled=true; err("");
   try{
-    if(authMode==="login"){ await signInWithEmailAndPassword(S.auth, email, pin); }
-    else if(authMode==="reset"){
-      const id = randHex(12);
-      await setDoc(doc(S.db,"resets",id), {name, team:sec.team, playerId:sec.playerId, pin, at:serverTimestamp()});
-      try{ localStorage.setItem("resetReq", JSON.stringify({id, name, t:Date.now()})); }catch(x){}
-      showResetWait();
+    if(authMode==="login"){
+      await signInWithEmailAndPassword(S.auth, email, pin);
+      const u=S.order.find(x=>slug(pname(x))===slug(name)); if(u) lsSet("lastUser", u);
+    } else {
+      const id = randHex(12); let data;
+      if(resetM==="mail"){ const code=($("#rsCode")?.value||"").trim(); if(!/^\d{6}$/.test(code)){ $("#authBtn").disabled=false; return err("Maildeki 6 haneli kodu yaz."); }
+        if(weakPin(pin)){ $("#authBtn").disabled=false; return err("Bu şifre çok kolay tahmin edilir; başka bir şifre seç."); }
+        data={name, code, pin, at:serverTimestamp()}; }
+      else { const sec=authSec?.value(); if(!sec){ $("#authBtn").disabled=false; return err("Takımı seç ve listeden bir oyuncuya dokun."); }
+        if(weakPin(pin)){ $("#authBtn").disabled=false; return err("Bu şifre çok kolay tahmin edilir; başka bir şifre seç."); }
+        data={name, team:sec.team, playerId:sec.playerId, pin, at:serverTimestamp()}; }
+      await setDoc(doc(S.db,"resets",id), data);
+      lsSet("resetReq", JSON.stringify({id, name, t:Date.now()}));
+      S.rsSent=null; showResetWait();
     }
-    else{
-      S.joinP = (async()=>{
-        const cred=await createUserWithEmailAndPassword(S.auth, email, pin);
-        try{
-          const b=writeBatch(S.db);
-          b.set(doc(S.db,"joins",cred.user.uid),{invite:inv});
-          b.set(doc(S.db,"players",cred.user.uid),{name, joined:serverTimestamp()});
-          await b.commit();
-        }catch(x){ await cred.user.delete().catch(()=>{}); throw {code:"invite"}; }
-        await saveRecovery(cred.user.uid, sec).catch(()=>{}); // olmazsa girişte tekrar sorulur
-      })();
-      await S.joinP;
-    }
-  }catch(x){ err(x.code==="invite"?"Davet kodu yanlış ya da ad uygun değil.":AUTH_ERR[x.code]||(authMode==="reset"?"İstek gönderilemedi, tekrar dene.":"Giriş yapılamadı, tekrar dene.")); }
-  S.joinP=null;
+  }catch(x){ err((!S.lgUser && x.code==="auth/invalid-credential") ? "Ad ya da şifre yanlış." : AUTH_ERR[x.code]||(authMode==="reset"?"İstek gönderilemedi, tekrar dene.":"Giriş yapılamadı, tekrar dene.")); if(authMode==="login"){ $("#inPin").value=""; $("#inPin")._paint(); } }
   $("#authBtn").disabled=false;
 });
+
+/* ---------- yeni oyuncu: adım adım kayıt (1 ad, 2 şifre, 3 güvenlik sorusu; katıldıktan sonra 4 takım ve avatar, 5 mail) */
+S.jw = {step:1, name:"", pin:"", inv:Q.get("davet")||"", ref:Q.get("ref")||""};
+const JSTEPS = ["Adın","Şifren","Güvenlik sorusu","Takım ve avatar","Mail adresin"];
+const stepBar = n => `<div class="jw-bar">${JSTEPS.map((t,i)=>`<i class="${i<n?"on":""}"></i>`).join("")}</div><div class="jw-step">Adım ${n}/5 · ${JSTEPS[n-1]}</div>`;
+function paintJoin(){
+  const box=$("#joinBox"), j=S.jw;
+  if(j.step===1){
+    box.innerHTML = stepBar(1) + `<label class="fld"><span>Ligde görünecek adın</span><input id="jwName" maxlength="40" autocomplete="username" placeholder="ör. Andaç" value="${esc(j.name)}"></label>
+      <small class="hint" id="jwNameHint">Büyük harfle başlamalı. Küfür, argo ya da hakaret içeremez.</small>
+      ${j.inv ? "" : `<label class="fld"><span>Davet kodu</span><input id="jwInv" autocomplete="off" maxlength="40" placeholder="Seni davet edenden al" value="${esc(j.inv)}"></label>`}
+      <p class="err" id="jwErr"></p><button class="btn-primary" id="jwNext" type="button">İleri</button>`;
+    const inp=$("#jwName"), hint=$("#jwNameHint");
+    const check=()=>{ const v=inp.value.trim(); const p = !v ? null : nameProblem(v) || (nameTaken(v) ? "Bu ad alınmış. Sen isen Giriş sekmesinden gir." : null);
+      hint.textContent = p || (v ? "✓ Bu ad uygun." : "Büyük harfle başlamalı. Küfür, argo ya da hakaret içeremez."); hint.className = "hint "+(p?"bad":v?"good":""); return p; };
+    inp.oninput=check; check(); setTimeout(()=>inp.focus(),50);
+    $("#jwNext").onclick=()=>{ const v=inp.value.trim(); const p=nameProblem(v) || (nameTaken(v)?"Bu ad alınmış.":null); if(p) return $("#jwErr").textContent=p;
+      const inv=j.inv || $("#jwInv")?.value.trim(); if(!inv) return $("#jwErr").textContent="Davet kodunu gir.";
+      j.name=v; j.inv=inv; j.step=2; paintJoin(); };
+    inp.onkeydown=e=>{ if(e.key==="Enter") $("#jwNext").click(); };
+  }
+  if(j.step===2){
+    box.innerHTML = stepBar(2) + `<div class="fld"><span>6 haneli şifre</span><input id="jwPin" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password" aria-label="Şifre"></div>
+      <div class="fld"><span>Şifreyi tekrar yaz</span><input id="jwPin2" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password" aria-label="Şifre tekrar"></div>
+      <small class="hint" id="jwPinHint">Doğum yılı, 123456 ya da 111111 gibi kolay şifreler seçme.</small>
+      <p class="err" id="jwErr"></p><div class="jw-nav"><button class="btn" id="jwBack" type="button">Geri</button><button class="btn-primary" id="jwNext" type="button">İleri</button></div>`;
+    const a=$("#jwPin"), b=$("#jwPin2"), hint=$("#jwPinHint");
+    const check=()=>{ const p=a.value, q=b.value; let t="Doğum yılı, 123456 ya da 111111 gibi kolay şifreler seçme.", c="";
+      if(p.length===6 && weakPin(p)){ t="Bu şifre çok kolay tahmin edilir; başka bir şifre seç."; c="bad"; }
+      else if(q.length===6 && p!==q){ t="İki şifre aynı değil."; c="bad"; }
+      else if(p.length===6 && p===q){ t="✓ Şifreler aynı."; c="good"; }
+      hint.textContent=t; hint.className="hint "+c; };
+    pinBoxes(a, ()=>{ check(); b.focus(); }); pinBoxes(b, check); a.addEventListener("input",check); b.addEventListener("input",check);
+    setTimeout(()=>a.focus(),50);
+    $("#jwBack").onclick=()=>{ j.step=1; paintJoin(); };
+    $("#jwNext").onclick=()=>{ const p=a.value; if(!/^\d{6}$/.test(p)) return $("#jwErr").textContent="Şifre 6 rakam olmalı.";
+      if(weakPin(p)) return $("#jwErr").textContent="Bu şifre çok kolay tahmin edilir; başka bir şifre seç.";
+      if(p!==b.value) return $("#jwErr").textContent="İki şifre aynı değil.";
+      j.pin=p; j.step=3; paintJoin(); };
+  }
+  if(j.step===3){
+    box.innerHTML = stepBar(3) + `<p class="muted" style="margin:8px 0 0">Şifreni unutursan bu ikisiyle de sıfırlayabilirsin. Kimseye söyleme.</p><div id="jwSec"></div>
+      <p class="err" id="jwErr"></p><div class="jw-nav"><button class="btn" id="jwBack" type="button">Geri</button><button class="btn-primary" id="jwNext" type="button">Oyuna katıl</button></div>`;
+    const pk=secPicker($("#jwSec"));
+    $("#jwBack").onclick=()=>{ j.step=2; paintJoin(); };
+    $("#jwNext").onclick=async()=>{ const sec=pk.value(); if(!sec) return $("#jwErr").textContent="Takımı seç ve listeden bir oyuncuya dokun.";
+      const btn=$("#jwNext"); btn.disabled=true; btn.textContent="Katılıyorsun…"; $("#jwErr").textContent="";
+      S.onboard = true;
+      try{
+        S.joinP = (async()=>{
+          const cred=await createUserWithEmailAndPassword(S.auth, `${slug(j.name)}@${S.cfg.authEmailDomain}`, j.pin);
+          try{
+            const bt=writeBatch(S.db);
+            bt.set(doc(S.db,"joins",cred.user.uid),{invite:j.inv});
+            const pd={name:j.name, joined:serverTimestamp()}; if(j.ref && S.players[j.ref]) pd.ref=j.ref;
+            bt.set(doc(S.db,"players",cred.user.uid),pd);
+            await bt.commit();
+          }catch(x){ await cred.user.delete().catch(()=>{}); throw {code:"invite"}; }
+          await saveRecovery(cred.user.uid, sec).catch(()=>{});
+          lsSet("lastUser", cred.user.uid);
+        })();
+        await S.joinP;
+      }catch(x){ S.onboard=false; btn.disabled=false; btn.textContent="Oyuna katıl";
+        $("#jwErr").textContent = x.code==="invite" ? "Davet kodu yanlış. Seni davet edenden kontrol etmesini iste." : AUTH_ERR[x.code]||"Katılınamadı, tekrar dene.";
+        if(x.code==="invite" && !Q.get("davet")){ j.step=1; j.inv=""; setTimeout(paintJoin, 1800); } }
+      S.joinP=null;
+    };
+  }
+}
+
+// Katıldıktan sonra: 4) takım + avatar, 5) mail. Girişte de onaylı mail yoksa 5. adım sorulur.
+function openOnboard(step){
+  S.obStep=step;
+  if(step===4){
+    const me=S.players[S.uid]||{}; S.ob = S.ob || {team:me.favTeam||"", av:me.av||""};
+    const teams=(ALLP?.teams||[]).slice().sort((a,b)=>a.n.localeCompare(b.n,"tr"));
+    openSheet(`${stepBar(4)}<h3 id="shTitle">Favori takımın</h3>
+      <div class="tm-grid ob-teams">${teams.map(t=>`<button class="tg" data-obt="${t.a}" aria-pressed="${S.ob.team===t.a}" style="--tc:${tcol(t.a)}"><span class="tg-l"><img src="${LOGO_SMALL(t.a)}" alt=""></span><b>${esc(t.n.split(" ").slice(-1)[0])}</b></button>`).join("") || `<p class="muted">Takımlar yükleniyor…</p>`}</div>
+      <h3 style="margin-top:18px">Avatarın</h3><p class="muted">Sıralamada ve tahtada adının yanında görünür.</p>
+      <div class="pf-avs ob-avs">${S.ob.team?`<button class="pf-av logo" data-oba="t:${S.ob.team}" aria-pressed="${S.ob.av===`t:${S.ob.team}`}"><img src="${LOGO_SMALL(S.ob.team)}" alt=""><small>Takımım</small></button>`:""}
+        ${STARS.map(([id,n])=>`<button class="pf-av" data-oba="p:${id}" aria-pressed="${S.ob.av===`p:${id}`}"><img src="${HEADSHOT(id)}" alt="" loading="lazy"><small>${esc(n.split(" ").slice(-1)[0])}</small></button>`).join("")}</div>
+      <p class="err" id="obErr"></p><div class="jw-nav"><button class="btn" id="obSkip" type="button">Sonra</button><button class="btn-primary" id="obNext" type="button">Kaydet ve devam</button></div>`);
+    if(!ALLP) allPlayers().then(()=>{ if(S.obStep===4) openOnboard(4); }).catch(()=>{});
+    $("#sheet .ob-teams").onclick=e=>{ const b=e.target.closest("[data-obt]"); if(!b) return; S.ob.team=b.dataset.obt; if(!S.ob.av || S.ob.av.startsWith("t:")) S.ob.av="t:"+S.ob.team; openOnboard(4); };
+    $("#sheet .ob-avs").onclick=e=>{ const b=e.target.closest("[data-oba]"); if(!b) return; S.ob.av=b.dataset.oba; $$("#sheet [data-oba]").forEach(x=>x.setAttribute("aria-pressed", x===b)); };
+    $("#obSkip").onclick=()=>openOnboard(5);
+    $("#obNext").onclick=async()=>{ const patch={}; if(S.ob.team){ patch.favTeam=S.ob.team; } if(S.ob.av){ patch.av=S.ob.av; }
+      if(Object.keys(patch).length){ try{ await saveProfile(patch); }catch(e){} } openOnboard(5); };
+    return;
+  }
+  if(step===5){
+    const em=S.contact?.email||"";
+    openSheet(`${S.onboard?stepBar(5):""}<h3 id="shTitle">Mail adresin</h3>
+      <p class="muted">Tahminin eksik kalırsa, seçtiğin oyuncu sakatlanırsa ve haftalık özet için mail atarız. Şifreni unutursan da kodu buraya yollarız. Adresini yalnızca sen görürsün.</p>
+      <label class="fld"><span>E-posta</span><input id="obMail" type="email" autocomplete="email" inputmode="email" placeholder="ornek@gmail.com" value="${esc(em)}"></label>
+      <button class="btn-primary" id="obSend" type="button">Onay kodu gönder</button>
+      <div id="obCodeBox" class="hide"><div class="fld"><span>Maildeki 6 haneli kod</span><input id="obCode" inputmode="numeric" maxlength="6" autocomplete="one-time-code" data-show="1" aria-label="Onay kodu"></div>
+        <button class="btn-primary" id="obOk" type="button">Onayla</button></div>
+      <p class="muted" id="obMsg" style="margin-top:8px"></p>
+      <div class="jw-nav"><button class="btn" id="obLater" type="button">Sonra</button></div>`);
+    const validMail = e => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e);
+    pinBoxes($("#obCode"), ()=>$("#obOk").click());
+    $("#obLater").onclick=()=>{ lsSet("mailAsk", String(Date.now())); finishOnboard(); };
+    $("#obSend").onclick=async()=>{ const email=$("#obMail").value.trim(); if(!validMail(email)) return $("#obMsg").textContent="Mail adresi geçerli görünmüyor.";
+      $("#obSend").disabled=true;
+      try{ const d={email, remind:true, weekly:true, verified:false, updatedAt:serverTimestamp()};
+        await setDoc(doc(S.db,"contacts",S.uid), d); S.contact={...d};
+        await setDoc(doc(S.db,"verifyReq",S.uid), {email, at:serverTimestamp()});
+        $("#obCodeBox").classList.remove("hide"); $("#obSend").textContent="Tekrar gönder";
+        $("#obMsg").textContent=`Kod ${email} adresine gidiyor; genelde 1-2 dakika sürer. Gereksiz klasörüne de bak.`; setTimeout(()=>$("#obCode").focus(),50);
+      }catch(e){ $("#obMsg").textContent="İstek gönderilemedi, tekrar dene."; }
+      $("#obSend").disabled=false; };
+    $("#obOk").onclick=async()=>{ const code=$("#obCode").value.trim(); if(!/^\d{6}$/.test(code)) return $("#obMsg").textContent="Kod 6 rakam olmalı.";
+      $("#obOk").disabled=true;
+      try{ const d={email:$("#obMail").value.trim(), remind:true, weekly:true, verified:true, code, updatedAt:serverTimestamp()};
+        await setDoc(doc(S.db,"contacts",S.uid), d); S.contact={...d, code:undefined}; renderBanners(); toast("Mail adresin onaylandı."); finishOnboard(); }
+      catch(e){ $("#obMsg").textContent="Kod yanlış ya da süresi dolmuş. Tekrar dene ya da yeni kod iste."; $("#obCode").value=""; $("#obCode")._paint(); }
+      $("#obOk").disabled=false; };
+  }
+}
+function finishOnboard(){ const first=S.onboard; S.onboard=false; S.obStep=null; closeSheet(); if(first) setTimeout(()=>openHow(), 350); }
+function maybeAskMail(){
+  if(S.onboard || !S.contact || (S.contact.verified && S.contact.email)) return;
+  const t=+(lsGet("mailAsk")||0); if(Date.now()-t < 3*864e5) return;
+  setTimeout(()=>{ if($("#sheet").classList.contains("hide") && !S.onboard) openOnboard(5); }, 1800);
+}
+
+// Nasıl oynanır: 3 kaydırmalı kart
+function openHow(){
+  const sl=[
+    ["🏀","Her gece tahmin yap","Her maç için kazananı, farkı ve en çok sayı atacak oyuncuyu seç. Her doğru +1. Bir maçı banko yap: tutarsa +2, tutmazsa -1. Her maç başlamadan 10 dakika önce kilitlenir."],
+    ["🏆","Puan topla, zirveye çık","Günün oyuncusu +2, gecenin sorusu +1. Gecenin ve haftanın kazananı tahtada taç ve yıldızla görünür; rozetler topla, Düello'da arkadaşınla kafa kafaya yarış."],
+    ["📅","Uzun vadeyi kaçırma","Haftanın ve ayın oyuncusunu, sezon sonu ödüllerini önceden tahmin et. Doğru tahminler ana sıralamaya büyük puan olarak eklenir."]];
+  openSheet(`<h3 id="shTitle" class="sr">Nasıl oynanır?</h3><div class="how" id="how">${sl.map(([e,t,d])=>`<div class="how-s"><div class="how-e">${e}</div><h3>${t}</h3><p>${d}</p></div>`).join("")}</div>
+    <div class="how-dots" id="howDots">${sl.map((_,i)=>`<i class="${i?"":"on"}"></i>`).join("")}</div><button class="btn-primary" id="howNext" type="button">Devam</button>`);
+  const how=$("#how"), idx=()=>Math.round(how.scrollLeft/how.clientWidth);
+  how.onscroll=()=>{ const i=idx(); $$("#howDots i").forEach((d,k)=>d.classList.toggle("on",k===i)); $("#howNext").textContent = i===sl.length-1 ? (S.uid?"Başla":"Anladım") : "Devam"; };
+  $("#howNext").onclick=()=>{ const i=idx(); if(i>=sl.length-1) return closeSheet(); how.scrollTo({left:(i+1)*how.clientWidth, behavior:"smooth"}); };
+}
+
+// Giriş ekranının üstü: bu gecenin özeti ve lider
+async function renderAuthLive(){
+  const el=$("#authLive"); if(!el) return;
+  const bits=[];
+  try{ const raw=await S.preSB?.p; const g=raw?parseGames(raw):[];
+    if(g.length){ const open=g.filter(x=>x.state==="pre"); bits.push(`<span><b>${g.length}</b> maç bu gece</span>`);
+      if(open.length===g.length) bits.push(`<span>İlk kilit <b>${timeTR(g[0].lock)}</b></span>`); else if(g.some(x=>x.state==="in")) bits.push(`<span class="lv"><i></i>Maçlar sürüyor</span>`); } }catch(e){}
+  try{ const t=seasonTotals(); const r=Object.entries(t).sort((a,b)=>b[1]-a[1]); if(r.length && r[0][1]>0) bits.push(`<span>Lider <b>${esc(pname(r[0][0]))}</b> · ${r[0][1]} puan</span>`); }catch(e){}
+  if(S.order.length) bits.push(`<span><b>${S.order.length}</b> oyuncu</span>`);
+  el.innerHTML=bits.join("");
+  const lg=$("#authLogos"); if(lg && !lg.innerHTML) lg.innerHTML=Object.keys(TEAM_COL).map(a=>`<img src="${LOGO_SMALL(a)}" alt="" loading="lazy">`).join("");
+}
+function paintAuthInvite(){
+  const r=S.jw.ref, el=$("#authInvite"); if(!el) return;
+  if(r && S.players[r]){ el.classList.remove("hide"); el.innerHTML=`${avatar(r,"lg")}<span><b>${esc(pname(r))}</b> seni NBA Tahmin ligine davet etti.<small>Aşağıdan birkaç adımda katılabilirsin.</small></span>`; }
+  else if(S.jw.inv){ el.classList.remove("hide"); el.innerHTML=`<span class="av lg">🏀</span><span><b>NBA Tahmin ligine davet edildin.</b><small>Aşağıdan birkaç adımda katılabilirsin.</small></span>`; }
+}
+// Davet linki: herkes kendi linkini paylaşır (ref = davet eden); kaç kişiyi getirdiği profilde görünür
+const invitedBy = u => S.order.filter(x=>S.players[x]?.ref===u);
+async function shareInvite(msgEl){
+  if(!S.invite){ try{ const r=await getDoc(doc(S.db,"config","secret")); S.invite=r.data()?.invite||""; }catch(e){} }
+  if(!S.invite){ if(msgEl) msgEl.textContent="Davet kodu alınamadı."; return; }
+  const url=`${location.origin}${location.pathname}?davet=${encodeURIComponent(S.invite)}&ref=${S.uid}`;
+  const text=`${pname(S.uid)} seni NBA Tahmin'e davet ediyor! Her gece maçlara tahmin yapıyoruz: ${url}`;
+  try{ if(navigator.share){ await navigator.share({title:"NBA Tahmin", text, url}); return; } }catch(e){ if(e.name==="AbortError") return; }
+  try{ await navigator.clipboard.writeText(url); if(msgEl) msgEl.textContent="Link kopyalandı."; else toast("Davet linkin kopyalandı."); }catch(e){ if(msgEl) msgEl.textContent=url; }
+}
 
 // Şifre sıfırlama isteğinin sonucunu bekle (GitHub görevi birkaç dakikada bir çalışır)
 const RESET_MSG = {
   ok:      ["ok",   "Şifren değişti. Yeni şifrenle giriş yapabilirsin."],
   wrong:   ["bad",  "Takım ya da oyuncu tutmadı. Tekrar deneyebilirsin (3 yanlıştan sonra 1 saat beklenir)."],
+  badcode: ["bad",  "Maildeki kod tutmadı. Tekrar deneyebilirsin (3 yanlıştan sonra 1 saat beklenir)."],
+  expired: ["bad",  "Kodun süresi dolmuş. Yeni bir kod iste."],
   locked:  ["bad",  "Çok fazla yanlış deneme oldu. 1 saat sonra tekrar dene."],
   nouser:  ["bad",  "Bu adla bir oyuncu bulunamadı. Adı kayıttaki gibi yazdığından emin ol."],
   nosetup: ["bad",  "Bu hesapta güvenlik sorusu yok. Oyunu kuran kişiden yardım iste."],
@@ -2720,7 +2951,10 @@ function paintProfile(){
   const me=S.players[S.uid]||{};
   const usedBy = c => S.order.filter(u=>u!==S.uid && S.players[u]?.color===c).map(pname);
   const teams = ALLP?.teams || Object.keys(TEAM_COL).map(a=>({a,n:a}));
-  box.innerHTML = `<div class="pf-sec"><h4>Hakkında</h4><small class="muted">Profilinde adının altında görünür. En fazla 60 karakter; küfür, argo ve hakaret yazılamaz.</small>
+  const myInv=invitedBy(S.uid);
+  box.innerHTML = `<div class="pf-sec"><h4>Arkadaşını davet et</h4><small class="muted">Linkinle katılan herkes profilinde "Lige getirdiği" olarak görünür.${myInv.length?` Şimdiye kadar ${myInv.length} kişi getirdin: ${myInv.map(x=>esc(pname(x))).join(", ")}.`:""}</small>
+      <button class="btn" id="pfInvite" type="button" style="margin-top:8px">${ICON.link}Davet linkimi paylaş</button><small class="muted" id="pfInvMsg"></small></div>
+    <div class="pf-sec"><h4>Hakkında</h4><small class="muted">Profilinde adının altında görünür. En fazla 60 karakter; küfür, argo ve hakaret yazılamaz.</small>
       <div class="adm-row" style="margin-top:6px"><input id="pfBio" class="adm-in" maxlength="60" placeholder="ör. Lakers'tan ölürüm" value="${esc(me.bio||"")}"><button class="btn" id="pfBioSave" type="button">Kaydet</button></div>
       <small class="err" id="pfBioErr"></small></div>
     <div class="pf-sec"><h4>Rengin</h4><div class="pf-colors">${PKEYS.map(c=>{ const u=usedBy(c); return `<button class="pf-col" data-col="${c}" style="--c:var(--${c})" aria-pressed="${col(S.uid)===`var(--${c})`}" title="${u.length?esc(u.join(", "))+" de kullanıyor":""}">${u.length?"<i></i>":""}</button>`; }).join("")}</div>
@@ -2760,6 +2994,7 @@ function paintProfile(){
   $("#secChange").onclick=()=>openRecoverySheet(false);
   $("#adminBtn")?.addEventListener("click", openAdmin);
   $("#histBtn").onclick = openHistory;
+  $("#pfInvite").onclick = () => shareInvite($("#pfInvMsg"));
   $("#pfBioSave").onclick = async () => {
     const v=$("#pfBio").value.trim().replace(/\s+/g," ");
     if(v.length>60) return $("#pfBioErr").textContent="En fazla 60 karakter.";
@@ -2915,11 +3150,13 @@ if("serviceWorker" in navigator && location.protocol==="https:") navigator.servi
   try{ ok = await initFirebase(); }catch(e){ console.error(e); }
   if(!ok){ $("#auth").classList.remove("hide"); $("#authForm").innerHTML=`<div class="note">Kurulum bekleniyor: config.json içine Firebase bilgileri girilince oyun açılacak.</div>`; return; }
   S.today = espnToday(); S.day = S.today;
-  if(Q.get("davet")){ setAuthMode("join"); $("#inInvite").value = Q.get("davet"); }
   await Promise.all([loadPlayers().catch(()=>{}), loadArchive().catch(()=>{})]);
+  { const last=lsGet("lastUser"); if(last && S.players[last]){ S.lgUser=last; $("#inName").value=pname(last); } }
+  setAuthMode(Q.get("davet") ? "join" : "login"); paintAuthInvite(); renderAuthLive();
   onAuthStateChanged(S.auth, async user=>{
-    if(!user){ S.uid=null; $("#app").classList.add("hide"); $("#me").classList.add("hide"); $("#auth").classList.remove("hide"); showResetWait(); dispatchEvent(new Event("app-ready")); return; }
+    if(!user){ S.uid=null; $("#app").classList.add("hide"); $("#me").classList.add("hide"); $("#auth").classList.remove("hide"); paintLgPick(); showResetWait(); dispatchEvent(new Event("app-ready")); return; }
     S.uid=user.uid;
+    if(S.joinP) await S.joinP.catch(()=>{});
     if(S.players?.[S.uid]) S.order=[S.uid, ...S.order.filter(u=>u!==S.uid)];
     else await loadPlayers().catch(()=>{});
     if(!S.players[S.uid]){ // kayıt yarıda kaldıysa
@@ -2934,9 +3171,11 @@ if("serviceWorker" in navigator && location.protocol==="https:") navigator.servi
     S.statFor=S.uid;
     $("#foot").innerHTML=`Kazanan +1 · Fark +1 · En skorer +1 · Banko +2 / -1 · Günün oyuncusu +2 · Gecenin sorusu +1<br>Veriler ESPN'den alınır. Maç varken 30 saniyede bir yenilenir.<br><span class="ver">${VERSION}</span>`;
     route(); showDay(); Promise.resolve(refresh()).catch(()=>{}).finally(()=>dispatchEvent(new Event("app-ready")));
-    checkRecovery();
+    if(S.onboard){ if(S.joinP) await S.joinP.catch(()=>{}); await loadPlayers().catch(()=>{}); allPlayers().catch(()=>{}).finally(()=>openOnboard(4)); }
+    else checkRecovery();
     loadLT();
-    getDoc(doc(S.db,"config","secret")).then(r=>{ S.isAdmin=true; S.invite=r.data()?.invite||""; }).catch(()=>{ S.isAdmin=false; });
-    getDoc(doc(S.db,"contacts",S.uid)).then(r=>{ S.contact = r.exists() ? r.data() : {email:"",remind:false}; }).catch(()=>{}).finally(()=>{ S.contactLoaded=true; renderBanners(); });
+    getDoc(doc(S.db,"config","admin")).then(()=>{ S.isAdmin=true; }).catch(()=>{ S.isAdmin=false; });
+    getDoc(doc(S.db,"config","secret")).then(r=>{ S.invite=r.data()?.invite||""; }).catch(()=>{});
+    getDoc(doc(S.db,"contacts",S.uid)).then(r=>{ S.contact = r.exists() ? r.data() : {email:"",remind:false}; }).catch(()=>{}).finally(()=>{ S.contactLoaded=true; renderBanners(); maybeAskMail(); });
   });
 })();
