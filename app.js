@@ -39,7 +39,7 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "v25";
+const VERSION = "v26";
 const LOGO_SMALL = a => `logos/${String(a).toLowerCase()}.png`;
 const LOGO_FULL  = a => `https://a.espncdn.com/i/teamlogos/nba/500/${String(a).toLowerCase()}.png`;
 document.addEventListener("error", e => {
@@ -63,10 +63,13 @@ const esc = s => String(s??"").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;"
 const bucket = m => m<=5?"1-5":m<=10?"6-10":m<=15?"11-15":"16+";
 const slug = s => s.toLocaleLowerCase("tr").replace(/[çğıöşü]/g, c => ({ç:"c",ğ:"g",ı:"i",ö:"o",ş:"s",ü:"u"}[c])).replace(/[^a-z0-9]/g, "");
 const weekKey = s => { const d = parseYmd(s); const w = (d.getUTCDay()+6)%7; d.setUTCDate(d.getUTCDate()-w); return ymd(d); };
-// Gecenin bütün tahminleri ilk maç başladığı anda kilitlenir; rakiplerin seçimleri o an açılır.
-// g.lock = o gecenin ilk maçının başlama saati (parseGames atar).
+// 4 Kasım 2026 gecesinden itibaren her maçın tahmini kendi maçı başlamadan 10 dk önce kilitlenir (rakiplerin
+// seçimi o an açılır). Banko, günün oyuncusu ve gecenin sorusu gecenin ilk maçından 10 dk önce kilitlenir.
+// g.lock = bu maçın kilidi, g.nightLock = gecenin kilidi, g.lockBase = Firestore'a yazılan "start" (kural 10 dk düşer).
+const LOCK_GAP = 10*6e4, PERGAME_FROM = Date.UTC(2026,10,4,12), GAP_FROM = Date.UTC(2026,10,3,12);
 const LOCK_MS = 0;
 const started = g => g.state !== "pre" || Date.now() >= g.lock.getTime();
+const lockedMsg = g => g.perGame ? "Bu maçın tahmini kilitlendi (maçtan 10 dk önce)." : "Tahminler kilitlendi.";
 // renk katılma sırasına sabit: herkes aynı oyuncuyu aynı renkte görür
 const PKEYS = ["p0","p1","p2","p3","p4","p5","p6","p7","p8","p9"];
 const col = uid => { const c=S.players[uid]?.color; return PKEYS.includes(c) ? `var(--${c})` : PCOL[Math.max(0, (S.colorOrder||S.order).indexOf(uid)) % PCOL.length]; };
@@ -128,7 +131,11 @@ function parseGames(raw){
              period:st.period||0, clock:st.displayClock||"", home:side("home"), away:side("away"),
              seasonType:ev.season?.type ?? 2 };
   }).sort((a,b) => a.start-b.start);
-  if(list.length){ const lock = new Date(Math.min(...list.map(g=>g.start.getTime()))); list.forEach(g => g.lock = lock); }
+  if(list.length){
+    const first = Math.min(...list.map(g=>g.start.getTime())), gap = first>=GAP_FROM ? LOCK_GAP : 0, per = first>=PERGAME_FROM;
+    list.forEach(g => { g.nightLock = new Date(first-gap); g.lock = per ? new Date(g.start.getTime()-gap) : g.nightLock;
+      g.lockBase = per ? g.start : new Date(first); g.nightBase = new Date(first); g.perGame = per; });
+  }
   return list;
 }
 async function loadRoster(team){
@@ -302,7 +309,7 @@ async function loadDayNow(day, {force=false}={}){
   }
   for(const uid of S.order){
     jobs.push(getDoc(progressRef(day, uid)).then(s => { D.progress[uid] = new Set(s.exists() ? s.data().gids||[] : []); }).catch(()=>{}));
-    if(uid!==S.uid && Date.now()<firstStart-LOCK_MS) continue;
+    if(uid!==S.uid && Date.now()<(games[0]?.nightLock?.getTime() ?? firstStart)) continue;
     jobs.push(readDaily(day, uid).then(d => { if(d) D.daily[uid]=d; else delete D.daily[uid]; }));
   }
   // kilitlenmiş maçlara bırakılan emoji ve yorumlar
@@ -330,14 +337,14 @@ async function loadDayNow(day, {force=false}={}){
 async function savePick(g, {quiet=false}={}){
   const d = S.draft[g.id]; if(!d) return;
   if(!(d.winner && d.margin && d.scorerId)) return;
-  if(started(g)){ toast("Tahminler kilitlendi (gecenin ilk maçı başladı)."); return; }
+  if(started(g)){ toast(lockedMsg(g)); return; }
   const D = S.days[S.day];
   const prev = D.picks[g.id]?.[S.uid];
   if(prev && prev.winner===d.winner && prev.margin===d.margin && prev.scorerId===d.scorerId) return;
   d.saving = true; renderGames();
   try{
-    // start = kilit saati (gecenin ilk maçı). Daha önce kaydedilmiş tahminde eski değer korunur (kural gereği değişmez).
-    const data = { uid:S.uid, gameId:g.id, day:S.day, start: prev?.start || Timestamp.fromDate(g.lock),
+    // start = kilidin dayanağı (maçın kendi saati; kural 10 dk önce kapatır). Kaydedilmiş tahminde eski değer korunur.
+    const data = { uid:S.uid, gameId:g.id, day:S.day, start: prev?.start || Timestamp.fromDate(g.lockBase),
       winner:d.winner, margin:d.margin, scorerId:d.scorerId, scorerName:d.scorerName, updatedAt:serverTimestamp() };
     await setDoc(pickRef(g.id, S.uid), data);
     D.picks[g.id][S.uid] = {...data, updatedAt:Timestamp.now()};
@@ -346,7 +353,7 @@ async function savePick(g, {quiet=false}={}){
     setDoc(progressRef(S.day, S.uid), {uid:S.uid, day:S.day, gids:arrayUnion(g.id), updatedAt:serverTimestamp()}, {merge:true})
       .then(()=>{ (D.progress[S.uid] ||= new Set()).add(g.id); renderDayView(); }).catch(()=>{});
   }catch(e){
-    d.err = started(g) ? "Kilitlendi, kaydedilemedi (gecenin ilk maçı başladı)." : "Kaydedilemedi, tekrar dene.";
+    d.err = started(g) ? "Kilitlendi, kaydedilemedi." : "Kaydedilemedi, tekrar dene.";
   }
   d.saving = false; renderGames(); renderStatus();
   if(!d.err){ setTimeout(()=>{ S.edit.delete(g.id); if(S.tab==="tahmin" && S.sub==="maclar") renderGames(); }, 1500); }
@@ -788,7 +795,7 @@ $("#games").addEventListener("click", e => {
   if(act==="collapse"){ S.open.delete(g.id); return renderGames(); }
   if(act==="info") return openInfo(g);
   if(act==="box") return openBox(g);
-  if(started(g)) return toast("Tahminler kilitlendi (gecenin ilk maçı başladı).");
+  if(started(g)) return toast(lockedMsg(g));
   if(act==="save") return savePick(g);
   if(act==="win"){ d.winner=b.dataset.v; }
   if(act==="mar"){ d.margin=b.dataset.v; }
@@ -796,7 +803,8 @@ $("#games").addEventListener("click", e => {
   if(act==="conf"){
     const cur = D.daily[S.uid]?.confGame;
     if(cur===g.id) return toast("Bankoyu başka maça taşıyabilirsin; kaldırılamaz.");
-    return saveDaily({confGame:g.id, confStart:g.lock});
+    if(Date.now()>=g.nightLock.getTime()) return toast("Banko gecenin ilk maçından 10 dk önce kilitlendi.");
+    return saveDaily({confGame:g.id, confStart:g.nightBase});
   }
   d.err=null; renderGames();
 });
@@ -930,7 +938,7 @@ function questionCard(){
   const lbl = v => v==="y" ? "Evet" : "Hayır";
   if(!locked) return `<div class="qcard"><span class="ico">${ICON.question}</span><span class="tx"><b>Gecenin sorusu</b><span class="qt">${q.t}</span>
     <span class="qbtns"><button data-q="y" aria-pressed="${mine==="y"}">Evet</button><button data-q="n" aria-pressed="${mine==="n"}">Hayır</button></span>
-    <small>Doğru cevap +1. Gecenin ilk maçı başlayınca kilitlenir.</small></span></div>`;
+    <small>Doğru cevap +1. Gecenin ilk maçından 10 dk önce kilitlenir.</small></span></div>`;
   const r=questionResult(S.day);
   const rows=S.order.map(u=>{ const a=D.daily[u]?.q; const st=!a?'<span class="muted">cevaplamadı</span>':r?.final?(a===r.ans?'<span class="ok">+1</span>':'<span class="no">0</span>'):"";
     return `<span><b style="color:${col(u)}">${esc(pname(u))}</b> ${a?lbl(a):""} ${st}</span>`; }).join("");
@@ -939,7 +947,7 @@ function questionCard(){
 }
 $("#dayPlayer").addEventListener("click", e => {
   const b=e.target.closest("[data-q]"); if(!b) return;
-  const D=S.days[S.day]; if(D.games.some(started)) return toast("Soru kilitlendi, gecenin ilk maçı başladı.");
+  const D=S.days[S.day]; if(D.games.some(started)) return toast("Soru kilitlendi (gecenin ilk maçından 10 dk önce).");
   saveDaily({q:b.dataset.q});
 });
 
@@ -1098,8 +1106,9 @@ function lockLeft(g){
   const ms = g.lock.getTime() - Date.now();
   if(ms<=0) return "Kilitlendi";
   const h=Math.floor(ms/36e5), m=Math.floor(ms%36e5/6e4);
-  if(h>=12) return `${timeTR(g.lock)}'de, gecenin ilk maçıyla kilitlenir`;
-  return `Kilide ${h?h+" sa ":""}${m} dk var · ${timeTR(g.lock)}'de, gecenin ilk maçıyla kilitlenir`;
+  const why = g.perGame ? "maçtan 10 dk önce" : "gecenin ilk maçıyla";
+  if(h>=12) return `${timeTR(g.lock)}'de, ${why} kilitlenir`;
+  return `Kilide ${h?h+" sa ":""}${m} dk var · ${timeTR(g.lock)}'de, ${why} kilitlenir`;
 }
 function renderDayView(){
   const D = S.days[S.day]; const box=$("#dayView"); if(!box) return;
@@ -1173,11 +1182,11 @@ async function openPlayerPicker({mode, g}){
     closeSheet();
     if(mode!=="game") S.swipeReturn=false;
     if(mode==="game"){
-      if(started(g)) return toast("Tahminler kilitlendi (gecenin ilk maçı başladı).");
+      if(started(g)) return toast(lockedMsg(g));
       const d=draftFor(g); d.scorerId=b.dataset.id; d.scorerName=b.dataset.name; d.err=null; renderGames();
       if(S.swipeReturn){ S.swipeReturn=false; openSheet(`<div id="swipe" class="swipe"></div>`); paintSwipe(); }
     } else {
-      if(D.games.some(started)) return toast("Günün oyuncusu kilitlendi (gecenin ilk maçı başladı).");
+      if(D.games.some(started)) return toast("Günün oyuncusu kilitlendi (gecenin ilk maçından 10 dk önce).");
       saveDaily({dayPlayerId:b.dataset.id, dayPlayerName:b.dataset.name});
     }
   };
@@ -1251,7 +1260,7 @@ function openRules(){
     <h4>Fark aralıkları</h4>
     <p>1-5 · 6-10 · 11-15 · 16+. Uzatmaya giden maçlarda da son skordaki fark geçerlidir. Fark puanını almak için kazananı da bilmen gerekir.</p>
     <h4>Kilit ve gizlilik</h4>
-    <p>Gecenin bütün tahminleri (maçlar, banko, günün oyuncusu, gecenin sorusu) <b>gecenin ilk maçı başladığı anda</b> kilitlenir; o ana kadar istediğin kadar değiştirebilirsin. Kilitlenene kadar kimse başkasının seçimlerini göremez. Kimin kaç maçı doldurduğu ise "Günün tahminleri"nde görünür.</p>
+    <p>Gecenin bütün tahminleri (maçlar, banko, günün oyuncusu, gecenin sorusu) kilitlenene kadar istediğin kadar değiştirebilirsin. <b>Her maçın tahmini, o maç başlamadan 10 dakika önce</b> kilitlenir; böylece geç maçlarda oyuncunun oynayıp oynamayacağı netleşir. Banko, günün oyuncusu ve gecenin sorusu <b>gecenin ilk maçından 10 dakika önce</b> kilitlenir. Kilitlenene kadar kimse başkasının seçimini göremez. Kimin kaç maçı doldurduğu ise "Günün tahminleri"nde görünür.</p>
     <h4>Eşitlikler</h4>
     <p>Birden fazla oyuncu aynı en yüksek sayıyı atarsa bunlardan birini seçen herkes bilmiş sayılır.</p>
     <h4>Gece, hafta, sezon</h4>
@@ -1765,7 +1774,7 @@ function tickerItems(){
   const wr=[...S.order].sort((a,b)=>(wp[b]||0)-(wp[a]||0)); if(wr.length>1 && (wp[wr[0]]||0)>(wp[wr[1]]||0)) out.push({t:`📆 Bu haftanın lideri ${pname(wr[0])}: ${wp[wr[0]]} puan.`});
   const D=S.days[S.today];
   if(D?.games.length){ const open=!D.games.some(started);
-    out.push({t: open ? `📅 Bu gece ${D.games.length} maç var. Tahminler ${timeTR(D.games[0].lock)} itibarıyla kapanıyor.` : (D.games.every(g=>g.state==="post") ? `🏁 Bu gecenin ${D.games.length} maçı bitti. Skorlar sekmesine bir göz at.` : `📺 Bu gecenin maçları başladı. Tahminler kapandı, herkesin seçimi artık görünüyor.`)});
+    out.push({t: open ? `📅 Bu gece ${D.games.length} maç var. ${D.games[0].perGame?`Her maç başlamadan 10 dk önce kilitleniyor; ilk kilit ${timeTR(D.games[0].lock)}.`:`Tahminler ${timeTR(D.games[0].lock)} itibarıyla kapanıyor.`}` : (D.games.every(g=>g.state==="post") ? `🏁 Bu gecenin ${D.games.length} maçı bitti. Skorlar sekmesine bir göz at.` : `📺 Bu gecenin maçları başladı. Tahminler kapandı, herkesin seçimi artık görünüyor.`)});
     if(open){ const q=questionOf(S.today); out.push({t:`❓ Gecenin sorusu: ${q.t}`});
       const miss=S.order.filter(u=>!(D.progress?.[u]?.size)); if(miss.length && miss.length<S.order.length) out.push({t:`⏳ Henüz tahmin yapmayanlar: ${miss.map(pname).join(", ")}.`}); }
   }
@@ -1881,7 +1890,9 @@ function profOzet(u, st){
     h += `<div class="sec-title"><h2 style="font-size:20px">Bu gecenin tahminleri</h2></div>`;
     if(!canSee){ const k=D.progress?.[u]?.size||0; h += `<div class="note">Seçimler kilit açılınca (${timeTR(D.games[0].lock)}) görünür. Şu an ${k}/${D.games.length} maça tahmin yaptı.</div>`; }
     else {
-      const rows=D.games.map(g=>{ const pk=D.picks[g.id]?.[u]; if(!pk) return `<div class="pt-row"><span class="pt-g">${esc(g.away.abbr)} @ ${esc(g.home.abbr)}</span><span class="muted">tahmin yok</span></div>`;
+      const rows=D.games.map(g=>{ const pk=D.picks[g.id]?.[u];
+        if(u!==S.uid && !started(g)) return `<div class="pt-row"><span class="pt-g">${esc(g.away.abbr)} @ ${esc(g.home.abbr)}</span><span class="muted">${timeTR(g.lock)}'de açılır</span></div>`;
+        if(!pk) return `<div class="pt-row"><span class="pt-g">${esc(g.away.abbr)} @ ${esc(g.home.abbr)}</span><span class="muted">tahmin yok</span></div>`;
         const r=started(g)?scorePick(g,pk,D.daily[u]?.confGame===g.id):null;
         return `<div class="pt-row"><span class="pt-g"><img src="${LOGO_SMALL(pk.winner)}" alt="">${esc(g.away.abbr)} @ ${esc(g.home.abbr)}</span><span class="pk"><span class="rc">${esc(pk.winner)}</span><span class="rc">${pk.margin}</span><span class="rc has-face">${faceImg(pk.scorerId,"rc-face")}${esc(pk.scorerName.split(" ").slice(-1)[0])}</span>${D.daily[u]?.confGame===g.id?'<span class="rc star-chip">★</span>':""}</span>${r&&(g.state!=="pre")?`<b class="pt-p ${r.pts>0?"pos":r.pts<0?"neg":""}">${r.pts>0?"+":""}${r.pts}</b>`:""}</div>`; }).join("");
       h += `<div class="box pt-list">${rows}</div>`;
@@ -1990,14 +2001,14 @@ function renderAlert(){
   if(!open.length){ el.innerHTML=""; return; }
   const missing = open.filter(g=>!D.picks[g.id]?.[S.uid]);
   const daily = D.daily[S.uid]||{};
-  const noBanko = !daily.confGame;
+  const noBanko = !daily.confGame && !D.games.some(started);
   const noDp = !daily.dayPlayerId && !D.games.some(started);
   const noQ = !daily.q && !D.games.some(started);
   const inj = injuryAlerts(D);
   if(!missing.length && !noBanko && !noDp && !noQ && !inj.length){ el.innerHTML=""; return; }
   // en yakın kilit: eksik maçlar ya da (günün oyuncusu eksikse) ilk maç
   const locks = missing.map(g=>g.lock.getTime());
-  if(noDp || noBanko || noQ || inj.length) locks.push(Math.min(...open.map(g=>g.lock.getTime())));
+  if(noDp || noBanko || noQ || inj.length) locks.push(D.games[0].nightLock.getTime());
   const ms = Math.min(...locks) - Date.now();
   if(ms > 12*36e5 && !inj.length){ el.innerHTML=""; return; }   // 12 saatten uzaksa gösterme (sakatlık hariç)
   const h=Math.floor(ms/36e5), m=Math.max(0,Math.floor(ms%36e5/6e4));
@@ -2725,7 +2736,7 @@ function paintProfile(){
       <div class="pf-teams"><button class="pf-tm none" data-tm="" aria-pressed="${!me.favTeam}">Yok</button>${teams.map(t=>`<button class="pf-tm" data-tm="${t.a}" aria-pressed="${me.favTeam===t.a}" title="${esc(t.n)}"><img src="${LOGO_SMALL(t.a)}" alt="${esc(t.n)}"></button>`).join("")}</div></div>
     <div class="pf-sec"><h4>Site renkleri</h4><div class="seg2 pf-theme"><button data-th="default" aria-pressed="${me.theme!=="team"}">Varsayılan</button><button data-th="team" aria-pressed="${me.theme==="team"}" ${me.favTeam?"":"disabled"}>Favori takımım</button></div>
       <small class="muted">${me.favTeam?"Üst alan ve vurgu renkleri takımının renklerine geçer. Yalnızca sende görünür.":"Önce bir favori takım seç."}</small></div>
-    <div class="pf-sec"><h4>Hatırlatma maili</h4><small class="muted" style="margin:0 0 8px">Tahminin eksikse her akşam 21.00'de (ilk maç daha erkense maçtan 1 saat önce), seçtiğin oyuncu sakatlanırsa hemen mail gelir. Mail gelmesi için adresini bir kez onaylaman gerekir. Adresini yalnızca sen görürsün.</small>
+    <div class="pf-sec"><h4>Hatırlatma maili</h4><small class="muted" style="margin:0 0 8px">Tahminin eksikse her akşam 21.00'de (ilk maç daha erkense maçtan 1 saat önce), seçtiğin oyuncu (maç skoreri, günün oyuncusu ya da uzun vade seçimin) sakatlanırsa ya da 65 maç kuralına takılırsa hemen mail gelir. Mail gelmesi için adresini bir kez onaylaman gerekir. Adresini yalnızca sen görürsün.</small>
       <div class="pf-mail"><input id="pfMail" type="email" inputmode="email" autocomplete="email" placeholder="ornek@gmail.com" value="${esc(S.contact?.email||"")}"><span class="mail-st" id="pfMailSt"></span></div>
       <div id="pfOtp" class="pf-otp hide"><small class="muted" id="pfOtpMsg"></small>
         <div class="adm-row"><input id="pfCode" class="adm-in otp-in" inputmode="numeric" maxlength="6" placeholder="6 haneli kod" autocomplete="one-time-code"><button class="btn" id="pfCodeOk" type="button">Onayla</button></div>

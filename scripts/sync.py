@@ -238,7 +238,12 @@ def score_game(g, pick, conf, top_ids):
     return r
 
 
-LOCK = timedelta(0)  # gecenin bütün tahminleri ilk maç başlayınca kilitlenir
+LOCK = timedelta(0)  # 3 Kasım 2026 öncesi: gecenin bütün tahminleri ilk maç başlayınca kilitlenir
+GAP_FROM, PERGAME_FROM = "20261103", "20261104"   # 3 Kasım: kilit 10 dk önce; 4 Kasım: her maç kendi saatinde
+
+
+def lock_gap(day):
+    return timedelta(minutes=10) if day >= GAP_FROM else LOCK
 
 # Gecenin sorusu: gün numarasına göre sırayla seçilir. app.js'teki QUESTIONS ile birebir aynı sıra.
 QUESTIONS = [
@@ -258,11 +263,11 @@ def question_answer(day, dgames):
 SERIES_WIN, SERIES_GAMES = 3, 2  # seri kazananı +3, maç sayısı da doğruysa +2
 
 
-def valid_before(doc, start_iso):
-    """Tahmin kilitten (gecenin ilk maçı) önce mi kaydedildi? (sunucu saatiyle)"""
+def valid_before(doc, start_iso, gap=LOCK):
+    """Tahmin kilitten önce mi kaydedildi? (sunucu saatiyle; kilit = start - gap)"""
     if not doc or not doc.get("updatedAt"):
         return False
-    return ts(doc["updatedAt"]) < ts(start_iso) - LOCK
+    return ts(doc["updatedAt"]) < ts(start_iso) - gap
 
 
 # ---------------------------------------------------------------- ana akış
@@ -400,17 +405,17 @@ def main(full=False):
             conf_game = None
             if daily and daily.get("confGame") and daily.get("confAt"):
                 cg = next((g for g in dgames if g["id"] == daily["confGame"]), None)
-                if cg and ts(daily["confAt"]) < ts(first_start) - LOCK:
+                if cg and ts(daily["confAt"]) < ts(first_start) - lock_gap(day):
                     conf_game = cg["id"]
             dp = 0
             dp_name = None
-            if daily and daily.get("dayPlayerId") and daily.get("dayAt") and ts(daily["dayAt"]) < ts(first_start) - LOCK:
+            if daily and daily.get("dayPlayerId") and daily.get("dayAt") and ts(daily["dayAt"]) < ts(first_start) - lock_gap(day):
                 dp_name = daily.get("dayPlayerName")
                 if daily["dayPlayerId"] in night_ids:
                     dp = 2
             # gecenin sorusu: gece tamamen bittiyse
             q, qp = None, 0
-            if daily and daily.get("q") in ("y", "n") and daily.get("qAt") and ts(daily["qAt"]) < ts(first_start) - LOCK:
+            if daily and daily.get("q") in ("y", "n") and daily.get("qAt") and ts(daily["qAt"]) < ts(first_start) - lock_gap(day):
                 q = daily["q"]
                 if nights.get(day, {}).get("done") and nights[day]["n"] == len(dgames):
                     qp = 1 if q == question_answer(day, dgames) else 0
@@ -418,8 +423,8 @@ def main(full=False):
             n = 0
             for g in dgames:
                 pick = fs_doc(f"picks/{g['id']}_{uid}")
-                # kilit saati = gecenin ilk maçı (ESPN'deki gerçek saat; sitenin yazdığı değere güvenilmez)
-                if not valid_before(pick, first_start) or not (pick.get("winner") and pick.get("margin") and pick.get("scorerId")):
+                # kilit = ESPN'deki gerçek saat (sitenin yazdığı değere güvenilmez): 4 Kasım'dan itibaren maçın kendisi, öncesinde gecenin ilk maçı
+                if not valid_before(pick, g["start"] if day >= PERGAME_FROM else first_start, lock_gap(day)) or not (pick.get("winner") and pick.get("margin") and pick.get("scorerId")):
                     pick = None
                 top_ids = {t["id"] for t in g["top"]}
                 r = score_game(g, pick, conf_game == g["id"], top_ids)
@@ -450,7 +455,7 @@ def main(full=False):
         row = {}
         for uid in players:
             sp = fs_doc(f"series/{key}_{uid}")
-            if not valid_before(sp, first_start):
+            if not valid_before(sp, first_start, lock_gap(sg[0]["day"])):
                 continue
             pts = 0
             if sp.get("winner") == winner:

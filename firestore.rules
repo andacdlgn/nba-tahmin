@@ -11,9 +11,9 @@ service cloud.firestore {
     function signedIn() { return request.auth != null; }
     function isPlayer() { return signedIn() && exists(/databases/$(database)/documents/players/$(request.auth.uid)); }
     function str(v, maxLen) { return v is string && v.size() > 0 && v.size() <= maxLen; }
-    // Tahminler kilit saatinde kapanır ve o an herkese açılır. Site, tahminin "start"
-    // alanına gecenin ilk maçının saatini yazar; puanlama betiği bunu ESPN'den ayrıca doğrular.
-    function lockAt(t) { return t; }
+    // Tahminler kilit saatinde (start'tan 10 dk önce) kapanır ve o an herkese açılır. Site "start" alanına
+    // maçın kendi saatini (günlük seçimlerde gecenin ilk maçını) yazar; puanlama betiği bunu ESPN'den ayrıca doğrular.
+    function lockAt(t) { return t - duration.value(10, 'm'); }
     // Yönetici: config/admin belgesindeki uids listesinde olanlar (Firebase konsolundan eklenir)
     function isAdmin() {
       return signedIn() && exists(/databases/$(database)/documents/config/admin)

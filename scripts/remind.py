@@ -3,6 +3,8 @@
 1. Hatırlatma: her akşam 21.00'de (Türkiye) eksik tahmini olanlara bir kez. Gecenin ilk maçı
    21.00'den önceyse maçtan 1 saat önce.
 2. Sakatlık uyarısı: skorer ya da günün oyuncusu olarak seçilen oyuncu ESPN'de "Out" görünürse, kilitten önce.
+   Uzun vade: haftanın/ayın oyuncusu ya da sezon ödülü seçimi sakatlanırsa ve sezon seçimi 65 maç kuralına
+   yaklaşır ya da takılırsa (takımın oynadığı maç - oyuncunun oynadığı maç >= 14 / > 17).
 3. Haftalık özet: pazartesi 10:00'dan (Türkiye) sonra, geçen haftanın sonuçları (data/scores.json).
 
 Hatırlatma ve sakatlık uyarısı "remind", haftalık özet "weekly" tercihi açık olanlara gider.
@@ -34,7 +36,7 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from sync import CONFIG, ESPN, espn_today, get, load, scoreboard, week_key  # noqa: E402
+from sync import CONFIG, ESPN, PERGAME_FROM, espn_today, get, load, lock_gap, scoreboard, week_key  # noqa: E402
 
 TR = ZoneInfo("Europe/Istanbul")
 REMIND_AT = CONFIG.get("remindAt", "21:00")                       # her akşam bu saatte (Türkiye)
@@ -81,29 +83,38 @@ def night_games(day):
                     "away": side["away"].get("shortDisplayName", side["away"]["abbreviation"]),
                     "home": side["home"].get("shortDisplayName", side["home"]["abbreviation"]),
                     "state": ev["status"]["type"]["state"]})
-    return sorted(out, key=lambda g: g["start"])
+    out.sort(key=lambda g: g["start"])
+    if out:  # kilit: 4 Kasım'dan itibaren her maç kendi saatinden 10 dk önce; banko/günün oyuncusu/soru gecenin ilk maçından 10 dk önce
+        gap, first = lock_gap(day), out[0]["start"]
+        for g in out:
+            g["night_lock"] = first - gap
+            g["lock"] = (g["start"] if day >= PERGAME_FROM else first) - gap
+    return out
 
 
 MONTHS = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"]
 nice = lambda d: f"{int(d[6:])} {MONTHS[int(d[4:6]) - 1]}"  # ESPN (ABD) tarihi, sitedeki gibi
 
 
-def card(title, sub, inner, button="Siteye git"):
-    """Bütün mailler için ortak görünüm."""
-    return f"""<div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;color:#121a24">
+def card(title, sub, inner, button="Siteye git", pre=""):
+    """Bütün mailler için ortak görünüm (tam HTML belgesi; spam filtreleri yarım HTML'i sevmez)."""
+    pre_html = f'<div style="display:none;max-height:0;overflow:hidden;opacity:0">{escape(pre)}</div>' if pre else ""
+    return f"""<!DOCTYPE html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{escape(title)}</title></head>
+<body style="margin:0;padding:16px;background:#ffffff">{pre_html}<div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;color:#121a24">
   <div style="background:#121a24;color:#f4f6f8;border-radius:14px 14px 0 0;padding:18px 20px;border-bottom:4px solid #e09410">
     <div style="font-size:13px;color:#8b98a8">NBA Tahmin · {escape(sub)}</div>
     <div style="font-size:22px;font-weight:bold;margin-top:4px">{escape(title)}</div></div>
   <div style="border:1px solid #dde3e9;border-top:0;border-radius:0 0 14px 14px;padding:18px 20px">{inner}
     <a href="{escape(SITE)}" style="display:inline-block;margin-top:6px;background:#121a24;color:#fff;text-decoration:none;font-weight:bold;padding:12px 20px;border-radius:10px">{escape(button)}</a>
-    <p style="margin:16px 0 0;color:#8b98a8;font-size:12px">Bu mailleri istemiyorsan sitede profilinden kapatabilirsin.</p></div></div>"""
+    <p style="margin:16px 0 0;color:#8b98a8;font-size:12px">Bu maili NBA Tahmin ligine katıldığın ve profilinden mail bildirimlerini açtığın için alıyorsun. İstemiyorsan sitede profilinden kapatabilir ya da bu maile "abonelikten çık" yazarak cevap verebilirsin.</p></div></div></body></html>"""
 
 
-def build(email, subject, text, html):
+def build(email, subject, text, html, name="", kind="bildirim"):
     msg = EmailMessage()
     msg["Subject"] = subject
-    msg["To"] = email
-    msg.set_content(text + f"\n\n{SITE}\n\nBu mailleri istemiyorsan sitede profilinden kapatabilirsin.\n")
+    msg["To"] = formataddr((name, email)) if name else email
+    msg["X-NBA-Kind"] = kind
+    msg.set_content(text + f"\n\n{SITE}\n\nBu maili NBA Tahmin ligine katıldığın ve mail bildirimlerini açtığın için alıyorsun. İstemiyorsan sitede profilinden kapatabilirsin.\n")
     msg.add_alternative(html, subtype="html")
     return msg
 
@@ -126,6 +137,13 @@ class Mailer:
             msg["Message-ID"] = make_msgid(domain=(self.user.split("@")[-1] if "@" in self.user else "nbatahmin.app"))
         if not msg["List-Unsubscribe"] and self.user:
             msg["List-Unsubscribe"] = f"<mailto:{self.user}?subject=unsubscribe>, <{SITE}>"
+        if self.user:
+            msg["Reply-To"] = formataddr(("NBA Tahmin", self.user))
+        # otomatik bildirim olduğunu açıkça söyleyen başlıklar (otomatik yanıtları da engeller)
+        msg["Auto-Submitted"] = "auto-generated"
+        msg["X-Auto-Response-Suppress"] = "All"
+        msg["Content-Language"] = "tr"
+        msg["Feedback-ID"] = f"{msg.get('X-NBA-Kind', 'bildirim')}:nbatahmin"
         if self.dry:
             print("[deneme]", msg["To"], "|", msg["Subject"])
             return True
@@ -174,7 +192,7 @@ def once(db, key):
 
 # ---------------------------------------------------------------- 1) hatırlatma
 def reminders(db, mail, day, games, force):
-    lock = games[0]["start"]
+    lock = games[0]["night_lock"]
     now = datetime.now(timezone.utc)
     when = remind_time(lock)
     if not force and not (when <= now < lock):
@@ -202,63 +220,168 @@ def reminders(db, mail, day, games, force):
         if not parts:
             continue
         rows = "".join(f"<li>{escape(g['away'])} – {escape(g['home'])}</li>" for g in missing[:15])
+        per = day >= PERGAME_FROM
+        rule = (f"Her maç başlamadan 10 dakika önce kilitlenir; ilk kilit saati {lock_tr} (Türkiye saati). Banko, günün oyuncusu ve gecenin sorusu da bu ilk kilitle kapanır."
+                if per else f"Bütün tahminlerin kilit saati {lock_tr} (Türkiye saati).")
+        rows = "".join(f"<li>{escape(g['away'])} – {escape(g['home'])} <span style=\"color:#8b98a8\">(kilit {g['lock'].astimezone(TR):%H:%M})</span></li>" for g in missing[:15])
         inner = (f'<p style="margin:0 0 10px">Selam {escape(name)}, {escape(", ".join(parts))}.</p>'
-                 f'<p style="margin:0 0 12px;color:#5f6b78;font-size:14px">Bütün tahminler gecenin ilk maçı başlayınca kilitlenir (Türkiye saatiyle {lock_tr}).</p>'
+                 f'<p style="margin:0 0 12px;color:#5f6b78;font-size:14px">{escape(rule)}</p>'
                  + (f'<ul style="margin:0 0 14px;padding-left:20px;font-size:14px">{rows}</ul>' if rows else ""))
-        text = (f"Selam {name}, {', '.join(parts)}.\nBütün tahminler gecenin ilk maçı başlayınca kilitlenir (Türkiye saatiyle {lock_tr}).\n"
-                + ("\nEksik maçlar:\n" + "\n".join(f"- {g['away']} – {g['home']}" for g in missing[:15]) if missing else ""))
-        msg = build(email, f"🏀 Tahminlerin eksik: {', '.join(parts)} (kilit {lock_tr})", text, card(f"Kilit saati: {lock_tr}", nice(day), inner, "Tahmin yap"))
+        text = (f"Selam {name}, {', '.join(parts)}.\n{rule}\n"
+                + ("\nEksik maçlar:\n" + "\n".join(f"- {g['away']} – {g['home']} (kilit {g['lock'].astimezone(TR):%H:%M})" for g in missing[:15]) if missing else ""))
+        subj = parts[0][:1].upper() + parts[0][1:]
+        msg = build(email, f"Bu gecenin tahminleri: {subj} (ilk kilit {lock_tr})", text,
+                    card(f"İlk kilit: {lock_tr}", nice(day), inner, "Tahmin yap", pre=f"{', '.join(parts)}."), name, "hatirlatma")
         if mail.send(msg) and not mail.dry:
             ref.set({"at": firestore.SERVER_TIMESTAMP, "missing": len(missing)})
 
 
 # ---------------------------------------------------------------- 2) sakatlık uyarısı
-def injuries(db, mail, day, games):
+INJ_PART = {"Knee": "diz", "Ankle": "ayak bileği", "Foot": "ayak", "Hamstring": "arka adale", "Calf": "baldır", "Back": "bel",
+            "Hip": "kalça", "Shoulder": "omuz", "Wrist": "el bileği", "Hand": "el", "Finger": "parmak", "Groin": "kasık",
+            "Achilles": "aşil", "Elbow": "dirsek", "Illness": "hastalık", "Concussion": "beyin sarsıntısı", "Thigh": "uyluk",
+            "Toe": "ayak parmağı", "Rest": "dinlenme", "Personal": "kişisel neden", "Neck": "boyun", "Abdomen": "karın",
+            "Quadriceps": "ön adale", "Leg": "bacak", "Chest": "göğüs", "Face": "yüz", "Eye": "göz", "Oblique": "yan karın", "Rib": "kaburga"}
+
+
+def injury_list():
+    """ESPN sakatlık listesi: {oyuncuId: {name, out, why, back}}. 'Out' ve ceza oynamıyor sayılır."""
+    import re
+    out = {}
+    try:
+        d = get("https://site.web.api.espn.com/apis/site/v2/sports/basketball/nba/injuries")
+    except Exception as e:
+        print("sakatlık listesi alınamadı:", type(e).__name__)
+        return out
+    for t in d.get("injuries", []):
+        for i in t.get("injuries", []):
+            a = i.get("athlete", {})
+            pid = next((m.group(1) for l in a.get("links", []) for m in [re.search(r"/id/(\d+)", l.get("href", ""))] if m), None)
+            if not pid:
+                continue
+            st, det = i.get("status", ""), i.get("details") or {}
+            why = "ceza" if st == "Suspension" else INJ_PART.get(det.get("type", ""), (det.get("type") or "sakatlık").lower())
+            out[pid] = {"name": a.get("displayName", "Oyuncu"), "out": st in ("Out", "Suspension"), "why": why,
+                        "back": det.get("returnDate", "")}
+    return out
+
+
+def back_txt(info):
+    r = info.get("back")
+    if not r:
+        return ""
+    try:
+        d = datetime.strptime(r, "%Y-%m-%d")
+        return f", tahmini dönüş {d.day} {MONTHS[d.month - 1]}"
+    except ValueError:
+        return ""
+
+
+def injuries(db, mail, day, games, inj):
     now = datetime.now(timezone.utc)
-    if now >= games[0]["start"]:
-        return  # kilitlendi, değiştirmek mümkün değil
-    status, names = {}, {}
-    for tid in {t for g in games for t in g["teams"]}:
-        try:
-            for a in get(f"{ESPN}/teams/{tid}/roster").get("athletes", []):
-                inj = (a.get("injuries") or [{}])[0].get("status", "")
-                status[str(a["id"])] = inj
-                names[str(a["id"])] = a.get("displayName", "")
-        except Exception as e:
-            print("kadro alınamadı:", tid, type(e).__name__)
-    out_ids = {pid for pid, st in status.items() if "out" in st.lower()}
+    out_ids = {pid for pid, x in inj.items() if x["out"]}
     if not out_ids:
-        print("sakatlık: seçilen oyuncularda sorun yok")
         return
+    night_open = now < games[0]["night_lock"]
     for uid, name, email in people(db, "remind"):
         hits = []
-        refs = [db.collection("picks").document(f"{g['id']}_{uid}") for g in games]
-        for snap in db.get_all(refs):
-            if snap.exists and (snap.to_dict() or {}).get("scorerId") in out_ids:
-                gid = snap.id.split("_")[0]
-                g = next(x for x in games if x["id"] == gid)
-                hits.append((snap.to_dict()["scorerId"], f"{g['away']} – {g['home']} maçının skorer seçimi"))
-        daily = db.collection("daily").document(f"{day}_{uid}").get()
-        dp = (daily.to_dict() or {}).get("dayPlayerId") if daily.exists else None
-        if dp in out_ids:
-            hits.append((dp, "günün oyuncusu seçimin"))
-        new = []
-        for pid, where in hits:
-            ref = once(db, f"inj_{day}_{uid}_{pid}")
-            if ref:
-                new.append((pid, where, ref))
+        refs = [db.collection("picks").document(f"{g['id']}_{uid}") for g in games if now < g["lock"]]
+        for snap in db.get_all(refs) if refs else []:
+            sid = (snap.to_dict() or {}).get("scorerId") if snap.exists else None
+            if sid in out_ids:
+                g = next(x for x in games if x["id"] == snap.id.split("_")[0])
+                hits.append((sid, f"{g['away']} – {g['home']} maçının skorer seçimin", g["lock"]))
+        if night_open:
+            daily = db.collection("daily").document(f"{day}_{uid}").get()
+            dp = (daily.to_dict() or {}).get("dayPlayerId") if daily.exists else None
+            if dp in out_ids:
+                hits.append((dp, "günün oyuncusu seçimin", games[0]["night_lock"]))
+        new = [(pid, where, lk, ref) for pid, where, lk in hits for ref in [once(db, f"inj_{day}_{uid}_{pid}")] if ref]
         if not new:
             continue
-        lines = [f"{names.get(pid, 'Oyuncu')} bu gece oynamıyor ({where})" for pid, where, _ in new]
-        lock_tr = games[0]["start"].astimezone(TR).strftime("%H:%M")
+        lines = [f"{inj[pid]['name']} bu gece oynamıyor ({inj[pid]['why']}{back_txt(inj[pid])}). Bu, {where}. Kilide kadar değiştirebilirsin (kilit saati {lk.astimezone(TR):%H:%M}, Türkiye saati)."
+                 for pid, where, lk, _ in new]
         inner = (f'<p style="margin:0 0 10px">Selam {escape(name)}, ESPN\'e göre seçtiğin oyunculardan biri bu gece oynamayacak:</p>'
-                 f'<ul style="margin:0 0 12px;padding-left:20px;font-size:14px">{"".join(f"<li>{escape(x)}</li>" for x in lines)}</ul>'
-                 f'<p style="margin:0 0 12px;color:#5f6b78;font-size:14px">Türkiye saatiyle {lock_tr}\'e kadar değiştirebilirsin.</p>')
-        first = names.get(new[0][0], "Seçtiğin oyuncu")
-        msg = build(email, f"⚠️ {first} bu gece oynamıyor", f"Selam {name},\n" + "\n".join(lines) + f"\nTürkiye saatiyle {lock_tr}'e kadar değiştirebilirsin.",
-                    card("Seçtiğin oyuncu oynamıyor", nice(day), inner, "Seçimi değiştir"))
+                 f'<ul style="margin:0 0 12px;padding-left:20px;font-size:14px">{"".join(f"<li>{escape(x)}</li>" for x in lines)}</ul>')
+        first = inj[new[0][0]]["name"]
+        msg = build(email, f"{first} bu gece oynamıyor, seçimini değiştirebilirsin", f"Selam {name},\n" + "\n".join(lines),
+                    card("Seçtiğin oyuncu oynamıyor", nice(day), inner, "Seçimi değiştir", pre=lines[0]), name, "sakatlik")
         if mail.send(msg) and not mail.dry:
-            for _, _, ref in new:
+            for *_, ref in new:
+                ref.set({"at": firestore.SERVER_TIMESTAMP})
+
+
+# ---------------------------------------------------------------- 2b) uzun vade uyarıları
+LT_NAMES = {"e": "haftanın oyuncusu (Doğu)", "w": "haftanın oyuncusu (Batı)", "pe": "ayın oyuncusu (Doğu)", "pw": "ayın oyuncusu (Batı)",
+            "re": "ayın çaylağı (Doğu)", "rw": "ayın çaylağı (Batı)", "de": "ayın savunmacısı (Doğu)", "dw": "ayın savunmacısı (Batı)",
+            "mvp": "MVP", "roy": "yılın çaylağı", "dpoy": "yılın savunmacısı", "mip": "en çok gelişen oyuncu", "smoy": "yılın 6. adamı"}
+
+
+def lt_lock(k):
+    if k[0] == "w":
+        return datetime.strptime(k[2:], "%Y%m%d").replace(tzinfo=timezone.utc) + timedelta(hours=71)
+    if k[0] == "m":
+        return datetime(int(k[2:6]), int(k[6:8]), 15, 17, tzinfo=timezone.utc)
+    return datetime(2026, 11, 15, 17, tzinfo=timezone.utc)
+
+
+def lt_alerts(db, mail, inj):
+    today = espn_today().strftime("%Y%m%d")
+    y, m = int(today[:4]), int(today[4:6])
+    mk = "m_202611" if (y, m) in ((2026, 10), (2026, 11)) else f"m_{y}{m:02d}"
+    keys = ["w_" + week_key(today), mk, "s_2027"]
+    now = datetime.now(timezone.utc)
+    # 65 maç kuralı: takımın oynadığı - oyuncunun oynadığı maç
+    games = load("games.json", {})
+    team_gp = {}
+    for g in games.values():
+        if g.get("seasonType") == 2:
+            for side in ("home", "away"):
+                team_gp[g[side]["abbr"]] = team_gp.get(g[side]["abbr"], 0) + 1
+    pst = load("players.json", {}).get("p", {})
+    swap_open = now < datetime(2027, 3, 1, tzinfo=timezone.utc)
+    for uid, name, email in people(db, "remind"):
+        items = []   # (anahtar, satır)
+        for k in keys:
+            snap = db.collection("lt").document(f"{k}_{uid}").get()
+            if not snap.exists:
+                continue
+            d = snap.to_dict() or {}
+            picks = dict(d.get("picks") or {})
+            for c, sw in (d.get("swaps") or {}).items():
+                picks[c] = sw.get("to", picks.get(c))
+            names = d.get("names") or {}
+            locked = now >= lt_lock(k)
+            for c, pid in picks.items():
+                if c == "coy" or not pid:
+                    continue
+                pid = str(pid)
+                who = inj.get(pid, {}).get("name") or names.get(c) or pst.get(pid, {}).get("n", "Seçtiğin oyuncu")
+                cat = LT_NAMES.get(c, c)
+                if pid in inj and inj[pid]["out"]:
+                    tail = (f"Tur henüz kilitlenmedi, değiştirebilirsin (kilit: {lt_lock(k).astimezone(TR).day} {MONTHS[lt_lock(k).astimezone(TR).month - 1]}, saat {lt_lock(k).astimezone(TR):%H:%M})." if not locked
+                            else "Tur kilitlendi; seçim artık değişmiyor, bilgin olsun.")
+                    items.append((f"ltinj_{k}_{uid}_{pid}",
+                                  f"{who} sakat ({inj[pid]['why']}{back_txt(inj[pid])}). {cat[:1].upper() + cat[1:]} seçimindi. {tail}"))
+                if k[0] == "s" and pid in pst:
+                    p = pst[pid]
+                    missed = team_gp.get(p.get("t"), 0) - p.get("gp", 0)
+                    if missed > 17 and not (d.get("swaps") or {}).get(c):
+                        tail = ("1 Mart'a kadar bu seçimi bir kere değiştirebilirsin; yeni seçim puanın yarısını alır." if swap_open
+                                else "Değiştirme süresi doldu.")
+                        items.append((f"lt65_{uid}_{c}_{pid}", f"{who} bu sezon {missed} maç kaçırdı ve 65 maç kuralına takıldı; {cat} adayı olamaz. {tail}"))
+                    elif missed >= 14:
+                        items.append((f"lt65w_{uid}_{c}_{pid}", f"{who} bu sezon {missed} maç kaçırdı. {18 - missed} maç daha kaçırırsa 65 maç kuralına takılır ve {cat} adayı olamaz."))
+        new = [(line, ref) for key, line in items for ref in [once(db, key)] if ref]
+        if not new:
+            continue
+        lines = [x for x, _ in new]
+        inner = (f'<p style="margin:0 0 10px">Selam {escape(name)}, uzun vade seçimlerinle ilgili bir gelişme var:</p>'
+                 f'<ul style="margin:0 0 12px;padding-left:20px;font-size:14px">{"".join(f"<li>{escape(x)}</li>" for x in lines)}</ul>')
+        subj = "Uzun vade seçimin 65 maç kuralına takıldı" if any("takıldı" in x for x in lines) else "Uzun vade seçiminle ilgili sakatlık haberi"
+        msg = build(email, subj, f"Selam {name},\n" + "\n".join(lines), card("Uzun vade", "seçimlerin", inner, "Uzun vadeye git", pre=lines[0]), name, "uzunvade")
+        if mail.send(msg) and not mail.dry:
+            for _, ref in new:
                 ref.set({"at": firestore.SERVER_TIMESTAMP})
 
 
@@ -388,7 +511,7 @@ def weekly(db, mail, force):
         ref = once(db, f"week_{wk}_{uid}")
         if not ref:
             continue
-        msg = build(email, f"🏆 Haftalık özet ({span}): {head}", f"Selam {name},\n\n" + text, card(head, span, inner))
+        msg = build(email, f"Haftalık özet ({span}): {head}", f"Selam {name},\n\n" + text, card(head, span, inner, pre=notes[0] if notes else head), name, "haftalik")
         if mail.send(msg) and not mail.dry:
             ref.set({"at": firestore.SERVER_TIMESTAMP})
 
@@ -406,11 +529,14 @@ def main():
     day = os.environ.get("REMIND_DAY") or espn_today().strftime("%Y%m%d")  # REMIND_DAY: yalnızca test
     games = night_games(day)
     upcoming = [g for g in games if g["state"] == "pre"]
+    inj = injury_list()
     if games and len(upcoming) == len(games):
         reminders(db, mail, day, games, force)
-        injuries(db, mail, day, games)
+    if games and upcoming:
+        injuries(db, mail, day, games, inj)
     else:
-        print(day, "maç yok ya da gece başladı")
+        print(day, "maç yok ya da gece bitti")
+    lt_alerts(db, mail, inj)
     weekly(db, mail, force)
     mail.close()
     print(f"{day}: {mail.sent} mail")
