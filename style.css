@@ -1352,3 +1352,10 @@ button,a,[data-act],.plr,.pf-av,.pf-emo{touch-action:manipulation;-webkit-tap-hi
 .lt-swap{display:flex;gap:10px;align-items:center;padding:10px 12px;border-top:1px solid var(--line);background:color-mix(in srgb,var(--amber) 12%,transparent);font-size:12.5px}
 .lt-swap span{flex:1}
 @media (max-width:420px){ .nav a{font-size:10.5px;letter-spacing:0} .nav a svg{width:21px;height:21px} }
+.lt-pl .pi small{display:block;white-space:normal;line-height:1.35}
+.lt-wl{font-weight:700;color:var(--ink)}
+.inj{display:inline-block;margin-top:3px;font-size:11px;font-weight:700;padding:1px 7px;border-radius:99px;background:color-mix(in srgb,var(--amber) 22%,transparent);color:var(--amber)}
+.inj.out{background:color-mix(in srgb,var(--lose) 22%,transparent);color:var(--lose)}
+.lt-pl .ppg small{white-space:nowrap}
+.tg-wl{font-size:11px;color:var(--muted);font-weight:700}
+.lt-mini{color:var(--muted);font-size:11.5px;font-weight:500}

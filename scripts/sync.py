@@ -13,6 +13,7 @@ için bu betik kimlik bilgisi olmadan çalışır. Sadece Python standart kütü
   python scripts/sync.py --full     # sezon başından baştan kurar
 """
 import json
+import re
 import os
 import sys
 import time
@@ -113,6 +114,7 @@ def box(event_id: str):
                 players.append({
                     "id": a["athlete"]["id"], "name": a["athlete"]["displayName"], "team": abbr,
                     "pts": pts, "reb": num("rebounds"), "ast": num("assists"),
+                    "stl": num("steals"), "blk": num("blocks"),
                     "min": row.get("minutes", "0"),
                 })
     return players
@@ -264,6 +266,29 @@ def valid_before(doc, start_iso):
 
 
 # ---------------------------------------------------------------- ana akış
+INJ_TR = {"Out": "Oynamıyor", "Day-To-Day": "Belirsiz", "Suspension": "Cezalı", "Questionable": "Belirsiz", "Doubtful": "Şüpheli"}
+
+
+def save_injuries():
+    """Sakatlık listesi -> data/injuries.json  {oyuncuId: {s: durum, y: bölge, r: dönüş tarihi}}"""
+    d = get("https://site.web.api.espn.com/apis/site/v2/sports/basketball/nba/injuries")
+    out = {}
+    for t in d.get("injuries", []):
+        for i in t.get("injuries", []):
+            a = i.get("athlete", {})
+            pid = None
+            for l in a.get("links", []):
+                m = re.search(r"/id/(\d+)", l.get("href", ""))
+                if m:
+                    pid = m.group(1); break
+            if not pid:
+                continue
+            det = i.get("details") or {}
+            out[pid] = {"s": INJ_TR.get(i.get("status"), i.get("status", "")), "y": det.get("type", ""),
+                        "r": det.get("returnDate", ""), "t": a.get("team", {}).get("abbreviation", "")}
+    return save("injuries.json", out)
+
+
 def save_all_players():
     """Tüm NBA oyuncuları (güvenlik sorusu için seçim listesi) -> data/allplayers.json"""
     teams = get(f"{ESPN}/teams")["sports"][0]["leagues"][0]["teams"]
@@ -272,7 +297,10 @@ def save_all_players():
         t = t["team"]
         tl.append({"a": t["abbreviation"], "n": t["displayName"], "id": str(t["id"])})
         for a in get(f"{ESPN}/teams/{t['id']}/roster").get("athletes", []):
-            out.append({"id": str(a["id"]), "n": a["displayName"], "t": t["abbreviation"]})
+            x = {"id": str(a["id"]), "n": a["displayName"], "t": t["abbreviation"]}
+            if (a.get("experience") or {}).get("years") == 0:
+                x["r"] = 1   # çaylak
+            out.append(x)
     if len(out) < 300:
         raise RuntimeError(f"yalnızca {len(out)} oyuncu geldi")
     # Listeden oyuncu silinmez (kadrodan çıkan oyuncu, onu güvenlik cevabı seçen için listede kalır).
@@ -286,6 +314,9 @@ def save_all_players():
 def main(full=False):
     games = load("games.json", {})
     pstats = load("players.json", {"counted": [], "p": {}})
+    if pstats.get("v") != 2:   # v2: maç maç kayıt (uzun vade istatistikleri için); bir kere baştan kurulur
+        pstats = {"v": 2, "counted": [], "p": {}}
+        full = True
     counted = set(pstats["counted"])
 
     start = datetime.strptime(CONFIG["seasonStart"], "%Y%m%d").date()
@@ -305,7 +336,7 @@ def main(full=False):
             g = finished_game(ev)
             if not g or g["seasonType"] == 1:
                 continue
-            if g["id"] in games and games[g["id"]].get("top"):
+            if games.get(g["id"], {}).get("top") and g["id"] in counted:
                 continue
             try:
                 bx = box(g["id"])
@@ -313,15 +344,19 @@ def main(full=False):
                 print(f"Kutu skoru alınamadı {g['id']}: {exc}", file=sys.stderr)
                 continue
             top = max((p["pts"] for p in bx), default=0)
+            winner = g.get("winner")
             g["day"] = day
             g["top"] = [{"id": p["id"], "name": p["name"], "team": p["team"], "pts": p["pts"]} for p in bx if p["pts"] == top]
             games[g["id"]] = g
             if g["id"] not in counted:
                 for p in bx:
-                    s = pstats["p"].setdefault(p["id"], {"n": p["name"], "t": p["team"], "gp": 0, "pts": 0, "reb": 0, "ast": 0})
+                    s = pstats["p"].setdefault(p["id"], {"n": p["name"], "t": p["team"], "gp": 0, "pts": 0, "reb": 0, "ast": 0, "stl": 0, "blk": 0})
                     s["n"], s["t"] = p["name"], p["team"]
                     s["gp"] += 1; s["pts"] += p["pts"]; s["reb"] += p["reb"]; s["ast"] += p["ast"]
+                    s["stl"] = s.get("stl", 0) + p["stl"]; s["blk"] = s.get("blk", 0) + p["blk"]
                     s["l5"] = (s.get("l5", []) + [p["pts"]])[-5:]   # son 5 maçın sayıları (formda olanlar listesi için)
+                    # son 16 maç: [gün, sayı, ribaund, asist, top çalma, blok, galibiyet]
+                    s["lg"] = (s.get("lg", []) + [[day, p["pts"], p["reb"], p["ast"], p["stl"], p["blk"], 1 if p["team"] == winner else 0]])[-16:]
                 counted.add(g["id"])
         d += timedelta(days=1)
     pstats["counted"] = sorted(counted)
@@ -459,6 +494,10 @@ def main(full=False):
     sc["weeks"] = weeks
 
     changed = [save("games.json", games), save("players.json", pstats), save("scores.json", sc), save("nights.json", nights)]
+    try:
+        changed.append(save_injuries())
+    except Exception as e:
+        print("Sakatlık listesi alınamadı:", e)
     try:
         changed.append(save_all_players())
     except Exception as e:  # kadro listesi olmasa da puanlar yazılsın
