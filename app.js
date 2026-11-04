@@ -45,10 +45,11 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.19.1";
+const VERSION = "1.19.2";
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.19.2", d:"4 Kasım 2026", items:["Üstteki puan panosu az oyuncu varken de sıralama listesi olarak görünüyor (iki kişilik VS görünümü kalktı)."]},
   {v:"1.19.1", d:"4 Kasım 2026", items:["Deneme haftası boyunca en üstte sabit, kapatılamayan bir \"DENEME HAFTASI\" şeridi var; asıl lige kaç gün kaldığını yazıyor, dokununca açıklama açılıyor."]},
   {v:"1.19.0", d:"4 Kasım 2026", items:["Deneme haftası: 4–8 Kasım deneme ligi. Puanlar 9 Kasım pazartesi kendiliğinden sıfırlanır, profiller kalır; deneme tablosu Geçmiş ligler'e geçer. Üstte şerit ve ilk girişte açıklama penceresi var, 9 Kasım'da \"Lig başladı\" penceresi çıkar.","Düzeltme: lig sıfırlanınca önceki uzun vade turlarının puanları artık yeni lige taşınmıyor."]},
   {v:"1.18.0", d:"4 Kasım 2026", items:["Sohbette yanıtla: mesajın altındaki Yanıtla ile cevap ver; alıntıya dokununca asıl mesaja gidilir.","@etiketleme: @ yazınca oyuncu listesi açılır. Seni anan ya da sana yanıt veren mesaj vurgulu görünür, baloncukta @ işareti çıkar.","Yazıyor… göstergesi, gönderdikten sonra 2 dakika içinde düzenleme, tıklanabilir bağlantılar.","Yönetici bir mesajı sohbetin üstüne sabitleyebilir.","🔔 düğmesiyle sohbeti sessize al: baloncukta yalnızca seni anan mesajlar sayılır."]},
@@ -782,7 +783,7 @@ function renderBoard(){
   const tonight = S.days[S.today] && inLeague(S.today) ? dayPoints(S.today) : {};
   const ranked = rankOrder(tot);
   let html;
-  if(S.order.length<=2){
+  if(false){   // eski iki kişilik "VS" görünümü kullanılmıyor; oyuncu sayısı ne olursa olsun sıralama listesi
     const [a,b] = S.order;
     const cell = u => u ? `<div class="pl" data-pu="${u}">${avatar(u)}<div class="nm" style="color:${col(u)}">${esc(pname(u))}</div>${digitsHTML(u, tot[u])}${deltaHTML(u)}${formHTML(u)}</div>` : `<div class="pl"><span class="av empty">?</span><div class="nm">Rakip bekleniyor</div><div class="digits">–</div></div>`;
     html = `<div class="duel">${cell(a)}<div class="vs">VS</div>${cell(b)}</div>`;
@@ -798,6 +799,7 @@ function renderBoard(){
     const showAll = S.boardAll || ranked.length<=4;
     const vis = showAll ? ranked : ranked.filter((u,i)=>i<3 || u===S.uid);
     html = `<div class="lb">${vis.map((u)=>{ const i=ranked.indexOf(u); return `<div class="lb-row" data-pu="${u}" style="--pc:${col(u)};--w:${Math.max(0,tot[u])/top*100}%"><span class="rk">${i+1}</span>${avatar(u,"sm")}<span class="nmw"><span class="nm" style="color:${col(u)};display:block">${esc(pname(u))}</span>${formHTML(u)}</span>${tonight[u]?.pts ? `<span class="td on">+${tonight[u].pts} bu gece</span>` : `<span class="td"></span>`}<span class="tn tnum">${tot[u]}${deltaHTML(u)}</span></div>`; }).join("")}</div>`
+      + (ranked.length<2 ? `<button class="lb-more lb-inv" id="lbInvite" type="button">${ICON.link}Arkadaşlarını davet et, tablo dolsun</button>` : "")
       + (ranked.length>4 ? `<button class="lb-more" id="lbMore" type="button">${S.boardAll?"Daralt":`Tümünü göster (${ranked.length})`}</button>` : "");
   }
   let lead = `<i></i>Henüz puan yok`;
@@ -805,11 +807,11 @@ function renderBoard(){
     if(tot[ranked[0]]===tot[ranked[1]]) lead = `<i style="background:var(--amber)"></i>Şu an berabere`;
     else lead = `<i style="background:${col(ranked[0])}"></i>${esc(pname(ranked[0]))} önde`;
   }
-  const tn = S.order.length<=2 && S.order.length ? `Bu gece <b>${S.order.map(u=>tonight[u]?.pts??0).join("–")}</b>` : "";
+  const tn = false ? `Bu gece <b>${S.order.map(u=>tonight[u]?.pts??0).join("–")}</b>` : "";
   const wk = weekKey(S.today), wkPts = {}; for(const u of S.order) wkPts[u]=(S.arch.scores.weeks?.[wk]?.[u]||0);
   for(const day of [S.today, shiftDay(S.today,-1)]){ if(weekKey(day)!==wk || !S.days[day] || !inLeague(day)) continue; const dp=dayPoints(day); for(const u of S.order) if(dp[u]?.src==="live") wkPts[u]+=dp[u].pts-(S.arch.scores.days?.[day]?.[u]?.pts||0); }
   const wkLead = [...S.order].sort((x,y)=>wkPts[y]-wkPts[x]);
-  const wkTxt = !S.order.length ? "" : S.order.length<=2 ? `Bu hafta <b>${S.order.map(u=>wkPts[u]).join("–")}</b>`
+  const wkTxt = !S.order.length ? "" : false ? `Bu hafta <b>${S.order.map(u=>wkPts[u]).join("–")}</b>`
     : wkPts[wkLead[0]]>0 ? `Haftanın lideri <b style="color:${col(wkLead[0])}">${esc(pname(wkLead[0]))}</b> · ${wkPts[wkLead[0]]} puan` : "Yeni hafta başladı";
   html += `<div class="board-foot"><div class="lead">${lead}</div><div class="bf-meta">${[tn,wkTxt].filter(Boolean).join(" · ")}</div></div>`;
   // sıralama değiştiyse satırlar kayarak yer değiştirsin (FLIP), öne geçenin yanında ▲ çıksın
@@ -2685,7 +2687,7 @@ $("#banners").addEventListener("click", e=>{
 
 /* ====================================================== oyuncu kartı, tahmin geçmişi, takım sayfası */
 document.addEventListener("click", e=>{ const p=e.target.closest(".podium [data-pu]"); if(p) openPlayer(p.dataset.pu); });
-$("#board").addEventListener("click", e=>{ if(e.target.closest("#lbMore")){ S.boardAll=!S.boardAll; return renderBoard(); } const p=e.target.closest("[data-pu]"); if(p) openPlayer(p.dataset.pu); });
+$("#board").addEventListener("click", e=>{ if(e.target.closest("#lbInvite")) return openInvite(); if(e.target.closest("#lbMore")){ S.boardAll=!S.boardAll; return renderBoard(); } const p=e.target.closest("[data-pu]"); if(p) openPlayer(p.dataset.pu); });
 document.addEventListener("click", e=>{ const t=e.target.closest("[data-tp]"); if(t) { e.stopPropagation(); openTeam(t.dataset.tp); } });
 // ====== Profil: herkesin kendi sayfası (Özet · İstatistik · Rozetler · kendi profilinde Ayarlar)
 S.prof = {u:null, tab:"ozet"};

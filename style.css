@@ -1997,3 +1997,4 @@ body.trial-on #alert.sticky{top:calc(var(--top-h) + var(--strip-h) + env(safe-ar
   body.trial-on.bars-hidden .topbar{transform:translateY(calc(-100% + var(--strip-h)))}
   body.trial-on.bars-hidden #alert.sticky{top:var(--strip-h)}
 }
+.lb-inv{display:inline-flex;align-items:center;gap:6px;justify-content:center}.lb-inv svg{width:16px;height:16px}
