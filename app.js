@@ -45,10 +45,12 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.19.2";
+const VERSION = "1.19.4";
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.19.4", d:"4 Kasım 2026", items:["Kayıtta mail adresi artık atlanamıyor; onay kodu istersen sonra Profil → Ayarlar'dan girilebiliyor. Kod girilene kadar hiçbir mail gönderilmiyor.","Favori takım adımında Takımım sekmesi anlatılıyor.","Oyuncu adlarında son ek düzeltmesi: \"III\" yerine \"Murphy III\", \"Jr.\" yerine \"Jackson Jr.\" yazıyor."]},
+  {v:"1.19.3", d:"4 Kasım 2026", items:["Güvenlik sorusu artık \"en sevdiğin\" takım ve oyuncuyu sormuyor: tahmin edilemesin diye seninle alakasız bir gizli takım ve gizli oyuncu seçmen isteniyor."]},
   {v:"1.19.2", d:"4 Kasım 2026", items:["Üstteki puan panosu az oyuncu varken de sıralama listesi olarak görünüyor (iki kişilik VS görünümü kalktı)."]},
   {v:"1.19.1", d:"4 Kasım 2026", items:["Deneme haftası boyunca en üstte sabit, kapatılamayan bir \"DENEME HAFTASI\" şeridi var; asıl lige kaç gün kaldığını yazıyor, dokununca açıklama açılıyor."]},
   {v:"1.19.0", d:"4 Kasım 2026", items:["Deneme haftası: 4–8 Kasım deneme ligi. Puanlar 9 Kasım pazartesi kendiliğinden sıfırlanır, profiller kalır; deneme tablosu Geçmiş ligler'e geçer. Üstte şerit ve ilk girişte açıklama penceresi var, 9 Kasım'da \"Lig başladı\" penceresi çıkar.","Düzeltme: lig sıfırlanınca önceki uzun vade turlarının puanları artık yeni lige taşınmıyor."]},
@@ -976,7 +978,7 @@ function pickedCard(g){
   const tm = side => { const t=g[side], on=sv.winner===t.abbr; return `<span class="pc-tm ${on?"on":""}" style="--tc:${tcol(t.abbr)}"><img src="${t.logo||LOGO_SMALL(t.abbr)}" alt=""><b>${esc(t.abbr)}</b></span>`; };
   return `<article class="game picked${g.cup?" cup":""}" style="--ca:${pairCols(g.away.abbr,g.home.abbr)[0]};--ch:${pairCols(g.away.abbr,g.home.abbr)[1]}" data-gid="${g.id}">
     <button class="pk-row" data-act="edit" data-g="${g.id}"><span class="pk-time">${g.cup?`<span class="cup-mini" title="NBA Kupası · 2× puan">${ICON.cup}</span>`:""}${timeTR(g.start)}</span>${tm("away")}<span class="pk-at">@</span>${tm("home")}
-      <span class="pk-sel"><span class="rc ok"><i>✓</i>${esc(sv.winner)}</span><span class="rc">${sv.margin}</span><span class="rc has-face">${faceImg(sv.scorerId,"rc-face")}${esc(sv.scorerName.split(" ").slice(-1)[0])}</span>${conf?'<span class="rc star-chip">★</span>':""}</span>
+      <span class="pk-sel"><span class="rc ok"><i>✓</i>${esc(sv.winner)}</span><span class="rc">${sv.margin}</span><span class="rc has-face">${faceImg(sv.scorerId,"rc-face")}${esc(surname(sv.scorerName))}</span>${conf?'<span class="rc star-chip">★</span>':""}</span>
       <span class="pk-edit">${ICON.edit}</span></button></article>`;
 }
 // Gece bitince en çok puan getiren tahmin
@@ -1080,7 +1082,7 @@ function infoBox(g){
     const hp0 = homeProb(g); const h = hp0!=null && !isNaN(hp0) ? Math.round(hp0*100) : null, a = h!=null ? 100-h : null;
     const l5 = t => ((s.lastFiveGames||[]).find(x=>x.team?.abbreviation===t.abbr)?.events||[]).map(e=>`<i class="${e.gameResult}">${e.gameResult==="W"?"G":"M"}</i>`).join("");
     const outs = t => injOfTeam(t.abbr).filter(x=>x.o);
-    const outTxt = t => { const o=outs(t); return !S.inj ? "" : !o.length ? "Eksik oyuncu yok" : `Oynamıyor: ${o.slice(0,3).map(x=>esc(x.n.split(" ").slice(-1)[0])).join(", ")}${o.length>3?` +${o.length-3}`:""}`; };
+    const outTxt = t => { const o=outs(t); return !S.inj ? "" : !o.length ? "Eksik oyuncu yok" : `Oynamıyor: ${o.slice(0,3).map(x=>esc(surname(x.n))).join(", ")}${o.length>3?` +${o.length-3}`:""}`; };
     const side = (t,p,cls) => `<div class="ib-side ${cls}"><b>${esc(t.name)}${p!=null?` %${Math.round(p)}`:""}</b><span class="ib-l5">${l5(t)||""}</span><small>${outTxt(t)}</small></div>`;
     inner = (a!=null ? `<div class="ib-bar"><i style="width:${a}%;background:${pairCols(g.away.abbr,g.home.abbr)[0]}"></i><i style="width:${h}%;background:${pairCols(g.away.abbr,g.home.abbr)[1]}"></i></div>` : "")
       + `<div class="ib-row">${side(g.away,a,"l")}${side(g.home,h,"r")}</div>` + lastMeetHTML(g);
@@ -2587,6 +2589,9 @@ const lastV = s => [...String(s).toLocaleLowerCase("tr")].reverse().find(c=>VOW.
 const endsV = s => VOW.includes(String(s).slice(-1).toLocaleLowerCase("tr"));
 // İlgi eki: Kemal'in, Mustafa'nın, Andaç'ın, Selin'in
 const FRONT_NAMES = new Set(["kemal","celal","cemal","bilal","hilal","nihal","hayal","iclal","meral"]); // ince l: Kemal'in
+// Oyuncu soyadı: "Trey Murphy III" → "Murphy III", "Jaren Jackson Jr." → "Jackson Jr." (yalnızca son ek gösterilmesin)
+const NAME_SFX = /^(jr\.?|sr\.?|ii|iii|iv|v)$/i;
+const surname = n => { const w=String(n||"").trim().split(/\s+/); if(w.length<2) return w[0]||""; const last=w[w.length-1]; return NAME_SFX.test(last) ? w[w.length-2]+" "+last : last; };
 const gen = n => n+"'"+(endsV(n)?"n":"")+({a:"ın",ı:"ın",e:"in",i:"in",o:"un",u:"un",ö:"ün",ü:"ün"}[FRONT_NAMES.has(String(n).toLocaleLowerCase("tr").split(/\s+/).pop()) ? "e" : lastV(n)]);
 const pick = a => a[Math.floor(Math.random()*a.length)];
 // Gecenin manşeti: bitmiş bir gece için tek cümle
@@ -2766,7 +2771,7 @@ function profOzet(u, st){
         if(u!==S.uid && !started(g)) return `<div class="pt-row"><span class="pt-g">${esc(g.away.abbr)} @ ${esc(g.home.abbr)}</span><span class="muted">${timeTR(g.lock)}'de açılır</span></div>`;
         if(!pk) return `<div class="pt-row"><span class="pt-g">${esc(g.away.abbr)} @ ${esc(g.home.abbr)}</span><span class="muted">tahmin yok</span></div>`;
         const r=started(g)?scorePick(g,pk,D.daily[u]?.confGame===g.id):null;
-        return `<div class="pt-row"><span class="pt-g"><img src="${LOGO_SMALL(pk.winner)}" alt="">${esc(g.away.abbr)} @ ${esc(g.home.abbr)}</span><span class="pk"><span class="rc">${esc(pk.winner)}</span><span class="rc">${pk.margin}</span><span class="rc has-face">${faceImg(pk.scorerId,"rc-face")}${esc(pk.scorerName.split(" ").slice(-1)[0])}</span>${D.daily[u]?.confGame===g.id?'<span class="rc star-chip">★</span>':""}</span>${r&&(g.state!=="pre")?`<b class="pt-p ${r.pts>0?"pos":r.pts<0?"neg":""}">${r.pts>0?"+":""}${r.pts}</b>`:""}</div>`; }).join("");
+        return `<div class="pt-row"><span class="pt-g"><img src="${LOGO_SMALL(pk.winner)}" alt="">${esc(g.away.abbr)} @ ${esc(g.home.abbr)}</span><span class="pk"><span class="rc">${esc(pk.winner)}</span><span class="rc">${pk.margin}</span><span class="rc has-face">${faceImg(pk.scorerId,"rc-face")}${esc(surname(pk.scorerName))}</span>${D.daily[u]?.confGame===g.id?'<span class="rc star-chip">★</span>':""}</span>${r&&(g.state!=="pre")?`<b class="pt-p ${r.pts>0?"pos":r.pts<0?"neg":""}">${r.pts>0?"+":""}${r.pts}</b>`:""}</div>`; }).join("");
       h += `<div class="box pt-list">${rows}</div>`;
     }
   }
@@ -2983,7 +2988,7 @@ function teamLeadersHTML(abbr){
   const cats=[["Sayı",p=>pg(p,"pts"),v=>v.toFixed(1)],["Ribaund",p=>pg(p,"reb"),v=>v.toFixed(1)],["Asist",p=>pg(p,"ast"),v=>v.toFixed(1)],
     ["Top çalma + blok",p=>pg(p,"stl")+pg(p,"blk"),v=>v.toFixed(1)],["Saha içi %",p=>(p.fga||0)>=8*p.gp?pct(p.fgm,p.fga):null,v=>"%"+v.toFixed(1)],["Üçlük %",p=>(p.tpa||0)>=3*p.gp?pct(p.tpm,p.tpa):null,v=>"%"+v.toFixed(1)]];
   const cards=cats.map(([l,f,fmt])=>{ const best=ps.map(([id,p])=>({id,p,v:f(p)})).filter(x=>x.v!=null).sort((a,b)=>b.v-a.v)[0]; if(!best) return "";
-    return `<button class="tl-c" data-ath="${best.id}"><img src="${FACE(best.id)}" alt="" loading="lazy"><span><small>${l}</small><b>${esc(best.p.n.split(" ").slice(-1)[0])}</b></span><em class="tnum">${fmt(best.v)}</em></button>`; }).join("");
+    return `<button class="tl-c" data-ath="${best.id}"><img src="${FACE(best.id)}" alt="" loading="lazy"><span><small>${l}</small><b>${esc(surname(best.p.n))}</b></span><em class="tnum">${fmt(best.v)}</em></button>`; }).join("");
   return `<div class="sec-title"><h2 style="font-size:20px">Takım liderleri</h2><span class="aside">maç başına, bu sezon</span></div><div class="tl-grid">${cards}</div>`;
 }
 async function renderTakim(){
@@ -3117,7 +3122,7 @@ const gamelogOf = id => cached("gl_"+id, `${WEB}/common/v3/sports/basketball/nba
 function openPlayerCompare(){
   S.pc = S.pc || [null,null];
   const slot=i=>{ const id=S.pc[i], p=id&&S.pstats[id], a=id&&(ALLP?.players||[]).find(x=>x.id===id);
-    return `<button class="pc-slot" data-pcs="${i}">${id?`<img src="${FACE(id)}" alt=""><b>${esc((p?.n||a?.n||"").split(" ").slice(-1)[0])}</b><small>${esc(p?.t||a?.t||"")}</small>`:`<span class="pc-plus">+</span><small>Oyuncu seç</small>`}</button>`; };
+    return `<button class="pc-slot" data-pcs="${i}">${id?`<img src="${FACE(id)}" alt=""><b>${esc(surname(p?.n||a?.n||""))}</b><small>${esc(p?.t||a?.t||"")}</small>`:`<span class="pc-plus">+</span><small>Oyuncu seç</small>`}</button>`; };
   const [A,B]=S.pc.map(id=>id&&S.pstats[id]);
   const R=[["Maç",p=>p.gp,0],["Sayı",p=>p.pts/p.gp,1],["Ribaund",p=>p.reb/p.gp,1],["Asist",p=>p.ast/p.gp,1],["Top çalma",p=>(p.stl||0)/p.gp,1],["Blok",p=>(p.blk||0)/p.gp,1],
     ["Saha içi %",p=>p.fga?p.fgm/p.fga*100:null,2],["Üçlük %",p=>p.tpa?p.tpm/p.tpa*100:null,2],["Son 5 maç sayı",p=>p.l5?.length?p.l5.reduce((x,y)=>x+y,0)/p.l5.length:null,1]];
@@ -3165,7 +3170,7 @@ function playersHTML(){
       return {id,p,avg:fTot(p)/p.gp,l5}; }).map(x=>({...x,d:x.l5-x.avg}))
     .filter(x=>!tonight.size || tonight.has(x.p.t)).filter(x=>x.l5>=fMin).sort((a,b)=>b.d-a.d).slice(0,6);
   const fchips=`<div class="chips fm-cat">${Object.entries(FC).map(([k,[l]])=>`<button class="chip" data-fcat="${k}" aria-pressed="${k===fc}">${l}</button>`).join("")}</div>`;
-  const formHTML = form.length ? `<div class="sec-title"><h2 style="font-size:20px">Formda olanlar</h2><span class="aside">${tonight.size?"bu gece oynayanlar":"son 5 maç"}</span></div>${fchips}<div class="form-list">${form.map(x=>`<button class="fm" data-ath="${x.id}"><img src="${FACE(x.id)}" alt="" loading="lazy"><b>${esc(x.p.n.split(" ").slice(-1)[0])}</b><small>${esc(x.p.t)}</small><em class="tnum">${x.l5.toFixed(1)}</em><span class="fm-d">▲ ${x.d.toFixed(1)}</span></button>`).join("")}</div><small class="muted">Son 5 maçtaki ${fl.toLocaleLowerCase("tr")} ortalaması; ▲ sezon ortalamasından ne kadar yüksek olduğu.${fc==="eff"?" Verimlilik: sayı + ribaund + asist + top çalma + blok − kaçan şut.":""}</small>` : fchips+emptyBox("filter", "Bu kategoride şu an öne çıkan oyuncu yok.");
+  const formHTML = form.length ? `<div class="sec-title"><h2 style="font-size:20px">Formda olanlar</h2><span class="aside">${tonight.size?"bu gece oynayanlar":"son 5 maç"}</span></div>${fchips}<div class="form-list">${form.map(x=>`<button class="fm" data-ath="${x.id}"><img src="${FACE(x.id)}" alt="" loading="lazy"><b>${esc(surname(x.p.n))}</b><small>${esc(x.p.t)}</small><em class="tnum">${x.l5.toFixed(1)}</em><span class="fm-d">▲ ${x.d.toFixed(1)}</span></button>`).join("")}</div><small class="muted">Son 5 maçtaki ${fl.toLocaleLowerCase("tr")} ortalaması; ▲ sezon ortalamasından ne kadar yüksek olduğu.${fc==="eff"?" Verimlilik: sayı + ribaund + asist + top çalma + blok − kaçan şut.":""}</small>` : fchips+emptyBox("filter", "Bu kategoride şu an öne çıkan oyuncu yok.");
   const f=S.nba, teams=(ALLP?.teams||[]).slice().sort((a,b)=>a.n.localeCompare(b.n,"tr"));
   return `${formHTML}<button class="btn" id="pcmpBtn" type="button" style="width:100%;margin-top:14px">⚖️ İki oyuncuyu karşılaştır</button><div class="sec-title"><h2 style="font-size:20px">Oyuncu ara</h2></div>
     <div class="ps-f">
@@ -3773,10 +3778,11 @@ async function saveRecovery(uid, v){
   const salt = randHex(16), h = await sha256hex(`${salt}${v.team}:${v.playerId}`);
   await setDoc(doc(S.db,"recovery",uid), {salt, h, setAt:serverTimestamp()});
 }
-function secPicker(box){
+function secPicker(box, setup){
   const st = {team:"", pid:""};
-  box.innerHTML = `<label class="fld"><span>En sevdiğin takım</span><select class="sec-team"><option value="">Yükleniyor…</option></select></label>
-    <label class="fld"><span>En sevdiğin basketbolcu</span><input class="sec-pl" autocomplete="off" placeholder="Ara: ör. Curry"></label>
+  box.innerHTML = `${setup?`<div class="sec-tip">🔒 Favori takımını ya da sevdiğin oyuncuyu <b>seçme</b>, arkadaşların kolayca tahmin eder. Seninle hiç alakası olmayan ama aklında kalacak bir takım ve bir oyuncu seç (ör. hiç izlemediğin bir takım, bir yedek oyuncu).</div>`:""}
+    <label class="fld"><span>Gizli takımın</span><select class="sec-team"><option value="">Yükleniyor…</option></select></label>
+    <label class="fld"><span>Gizli oyuncun</span><input class="sec-pl" autocomplete="off" placeholder="Ara: oyuncunun adı"></label>
     <div class="sec-res"></div>`;
   const sel = box.querySelector(".sec-team"), inp = box.querySelector(".sec-pl"), res = box.querySelector(".sec-res");
   allPlayers().then(d => {
@@ -3802,9 +3808,9 @@ function openRecoverySheet(required){
   S.sheetLocked = required;
   $("#shClose").classList.toggle("hide", required);
   openSheet(`<h3 id="shTitle">Güvenlik sorusu</h3>
-    <p class="muted">${required?"Şifreni unutursan sıfırlayabilmen için bir kez seçmen gerekiyor.":"Yeni cevabın eskisinin yerine geçer."} Takım ve oyuncuyu başkalarına söyleme.</p>
+    <p class="muted">${required?"Şifreni unutursan sıfırlayabilmen için bir kez seçmen gerekiyor.":"Yeni cevabın eskisinin yerine geçer."} Seçtiğin takım ve oyuncuyu kimseye söyleme.</p>
     <div id="recBox"></div><p class="err" id="recErr"></p><button class="btn-primary" id="recSave" type="button">Kaydet</button>`);
-  const pk = secPicker($("#recBox"));
+  const pk = secPicker($("#recBox"), true);
   $("#recSave").onclick = async () => {
     const v = pk.value(); if(!v){ $("#recErr").textContent = "Takımı seç ve listeden bir oyuncuya dokun."; return; }
     $("#recSave").disabled = true;
@@ -3988,9 +3994,9 @@ function paintJoin(){
       j.pin=p; j.step=3; paintJoin(); };
   }
   if(j.step===3){
-    box.innerHTML = stepBar(3) + `<p class="muted" style="margin:8px 0 0">Şifreni unutursan bu ikisiyle de sıfırlayabilirsin. Kimseye söyleme.</p><div id="jwSec"></div>
+    box.innerHTML = stepBar(3) + `<p class="muted" style="margin:8px 0 0">Şifreni unutursan bu takım ve oyuncuyla sıfırlarsın. Kimseye söyleme.</p><div id="jwSec"></div>
       <p class="err" id="jwErr"></p><div class="jw-nav"><button class="btn" id="jwBack" type="button">Geri</button><button class="btn-primary" id="jwNext" type="button">Oyuna katıl</button></div>`;
-    const pk=secPicker($("#jwSec"));
+    const pk=secPicker($("#jwSec"), true);
     $("#jwBack").onclick=()=>{ j.step=2; paintJoin(); };
     $("#jwNext").onclick=async()=>{ const sec=pk.value(); if(!sec) return $("#jwErr").textContent="Takımı seç ve listeden bir oyuncuya dokun.";
       const btn=$("#jwNext"); btn.disabled=true; btn.textContent="Katılıyorsun…"; $("#jwErr").textContent="";
@@ -4026,10 +4032,10 @@ function openOnboard(step){
     const teams=(ALLP?.teams||[]).slice().sort((a,b)=>a.n.localeCompare(b.n,"tr"));
     openSheet(`${S.onboard?stepBar(4):""}<h3 id="shTitle">Takım adın</h3><p class="muted">Ligde adının altında görünür (ör. Kyle Korver Sevenler Derneği). Zorunlu.</p>
       <input id="obClub" class="adm-in" style="width:100%" maxlength="40" placeholder="ör. Kyle Korver Sevenler Derneği" value="${esc(S.ob.club||"")}"><small class="hint" id="obClubErr"></small>
-      <h3 style="margin-top:18px">Favori takımın</h3><p class="muted">Uygulamanın renkleri (tema) bu takıma göre olur. Sonra Ayarlar'dan değiştirebilirsin.</p>
+      <h3 style="margin-top:18px">Favori takımın</h3><p class="muted">Alt menüde bu takıma özel <b>Takımım</b> sekmesi açılır: maçlarını, oyuncularını, sakatlıklarını ve sıralamasını oradan takip edersin. Uygulamanın renkleri de bu takıma göre olur. Sonra Ayarlar'dan değiştirebilirsin.</p>
       <div class="tm-grid ob-teams">${teams.map(t=>`<button class="tg" data-obt="${t.a}" aria-pressed="${S.ob.team===t.a}" style="--tc:${tcol(t.a)}"><span class="tg-l"><img src="${LOGO_SMALL(t.a)}" alt=""></span><b>${esc(t.n.split(" ").slice(-1)[0])}</b></button>`).join("") || `<p class="muted">Takımlar yükleniyor…</p>`}</div>
       <h3 style="margin-top:18px">Avatarın</h3><p class="muted">Bir basketbolcu seç; sıralamada ve tahtada adının yanında fotoğrafı görünür. Sonra profilinden değiştirebilir, listede olmayan bir oyuncuyu da arayabilirsin.</p>
-      <div class="pf-avs ob-avs">${STARS.map(([id,n])=>`<button class="pf-av" data-oba="p:${id}" aria-pressed="${S.ob.av===`p:${id}`}"><img src="${HEADSHOT(id)}" alt="" loading="lazy"><small>${esc(n.split(" ").slice(-1)[0])}</small></button>`).join("")}</div>
+      <div class="pf-avs ob-avs">${STARS.map(([id,n])=>`<button class="pf-av" data-oba="p:${id}" aria-pressed="${S.ob.av===`p:${id}`}"><img src="${HEADSHOT(id)}" alt="" loading="lazy"><small>${esc(surname(n))}</small></button>`).join("")}</div>
       <p class="err" id="obErr"></p><button class="btn-primary" id="obNext" type="button">Devam</button>`);
     obLock(true);
     if(!ALLP) allPlayers().then(()=>{ if(S.obStep===4) openOnboard(4); }).catch(()=>{});
@@ -4054,18 +4060,19 @@ function openOnboard(step){
   if(step===5){
     const em=S.contact?.email||"", rem=S.contact?.remind ?? true, wk=S.contact?.weekly ?? true;
     openSheet(`${S.onboard?stepBar(5):""}<h3 id="shTitle">Mail adresin</h3>
-      <p class="muted">Onaylı mail adresin olursa eksik tahmin ve sakatlık hatırlatmaları gelir, şifreni unutursan sıfırlama kodu bu adrese gelir. Adresini yalnızca sen görürsün. Şimdilik geçebilirsin, oyun yine açık.</p>
+      <p class="muted">Mail adresini yaz, sana 6 haneli bir onay kodu gönderelim. Kodu <b>şimdi</b> girebilir ya da <b>sonra Profil → Ayarlar'dan</b> girebilirsin. <b>Kodu girene kadar sana hiçbir mail gelmez</b> (hatırlatma, haftalık özet, şifre sıfırlama). Adresini yalnızca sen görürsün.</p>
       <label class="fld"><span>E-posta</span><input id="obMail" type="email" autocomplete="email" inputmode="email" placeholder="ornek@gmail.com" value="${esc(em)}"></label>
       <div class="ob-opts"><b>Hangi mailler gelsin?</b> <small class="muted">İsteğe bağlı, sonra Ayarlar'dan değiştirebilirsin.</small>
         <label class="ob-chk"><input type="checkbox" id="obRemind" ${rem?"checked":""}><span>Eksik tahmin ve sakatlık hatırlatmaları</span></label>
         <label class="ob-chk"><input type="checkbox" id="obWeekly" ${wk?"checked":""}><span>Pazartesi haftalık özet</span></label>
         <label class="ob-chk dis"><input type="checkbox" checked disabled><span>Şifre sıfırlama kodu (her zaman)</span></label></div>
-      <button class="btn-primary" id="obSend" type="button">Onay kodu gönder</button>
+      <button class="btn-primary" id="obSend" type="button">Kaydet ve onay kodu gönder</button>
       <div id="obCodeBox" class="hide"><div class="fld"><span>Maildeki 6 haneli kod</span><input id="obCode" inputmode="numeric" maxlength="6" autocomplete="one-time-code" data-show="1" aria-label="Onay kodu"></div>
         <button class="btn-primary" id="obOk" type="button">Onayla ve bitir</button></div>
       <p class="muted" id="obMsg" style="margin-top:8px"></p>
-      <button class="linkish ob-skip" id="obSkip" type="button">Şimdilik geç, sonra onaylarım</button>`);
-    obLock(false);
+      <button class="linkish ob-skip ${em?"":"hide"}" id="obSkip" type="button">Kodu sonra gireceğim</button>`);
+    // mail adresi yazılmadan geçilemez; adres kaydedildikten sonra kod sonraya bırakılabilir
+    obLock(!em);
     $("#obSkip").onclick=()=>{ lsSet("mailAsk", String(Date.now())); finishOnboard(); };
     const validMail = e => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e);
     const prefs = () => ({remind:$("#obRemind").checked, weekly:$("#obWeekly").checked});
@@ -4076,7 +4083,8 @@ function openOnboard(step){
         await setDoc(doc(S.db,"contacts",S.uid), d); S.contact={...d};
         await setDoc(doc(S.db,"verifyReq",S.uid), {email, at:serverTimestamp()});
         $("#obCodeBox").classList.remove("hide"); $("#obSend").textContent="Kodu tekrar gönder"; $("#obSend").className="btn"; $("#obSend").style.cssText="width:100%;margin-top:8px";
-        $("#obMsg").textContent=`Kod ${email} adresine gidiyor; genelde 1-2 dakika sürer. Gereksiz (spam) klasörüne de bak.`; setTimeout(()=>$("#obCode").focus(),50);
+        $("#obMsg").textContent=`Kod ${email} adresine gidiyor; genelde 1-2 dakika sürer. Gereksiz (spam) klasörüne de bak. Şimdi girmek istemezsen "Kodu sonra gireceğim"e bas.`; setTimeout(()=>$("#obCode").focus(),50);
+        $("#obSkip").classList.remove("hide"); obLock(false);
       }catch(e){ $("#obMsg").textContent="İstek gönderilemedi, tekrar dene."; }
       $("#obSend").disabled=false; };
     $("#obOk").onclick=async()=>{ const code=$("#obCode").value.trim(); if(!/^\d{6}$/.test(code)) return $("#obMsg").textContent="Kod 6 rakam olmalı.";
@@ -4491,7 +4499,7 @@ function paintProfile(){
       <small class="muted" style="margin:0 0 8px;display:block">Avatarın bir basketbolcunun fotoğrafı olur.</small>
       <input class="search pf-avq" id="pfAvQ" placeholder="Oyuncu ara (ör. Curry)" autocomplete="off">
       <div class="pf-avs" id="pfAvs">${(()=>{ const cur=(/^p:(\w+)$/.exec(me.av||"")||[])[1]; const list=[...(cur && !STARS.some(x=>x[0]===cur) ? [[cur,(ALLP?.players||[]).find(x=>x.id===cur)?.n||""]] : []), ...STARS];
-        return list.map(([id,n])=>`<button class="pf-av" data-av="p:${id}" aria-pressed="${me.av===`p:${id}`}" title="${esc(n)}"><img src="${HEADSHOT(id)}" alt="" loading="lazy"><small>${esc(n.split(" ").slice(-1)[0])}</small></button>`).join(""); })()}</div>
+        return list.map(([id,n])=>`<button class="pf-av" data-av="p:${id}" aria-pressed="${me.av===`p:${id}`}" title="${esc(n)}"><img src="${HEADSHOT(id)}" alt="" loading="lazy"><small>${esc(surname(n))}</small></button>`).join(""); })()}</div>
         <small class="muted">Liste: CBS Sports'un 2026-27 sezonu ilk 50 oyuncusu. Başka bir oyuncu için yukarıdan ara.</small>
       ${avImg(me.av)?`<button class="linkish" data-emo="" style="font-size:13px">Fotoğrafı kaldır</button>`:""}</div>
     <div class="pf-sec"><h4>Yedek tahmin</h4><small class="muted" style="margin:0 0 8px;display:block">Bir gece hiç tahmin yapmazsan ESPN favorileri senin yerine girer; doğru çıkan her 2 kazanan 1 puan.</small>
@@ -4523,7 +4531,7 @@ function paintProfile(){
   };
   $("#pfAvQ")?.addEventListener("input", e=>{ const q=slug(e.target.value||""); const box2=$("#pfAvs"); if(!box2) return;
     const list = q.length<2 ? STARS : (ALLP?.players||[]).filter(x=>slug(x.n).includes(q)).slice(0,30).map(x=>[x.id,x.n]);
-    box2.innerHTML = list.map(([id,n])=>`<button class="pf-av" data-av="p:${id}" title="${esc(n)}"><img src="${HEADSHOT(id)}" alt="" loading="lazy"><small>${esc(n.split(" ").slice(-1)[0])}</small></button>`).join("") || '<p class="muted">Oyuncu bulunamadı.</p>'; });
+    box2.innerHTML = list.map(([id,n])=>`<button class="pf-av" data-av="p:${id}" title="${esc(n)}"><img src="${HEADSHOT(id)}" alt="" loading="lazy"><small>${esc(surname(n))}</small></button>`).join("") || '<p class="muted">Oyuncu bulunamadı.</p>'; });
   $("#secChange").onclick=()=>openRecoverySheet(false);
   $("#adminBtn")?.addEventListener("click", openAdmin);
   $("#histBtn").onclick = () => openHistory();

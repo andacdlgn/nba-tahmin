@@ -1998,3 +1998,4 @@ body.trial-on #alert.sticky{top:calc(var(--top-h) + var(--strip-h) + env(safe-ar
   body.trial-on.bars-hidden #alert.sticky{top:var(--strip-h)}
 }
 .lb-inv{display:inline-flex;align-items:center;gap:6px;justify-content:center}.lb-inv svg{width:16px;height:16px}
+.sec-tip{font-size:13.5px;line-height:1.45;padding:9px 11px;margin:10px 0 4px;border-radius:10px;border-left:3px solid var(--amber);background:var(--panel-2);color:var(--ink)}
