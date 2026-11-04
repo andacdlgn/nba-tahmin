@@ -45,10 +45,11 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.18.0";
+const VERSION = "1.19.0";
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.19.0", d:"4 Kasım 2026", items:["Deneme haftası: 4–8 Kasım deneme ligi. Puanlar 9 Kasım pazartesi kendiliğinden sıfırlanır, profiller kalır; deneme tablosu Geçmiş ligler'e geçer. Üstte şerit ve ilk girişte açıklama penceresi var, 9 Kasım'da \"Lig başladı\" penceresi çıkar.","Düzeltme: lig sıfırlanınca önceki uzun vade turlarının puanları artık yeni lige taşınmıyor."]},
   {v:"1.18.0", d:"4 Kasım 2026", items:["Sohbette yanıtla: mesajın altındaki Yanıtla ile cevap ver; alıntıya dokununca asıl mesaja gidilir.","@etiketleme: @ yazınca oyuncu listesi açılır. Seni anan ya da sana yanıt veren mesaj vurgulu görünür, baloncukta @ işareti çıkar.","Yazıyor… göstergesi, gönderdikten sonra 2 dakika içinde düzenleme, tıklanabilir bağlantılar.","Yönetici bir mesajı sohbetin üstüne sabitleyebilir.","🔔 düğmesiyle sohbeti sessize al: baloncukta yalnızca seni anan mesajlar sayılır."]},
   {v:"1.17.2", d:"4 Kasım 2026", items:["Sohbette her mesaj grubunun üstünde gönderenin adı ve avatarı görünüyor; kendi mesajlarında \"(sen)\" yazıyor.","Sohbetteki 5 saniyede bir mesaj sınırı kalktı."]},
   {v:"1.17.1", d:"4 Kasım 2026", items:["Sohbette mesaj yokken görünen gereksiz \"Daha eski mesajlar\" düğmesi kalktı; sohbet açılamazsa açık bir uyarı çıkıyor."]},
@@ -1811,6 +1812,49 @@ function openScoringGuide(){
 <button class="btn-primary" id="pgOk" type="button">Anladım</button>`}</div>`);
   $("#pgOk").onclick=()=>closeSheet();
 }
+// Deneme haftasında ilk girişte bir kez; deneme bitince ilk girişte bir kez "Lig başladı"
+function maybeLeaguePop(){
+  if(!S.uid || S.onboard) return;
+  if(!$("#sheet").classList.contains("hide")) return setTimeout(maybeLeaguePop, 4000);
+  const t=S.league?.trial; if(!t?.end) return;
+  const nice=(d,o={day:"numeric",month:"long"})=>dayNice(d,o), go=shiftDay(t.end,1);
+  if(trialActive() && !lsGet("trialPop_"+t.end)){
+    lsSet("trialPop_"+t.end,"1");
+    return openSheet(`<div class="rules lg-pop"><div class="lg-ico">🧪</div><h3 id="shTitle">Bu hafta deneme haftası</h3>
+      <p><b>${nice(baseStart())} – ${nice(t.end)}</b> arası deneme ligi. Tahmin yap, puan topla, siteyi tanı: her şey gerçeği gibi sayılıyor.</p>
+      <p><b>${nice(go,{day:"numeric",month:"long",weekday:"long"})}</b> puanlar, rozetler ve istatistikler sıfırlanacak, asıl lig o gün başlayacak. Hesabın, profilin, avatarın ve ayarların olduğu gibi kalır. Deneme haftasının tablosu "Geçmiş ligler"de saklanır.</p>
+      <button class="btn-primary" type="button" id="lgPopOk">Anladım, oynamaya başla</button></div>`);
+    $("#lgPopOk").onclick=()=>closeSheet(); return;
+  }
+  const done = t.done || espnToday()>t.end;
+  if(done && !lsGet("leagueGo_"+go) && espnToday()<=shiftDay(go,13)){
+    lsSet("leagueGo_"+go,"1"); lsSet("trialPop_"+t.end,"1");
+    const h=(S.league?.history||[]).filter(x=>x.end===t.end).pop(), top=h?.rows?.[0];
+    openSheet(`<div class="rules lg-pop"><div class="lg-ico">🏁</div><h3 id="shTitle">Lig başladı!</h3>
+      <p>Deneme haftası bitti. Puanlar, rozetler ve istatistikler sıfırlandı; <b>${nice(go)} gecesinden itibaren her puan gerçek</b>.</p>
+      ${top?.pts?`<p>Deneme haftasının birincisi <b>${esc(top.name)}</b> (${top.pts} puan). Bütün tablo "Geçmiş ligler"de.</p>`:""}
+      <p>Bu hafta sohbette ve tahminlerde bol şans!</p>
+      <button class="btn-primary" type="button" id="lgPopOk">Hadi başlayalım</button></div>`); $("#lgPopOk").onclick=()=>closeSheet();
+    if(typeof confetti==="function") try{ confetti(); }catch(e){}
+  }
+}
+// Deneme bittiyse yönetici açtığında deneme tablosunu arşive yaz ve lig başlangıcını kalıcı yap
+async function maybeArchiveTrial(){
+  const t=trialOf(); if(!S.isAdmin || !t || espnToday()<=t.end || S.trialArchiving) return;
+  S.trialArchiving=true;
+  try{
+    S.lsRange=[baseStart(), t.end]; applyLeague();
+    const tt=seasonTotals(), nights={}; for(const n of nightsOf()) if(n.w.st==="w") nights[n.w.u]=(nights[n.w.u]||0)+1;
+    const rows=[...S.order].sort((a,b)=>(tt[b]||0)-(tt[a]||0)).map(u=>({uid:u, name:pname(u), pts:tt[u]||0, nights:nights[u]||0}));
+    const lt=Object.fromEntries(S.order.map(u=>[u, S.lt?.loaded?ltPoints(u):0]));
+    S.lsRange=null;
+    const entry={start:baseStart(), end:t.end, rows, at:new Date().toISOString(), name:t.name||"Deneme haftası", awards:[], lt};
+    const history=[...(S.league?.history||[]), ...(rows.some(r=>r.pts) ? [entry] : [])];
+    const next={...S.league, start:shiftDay(t.end,1), history, trial:{...t, done:true}};
+    await setDoc(doc(S.db,"league","settings"), next); S.league=next;
+  }catch(e){ S.lsRange=null; }
+  S.trialArchiving=false; applyLeague(); render();
+}
 function maybeScoringGuide(){ if(lsGet("pg1141") || S.onboard) return; if(!$("#sheet").classList.contains("hide")){ return setTimeout(maybeScoringGuide, 4000); } lsSet("pg1141","1"); openScoringGuide(); }
 function openRules(){
   openSheet(`<div class="rules"><h3 id="shTitle">Kurallar</h3><button class="btn pg-open" id="pgOpen" type="button">📖 Puanlama rehberi: bütün puanlar örnekleriyle</button>
@@ -2210,7 +2254,7 @@ function renderPuan(){
   const rv=S.players[S.uid]?.rival; let rivalBox="";
   if(rv && S.players[rv] && tot[rv]!=null){ const d=tot[S.uid]-tot[rv], wk=weekKey(S.today), wkP=u=>dayRows.filter(x=>weekKey(x.d)===wk).reduce((s,x)=>s+(x.pts[u]?.pts||0),0), wd=wkP(S.uid)-wkP(rv);
     rivalBox=`<div class="rival-card" style="--pc:${col(rv)}">${avatar(S.uid,"sm")}<span class="rv-vs">VS</span>${avatar(rv,"sm")}<span class="rv-t"><b>Rakibin ${esc(pname(rv))}</b><small>${d>0?`Sezonda ${d} puan öndesin`:d<0?`Sezonda ${-d} puan gerisindesin`:"Sezonda puanlar eşit"} · bu hafta ${wd>0?`+${wd}`:wd}</small></span><button class="linkish" data-pu="${rv}" type="button">Profil</button></div>`; }
-  let html = pod + rivalBox + `<div class="sec-title"><h2>Puan tablosu</h2><span class="aside">${S.league?.start ? dayNice(leagueStart(),{day:"numeric",month:"long"})+" gecesinden beri" : "sezon"}</span></div>
+  let html = pod + rivalBox + `<div class="sec-title"><h2>Puan tablosu</h2><span class="aside">${trialActive() ? `<span class="trial-tag">Deneme haftası</span> ${dayNice(shiftDay(trialOf().end,1),{day:"numeric",month:"long"})}'da sıfırlanır` : S.league?.start ? dayNice(leagueStart(),{day:"numeric",month:"long"})+" gecesinden beri" : "sezon"}</span></div>
     <div class="tbl"><div class="tr th t-lb"><span>#</span><span>Oyuncu</span><span class="r">Puan</span><span class="c">Gece</span><span class="c">Hafta</span><span class="c" title="Uzun vade puanı">UV</span></div>
     ${ranked.map((u,i)=>`<div class="tr t-lb${u===rv?" rival":""}${u===S.uid?" me":""}"><span class="muted">${i+1}</span><span class="pn"><i style="background:${col(u)}"></i><span>${S.players[u]?.club?`<b class="pn-club">${esc(S.players[u].club)}</b><small class="pn-name">${esc(pname(u))}</small>`:`<b class="pn-solo">${esc(pname(u))}</b>`}</span></span><span class="r big tnum">${tot[u]}</span><span class="c tnum">${wins[u]}</span><span class="c tnum">${wks[u]}</span><span class="c tnum">${S.lt?.loaded?ltPoints(u):"–"}</span></div>`).join("")}</div>
     <p class="muted" style="font-size:13px;margin:6px 2px">Gece: tek başına en çok puan aldığın geceler. Hafta: kazandığın haftalar (pazartesi–pazar). UV: uzun vade tahminlerinden gelen puan (Puan'a dahil).</p>`;
@@ -2610,6 +2654,8 @@ const lsSet = (k,v) => { try{ localStorage.setItem(k,v); }catch(e){} };
 function renderBanners(){
   const box=$("#banners"); if(!box) return;
   let html="";
+  const tr=trialActive() ? trialOf() : null;
+  if(tr && Date.now()>+(lsGet("trialBar")||0)) html += `<div class="banner trial"><span class="bn-i">🧪</span><span class="bn-t"><b>Deneme haftası · ${dayNice(baseStart(),{day:"numeric",month:"long"})}–${dayNice(tr.end,{day:"numeric",month:"long"})}</b> Puanlar, rozetler ve istatistikler ${dayNice(shiftDay(tr.end,1),{day:"numeric",month:"long",weekday:"long"})} sıfırlanacak; profilin ve ayarların kalır. Asıl lig o gün başlıyor.</span><button class="bn-x" data-bn="trial" aria-label="Kapat">✕</button></div>`;
   const n=S.notice;
   if(n?.text && lsGet("noticeSeen")!==String(n.at)) html += `<div class="banner notice"><span class="bn-i">${ICON.megaphone}</span><span class="bn-t">${esc(n.text)}</span><button class="bn-x" data-bn="notice" aria-label="Kapat">✕</button></div>`;
   const later=+(lsGet("mailNudge")||0);
@@ -2626,6 +2672,7 @@ $("#banners").addEventListener("click", e=>{
   const b=e.target.closest("[data-bn]"); if(!b) return;
   if(b.dataset.bn==="notice"){ lsSet("noticeSeen", String(S.notice?.at)); }
   if(b.dataset.bn==="later"){ lsSet("mailNudge", String(Date.now()+6*36e5)); }
+  if(b.dataset.bn==="trial"){ lsSet("trialBar", String(Date.now()+20*36e5)); }
   if(b.dataset.bn==="plater"){ lsSet("profileNudge", String(Date.now()+3*864e5)); }
   if(b.dataset.bn==="profile"){ openProfile("ayar"); setTimeout(()=>{ $(".pf-avtab")?.closest(".pf-sec")?.scrollIntoView({block:"start"}); }, 300); }
   if(b.dataset.bn==="mail"){ allPlayers().catch(()=>{}).finally(()=>openOnboard(5)); }
@@ -3288,6 +3335,7 @@ function ltCatPts(k, r, c, mine, sw, p){
 function ltPoints(u){
   let t=0;
   for(const [k,r] of Object.entries(S.lt.res)){
+    if(!ltInLeague(k)) continue;
     const d=S.lt.all[k]?.[u]; if(!d?.picks) continue;
     for(const [c,,p] of LT_CATS[ltType(k)]||[]){
       if(!r[c]) continue;
@@ -3611,19 +3659,29 @@ async function loadArchive(){
   S.archRaw = S.arch.scores;
   await loadLeague();
 }
-// Lig: yönetim panelinden sıfırlanınca yalnızca başlangıç gecesinden sonraki geceler sayılır
-const leagueStart = () => [S.cfg?.seasonStart||"", S.league?.start||""].sort().pop();
-const inLeague = d => d >= leagueStart();
+// Lig: yönetim panelinden sıfırlanınca yalnızca başlangıç gecesinden sonraki geceler sayılır.
+// Deneme haftası (league/settings.trial = {end, name}): bitiş gecesinden sonraki gün (TR 08.00) lig kendiliğinden sıfırlanır;
+// yönetici siteyi ilk açtığında deneme tablosu "Geçmiş ligler"e kaydedilir. scripts/sync.py da aynı günü kullanır.
+const baseStart = () => [S.cfg?.seasonStart||"", S.league?.start||""].sort().pop();
+const trialOf = () => { const t=S.league?.trial; return t?.end && !t.done && t.end>=baseStart() ? t : null; };
+const trialActive = () => { const t=trialOf(); return !!t && espnToday()<=t.end; };
+const trialOver = () => { const t=trialOf(); return !!t && espnToday()>t.end; };
+const leagueStart = () => { if(S.lsRange) return S.lsRange[0]; const t=trialOf(); return t && espnToday()>t.end ? shiftDay(t.end,1) : baseStart(); };
+const leagueEnd = () => S.lsRange ? S.lsRange[1] : "99999999";
+// uzun vade turları: yalnızca lig başladıktan sonra kilitlenen turlar sayılır (başlangıç gecesi TR 15.00)
+const dayMs = d => Date.UTC(+d.slice(0,4), +d.slice(4,6)-1, +d.slice(6,8), 12);
+const ltInLeague = k => { const l=ltLock(k), en=leagueEnd(); return l >= dayMs(leagueStart()) && (en==="99999999" || l < dayMs(shiftDay(en,1))); };
+const inLeague = d => d >= leagueStart() && d <= leagueEnd();
 async function loadLeague(){
   try{ const r=await getDoc(doc(S.db,"league","settings")); S.league = r.exists() ? r.data() : {}; }catch(e){ S.league = S.league || {}; }
   try{ const n=await getDoc(doc(S.db,"league","notice")); S.notice = n.exists() ? n.data() : null; }catch(e){}
   applyLeague();
 }
 function applyLeague(){
-  const raw=S.archRaw||S.arch.scores, st=leagueStart();
-  const days=Object.fromEntries(Object.entries(raw.days||{}).filter(([d])=>d>=st));
-  const games=Object.fromEntries(Object.entries(raw.games||{}).filter(([gid])=>(S.arch.games[gid]?.day||"")>=st));
-  const series=Object.fromEntries(Object.entries(raw.series||{}).filter(([,x])=>(x.day||"")>=st));
+  const raw=S.archRaw||S.arch.scores, st=leagueStart(), en=leagueEnd(), ok=d=>d>=st && d<=en;
+  const days=Object.fromEntries(Object.entries(raw.days||{}).filter(([d])=>ok(d)));
+  const games=Object.fromEntries(Object.entries(raw.games||{}).filter(([gid])=>ok(S.arch.games[gid]?.day||"")));
+  const series=Object.fromEntries(Object.entries(raw.series||{}).filter(([,x])=>ok(x.day||"")));
   // haftaları lig gecelerinden yeniden hesapla
   const weeks={};
   for(const [d,row] of Object.entries(days)) for(const [u,v] of Object.entries(row)){ const w=weekKey(d); (weeks[w] ||= {}); weeks[w][u]=(weeks[w][u]||0)+(v.tot ?? (v.pts+(v.sr||0))); }
@@ -3632,7 +3690,7 @@ function applyLeague(){
 }
 async function refresh(){
   // gün döndüyse (sabah 08.00) "bugün"ü ilerlet; kullanıcı bugündeyse onu da taşı
-  const nt=espnToday(); if(nt!==S.today){ if(S.day===S.today) S.day=nt; S.today=nt; renderDayLabel?.(); }
+  const nt=espnToday(); if(nt!==S.today){ if(S.day===S.today) S.day=nt; S.today=nt; renderDayLabel?.(); applyLeague(); maybeLeaguePop(); }
   const jobs=[loadDay(S.today,{force:true})];
   if(S.tab==="sonuclar" && S.rday && S.rday!==S.today) jobs.push(loadDay(S.rday,{force:true}));
   if(S.day!==S.today) jobs.push(loadDay(S.day,{force:true}));
@@ -4559,6 +4617,7 @@ async function openAdmin(){
   let banned=[];
   try{ const snap=await getDocs(collection(S.db,"banned")); snap.forEach(x=>banned.push({uid:x.id,...x.data()})); }catch(e){}
   await loadLeague();
+  try{ S.purge=(await getDoc(doc(S.db,"league","purge"))).data()||null; }catch(e){}
   const st=leagueStart(), hist=S.league?.history||[];
   const first=S.days[S.today]?.games.some(started);
   const opts=[[first?shiftDay(S.today,1):S.today, first?"Yarın geceden":"Bu geceden"], [shiftDay(S.today,first?2:1), first?"Öbür geceden":"Yarın geceden"]];
@@ -4584,7 +4643,14 @@ async function openAdmin(){
       <div class="adm-row"><select id="admStart" class="adm-in">${opts.map(([d,l])=>`<option value="${d}">${l} (${dayNice(d,{day:"numeric",month:"long"})})</option>`).join("")}<option value="custom">Başka bir gece…</option></select>
       <input type="date" id="admDate" class="adm-in hide"></div>
       <input id="admSeason" class="adm-in" maxlength="40" placeholder="Biten dönemin adı (ör. 2026 sonbaharı)" style="margin:8px 0">
-      <button class="btn danger" id="admReset" type="button">Ligi sıfırla / yeni sezon</button><small class="muted" id="admResetMsg"></small></div>
+      <label class="adm-trial"><input type="checkbox" id="admTrialOn"> Deneme haftası olarak başlat; puanlar şu tarihten sonra kendiliğinden sıfırlansın:</label>
+      <input type="date" id="admTrialEnd" class="adm-in hide" style="margin:6px 0 8px">
+      <button class="btn danger" id="admReset" type="button">Ligi sıfırla / yeni sezon</button><small class="muted" id="admResetMsg"></small>
+      ${trialOf()?`<p class="muted" style="margin:10px 0 0">🧪 Deneme haftası ${dayNice(trialOf().end,{day:"numeric",month:"long"})} gecesi bitiyor; ${dayNice(shiftDay(trialOf().end,1),{day:"numeric",month:"long"})} sabahı lig kendiliğinden sıfırlanır.</p>`:""}</div>
+    <div class="pf-sec"><h4>Herkesi sil (yeniden kayıt)</h4>
+      <p style="margin:0 0 8px;font-size:14px">Senin ve yöneticilerin dışındaki <b>bütün oyuncuların hesabı ve verisi</b> (tahminler, uzun vade seçimleri, sohbet, mail adresleri) kalıcı olarak silinir; aynı adla yeniden kayıt olabilirler. Sohbet de tamamen temizlenir. <b>Geri alınamaz.</b></p>
+      <div class="adm-row"><input id="admPurgeOk" class="adm-in" maxlength="10" placeholder='Onay için SİL yaz' autocomplete="off"><button class="btn danger" id="admPurge" type="button">Herkesi sil</button></div>
+      <small class="muted" id="admPurgeMsg">${S.purge?.state==="pending"?"Silme isteği sırada; yarım dakika içinde yapılır.":S.purge?.state==="done"?`Son silme: ${S.purge.n||0} oyuncu silindi.`:S.purge?.state==="error"?"Son silme isteği yapılamadı.":""}</small></div>
     <div class="pf-sec"><h4>Oyuncular</h4><div class="adm-pl">${S.order.map(u=>`<div class="adm-p">${avatar(u,"sm")}<span><b>${esc(pname(u))}</b><small>${tot[u]??0} puan · ${new Date(S.players[u].joined).toLocaleDateString(LOC,{timeZone:TZ,day:"numeric",month:"long"})} katıldı</small></span>
       ${u===S.uid?'<small class="muted">sen</small>':`<button class="btn danger sm" data-kick="${u}" type="button">Ligden çıkar</button>`}</div>`).join("")}</div>
       ${banned.length?`<h4 style="margin-top:12px">Çıkarılanlar</h4><div class="adm-pl">${banned.map(b=>`<div class="adm-p"><span class="av sm empty">?</span><span><b>${esc(b.name||"?")}</b><small>tekrar katılamaz</small></span><button class="btn sm" data-unban="${b.uid}" type="button">Geri al</button></div>`).join("")}</div>`:""}
@@ -4599,6 +4665,17 @@ async function openAdmin(){
       <small class="muted" id="admNoticeMsg"></small></div>`;
   $("#admLT")?.addEventListener("click", ()=>allPlayers().catch(()=>{}).then(openLTAdmin));
   $("#admStart").onchange=()=>$("#admDate").classList.toggle("hide", $("#admStart").value!=="custom");
+  $("#admTrialOn").onchange=()=>$("#admTrialEnd").classList.toggle("hide", !$("#admTrialOn").checked);
+  $("#admPurge").onclick=async()=>{
+    const v=($("#admPurgeOk").value||"").trim().toLocaleUpperCase("tr");
+    if(v!=="SİL"){ $("#admPurgeMsg").textContent='Onaylamak için kutuya SİL yaz.'; return; }
+    try{ await setDoc(doc(S.db,"league","purge"), {state:"pending", by:S.uid, at:serverTimestamp()}); $("#admPurgeMsg").textContent="Silme isteği gönderildi; arka plan görevi yarım dakika içinde yapar. Bu pencere sonucu gösterecek.";
+      const t0=Date.now(); const poll=async()=>{ const d=(await getDoc(doc(S.db,"league","purge")).catch(()=>null))?.data(); S.purge=d;
+        if(d?.state==="done"){ $("#admPurgeMsg").textContent=`Tamam: ${d.n||0} oyuncu silindi. Sayfa yenileniyor…`; setTimeout(()=>location.reload(), 2500); return; }
+        if(d?.state==="error"){ $("#admPurgeMsg").textContent="Silinemedi: "+(d.err||"bilinmeyen hata"); return; }
+        if(Date.now()-t0<10*60e3 && $("#admPurgeMsg")) setTimeout(poll, 5000); }; setTimeout(poll, 5000);
+    }catch(e){ $("#admPurgeMsg").textContent="İstek gönderilemedi."; }
+  };
   $("#admReset").onclick=e=>confirmBtn(e.currentTarget,"Emin misin? Tekrar dokun",async()=>{
     let ns=$("#admStart").value; if(ns==="custom"){ const v=$("#admDate").value; if(!v){ $("#admResetMsg").textContent="Bir tarih seç."; return; } ns=v.replaceAll("-",""); }
     const t=seasonTotals(), nights={}; for(const n of nightsOf()) if(n.w.st==="w") nights[n.w.u]=(nights[n.w.u]||0)+1;
@@ -4607,7 +4684,12 @@ async function openAdmin(){
     const entry={start:leagueStart(), end:shiftDay(ns,-1), rows, at:new Date().toISOString(), name:($("#admSeason").value||"").trim().slice(0,40), awards:aw,
       lt:Object.fromEntries(S.order.map(u=>[u, S.lt?.loaded?ltPoints(u):0]))};
     const history=[...(S.league?.history||[]), ...(rows.some(r=>r.pts) ? [entry] : [])];
-    try{ await setDoc(doc(S.db,"league","settings"), {start:ns, history}); S.league={start:ns, history}; applyLeague(); render(); toast("Lig sıfırlandı."); openAdmin(); }
+    let trial=null;
+    if($("#admTrialOn").checked){ const te=($("#admTrialEnd").value||"").replaceAll("-","");
+      if(!/^\d{8}$/.test(te) || te<ns){ $("#admResetMsg").textContent="Deneme haftasının bitiş gecesini seç (başlangıçtan sonra)."; return; }
+      trial={end:te, name:"Deneme haftası"}; }
+    const next={start:ns, history, ...(trial?{trial}:{})};
+    try{ await setDoc(doc(S.db,"league","settings"), next); S.league=next; applyLeague(); render(); renderBanners(); toast(trial?"Lig deneme haftasıyla başladı.":"Lig sıfırlandı."); openAdmin(); }
     catch(err){ $("#admResetMsg").textContent="Kaydedilemedi, tekrar dene."; }
   });
   $("#adm").addEventListener("click", async e=>{ const rd=e.target.closest("[data-repdel]"); if(rd){ try{ await deleteDoc(doc(S.db,"reports",rd.dataset.repdel)); rd.closest(".adm-rep").remove(); }catch(x){ toast("Silinemedi."); } return; } });
@@ -4684,8 +4766,8 @@ if("serviceWorker" in navigator && location.protocol==="https:") navigator.servi
     route(); showDay(); Promise.resolve(refresh()).catch(()=>{}).finally(()=>dispatchEvent(new Event("app-ready")));
     if(S.onboard){ if(S.joinP) await S.joinP.catch(()=>{}); await loadPlayers().catch(()=>{}); allPlayers().catch(()=>{}).finally(()=>openOnboard(4)); }
     else checkRecovery();
-    loadLT(); setTimeout(installBanner, 6000); maybeNews(); maybeCeremony(); later(markSeen, 3000); setTimeout(()=>later(maybeScoringGuide,0), 4500); setTimeout(()=>later(maybeAskAuto, 0), 9000);
-    later(()=>{ getDoc(doc(S.db,"config","admin")).then(()=>{ S.isAdmin=true; }).catch(()=>{ S.isAdmin=false; });
+    loadLT(); setTimeout(installBanner, 6000); maybeNews(); maybeCeremony(); later(markSeen, 3000); setTimeout(()=>later(maybeLeaguePop,0), 3000); setTimeout(()=>later(maybeScoringGuide,0), 4500); setTimeout(()=>later(maybeAskAuto, 0), 9000);
+    later(()=>{ getDoc(doc(S.db,"config","admin")).then(()=>{ S.isAdmin=true; maybeArchiveTrial(); }).catch(()=>{ S.isAdmin=false; });
       getDoc(doc(S.db,"config","secret")).then(r=>{ S.invite=r.data()?.invite||""; }).catch(()=>{});
       allPlayers().catch(()=>{}); }, 2000);
     getDoc(doc(S.db,"contacts",S.uid)).then(r=>{ S.contact = r.exists() ? r.data() : {email:"",remind:false}; }).catch(()=>{}).finally(()=>{ S.contactLoaded=true; renderBanners(); maybeAskMail(); });

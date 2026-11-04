@@ -308,10 +308,30 @@ def fs_list(coll):
     return {x["name"].rsplit("/", 1)[1]: {k: fs_value(v) for k, v in x.get("fields", {}).items()} for x in d.get("documents", [])}
 
 
-def lt_scores(players):
-    """Sonuçlanan uzun vade turlarının puanları: {uid: {tur: puan}} ve her turun gün anahtarı."""
+def lt_lock(k):
+    """Uzun vade turunun kilit anı (app.js ltLock ile aynı)."""
+    if k[0] == "w":
+        return datetime(int(k[2:6]), int(k[6:8]), int(k[8:10]), tzinfo=timezone.utc) + timedelta(hours=71)
+    if k[0] == "m":
+        return datetime(int(k[2:6]), int(k[6:8]), 15, 17, tzinfo=timezone.utc)
+    if k[0] == "c":
+        return datetime(2026, 12, 4, 17, tzinfo=timezone.utc)
+    if k[0] == "k":
+        return datetime(2026, 12, 1, 17, tzinfo=timezone.utc)
+    return datetime(2027, 1, 15, 17, tzinfo=timezone.utc)
+
+
+def lt_scores(players, league_start="00000000"):
+    """Sonuçlanan uzun vade turlarının puanları: {uid: {tur: puan}} ve her turun gün anahtarı.
+    Yalnızca lig başladıktan sonra (başlangıç gecesi 12.00 UTC) kilitlenen turlar sayılır."""
     out, days = {}, {}
+    ls = datetime(int(league_start[:4]), int(league_start[4:6]), int(league_start[6:8]), 12, tzinfo=timezone.utc) if league_start[:4] != "0000" else None
     for k, r in fs_list("ltResults").items():
+        try:
+            if ls and lt_lock(k) < ls:
+                continue
+        except (ValueError, IndexError):
+            pass
         cats = LT_PTS.get(k[:1], {})
         if not any(r.get(c) for c in cats):
             continue
@@ -758,6 +778,13 @@ def main(full=False):
     # 2) puanlar — yalnızca ligin başladığı geceden itibaren (yönetim panelinden sıfırlanabilir)
     league = fs_doc("league/settings") or {}
     league_start = max(CONFIG["seasonStart"], str(league.get("start") or ""))
+    # deneme haftası: bitiş gecesinden sonraki gün (TR 08.00) lig kendiliğinden sıfırlanır (app.js leagueStart ile aynı an)
+    trial = league.get("trial") or {}
+    if isinstance(trial, dict) and trial.get("end") and not trial.get("done") and str(trial["end"]) >= league_start:
+        tr_today = (datetime.now(TR_TZ) - timedelta(hours=8)).strftime("%Y%m%d")
+        if tr_today > str(trial["end"]):
+            nxt = (datetime.strptime(str(trial["end"]), "%Y%m%d") + timedelta(days=1)).strftime("%Y%m%d")
+            league_start = max(league_start, nxt)
     players = fs_players()
     old = load("scores.json", {})
     sc = {"players": players, "games": old.get("games", {}), "days": old.get("days", {})}
@@ -892,7 +919,7 @@ def main(full=False):
                     tot[uid]["aw"] = tot[uid].get("aw", 0) + x["pts"]
     # uzun vade puanları: toplama ve sonucun açıklandığı haftaya eklenir
     try:
-        lt, lt_days = lt_scores(players)
+        lt, lt_days = lt_scores(players, league_start)
     except Exception as e:
         print("Uzun vade puanları alınamadı:", e)
         lt, lt_days = {}, {}

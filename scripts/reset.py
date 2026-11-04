@@ -86,6 +86,13 @@ def main():
         r.reference.delete()
         print(r.id[:6], state)
 
+    # yönetim panelindeki "Herkesi sil" isteği (varsa)
+    try:
+        import purge
+        purge.run(db)
+    except Exception as e:
+        print("silme görevi hatası:", type(e).__name__)
+
     # bir günden eski sonuç kayıtlarını temizle
     old = now - timedelta(days=1)
     for s in db.collection("resetStatus").where(filter=FieldFilter("at", "<", old)).stream():
