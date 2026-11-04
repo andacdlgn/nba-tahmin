@@ -45,10 +45,11 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.20.0";
+const VERSION = "1.21.0";
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.21.0", d:"4 Kasım 2026", items:["Üst çubukta İstekler düğmesi: sorun, istek, öneri ya da soru yaz; doğrudan lig yöneticisinin mailine gider, yönetici yanıtlayınca cevap senin mailine gelir."]},
   {v:"1.20.0", d:"4 Kasım 2026", items:["Otomatik tahmin (eski adıyla yedek tahmin) kayıt sırasında zorunlu bir seçim oldu; Profil → Ayarlar'ın en üstünde açık/kapalı durumu görünüyor.","Kurallar ve Puanlama rehberi baştan gözden geçirildi: otomatik tahmin, deneme haftası, sohbet, mail ve konferans sıralaması puanları eklendi; playoff'ta neyin katlandığı netleşti."]},
   {v:"1.19.5", d:"4 Kasım 2026", items:["Düzeltme: deneme haftası penceresindeki \"Anladım, oynamaya başla\" düğmesi pencereyi kapatmıyordu.","Bir pencere kapatılamaz durumda kalmasın diye her yeni pencere kilitsiz açılıyor."]},
   {v:"1.19.4", d:"4 Kasım 2026", items:["Kayıtta mail adresi artık atlanamıyor; onay kodu istersen sonra Profil → Ayarlar'dan girilebiliyor. Kod girilene kadar hiçbir mail gönderilmiyor.","Favori takım adımında Takımım sekmesi anlatılıyor.","Oyuncu adlarında son ek düzeltmesi: \"III\" yerine \"Murphy III\", \"Jr.\" yerine \"Jackson Jr.\" yazıyor."]},
@@ -119,14 +120,26 @@ const CHANGELOG = [
     "Sürüm numaraları artık 1.1.0 biçiminde; her yenilik burada listelenir."]},
   {v:"1.0.0", d:"Ekim–Kasım 2026", items:["Günlük tahminler, uzun vade, NBA Kupası, Tahminler sekmesi ve daha önceki her şey (eski v1–v33 sürümleri)."]},
 ];
-function openReport(){
-  openSheet(`<h3 id="shTitle">Sorun bildir</h3><p class="muted">Ne oldu, nerede oldu? Kısaca yaz; sürüm, cihaz ve açık sekme bilgisi otomatik eklenir. Yönetici görür.</p>
-    <textarea id="repText" class="adm-in" rows="5" maxlength="1000" placeholder="ör. Uzun vade sekmesinde oyuncu seçince ekran donuyor"></textarea>
+// İstekler: sorun, istek / öneri, soru → reports/{id}; arka plan görevi yöneticinin mailine yollar (yanıt, bildirenin onaylı adresine gider)
+const REP_KINDS = [["sorun","🐞 Sorun / hata"],["istek","💡 İstek / öneri"],["soru","❓ Soru"],["diger","💬 Diğer"]];
+function openReport(kind){
+  S.repKind = kind || S.repKind || "";
+  const mailOk = S.contact?.verified && S.contact?.email;
+  openSheet(`<h3 id="shTitle">İstekler ve sorunlar</h3><p class="muted">Bir sorun mu var, bir şey mi istiyorsun, aklına bir soru mu takıldı? Yaz, doğrudan lig yöneticisinin mail kutusuna gider. ${mailOk?`Cevap <b>${esc(S.contact.email)}</b> adresine gelebilir.`:`Mail adresini onaylarsan cevap doğrudan mailine gelebilir.`}</p>
+    <div class="rep-k">${REP_KINDS.map(([k,l])=>`<button type="button" data-rk="${k}" aria-pressed="${S.repKind===k}">${l}</button>`).join("")}</div>
+    <textarea id="repText" class="adm-in" rows="6" maxlength="1000" placeholder="ör. Uzun vade sekmesinde oyuncu seçince ekran donuyor · ör. Maç sonu skor kartı sohbete düşsün"></textarea>
+    <small class="muted" id="repCnt" style="display:block;text-align:right">0/1000</small>
+    <p class="muted" style="font-size:12.5px;margin:4px 0 0">Sürüm, cihaz ve açık sekme bilgisi sorunu bulmak için otomatik eklenir.</p>
     <p class="err" id="repErr"></p><button class="btn-primary" id="repSend" type="button">Gönder</button>`);
-  $("#repSend").onclick=async()=>{ const t=$("#repText").value.trim(); if(t.length<5) return $("#repErr").textContent="Biraz daha ayrıntı yaz.";
+  $("#sheet .rep-k").onclick=e=>{ const b=e.target.closest("[data-rk]"); if(!b) return; S.repKind=b.dataset.rk; $$("#sheet [data-rk]").forEach(x=>x.setAttribute("aria-pressed", x===b)); $("#repErr").textContent=""; };
+  $("#repText").oninput=()=>{ $("#repCnt").textContent=`${$("#repText").value.length}/1000`; };
+  $("#repSend").onclick=async()=>{ const t=$("#repText").value.trim();
+    if(!S.repKind) return $("#repErr").textContent="Önce ne tür bir mesaj olduğunu seç.";
+    if(t.length<5) return $("#repErr").textContent="Biraz daha ayrıntı yaz.";
+    if(chatProblem(t)) return $("#repErr").textContent="Mesajda küfür ya da hakaret var, gönderilmedi.";
     $("#repSend").disabled=true;
-    try{ await setDoc(doc(S.db,"reports",randHex(10)), {uid:S.uid, text:t, v:VERSION, tab:S.tab||"", ua:navigator.userAgent.slice(0,180), w:innerWidth, at:serverTimestamp()});
-      closeSheet(); toast("Teşekkürler, bildirimin iletildi."); }
+    try{ await setDoc(doc(S.db,"reports",randHex(10)), {uid:S.uid, kind:S.repKind, text:t, v:VERSION, tab:S.tab||"", ua:navigator.userAgent.slice(0,180), w:innerWidth, at:serverTimestamp()});
+      S.repKind=""; closeSheet(); toast("Teşekkürler, mesajın yöneticiye iletildi."); }
     catch(e){ $("#repErr").textContent="Gönderilemedi, tekrar dene."; $("#repSend").disabled=false; } };
 }
 function openNews(all=false){
@@ -1908,6 +1921,7 @@ function openRules(){
 }
 $("#rulesBtn").onclick = openRules;
 $("#scoreBtn").onclick = openScoringGuide;
+$("#reqBtn").onclick = ()=>openReport();
 document.addEventListener("click", e=>{ if(e.target.closest("#pgOpen, #pgFoot")) openScoringGuide(); });
 
 /* ====================================================== SONUÇLAR */
@@ -4658,7 +4672,7 @@ async function openAdmin(){
           <span class="${c?.verified?"ok":"bad"}">${c?.verified?"mail onaylı":c?.email?"mail onaysız":"mail yok"}</span>
           <span class="muted">${(()=>{ const nights=Object.values(S.arch.scores.days||{}).filter(r=>r[u]?.n).length, sn=S.players[u]?.seen; const ago=sn?Math.round((Date.now()-sn)/36e5):null;
             return `${nights} gece oynadı · son giriş ${ago==null?"bilinmiyor":ago<1?"az önce":ago<24?ago+" sa önce":Math.round(ago/24)+" gün önce"}${S.players[u]?.autoPick?" · otomatik tahmin açık":""}`; })()}</span></div>`; }).join("")}</div></div>
-    <div class="pf-sec"><h4>Sorun bildirimleri ${reports.length?`<span class="pill-n">${reports.length}</span>`:""}</h4>${reports.length?reports.map(r=>`<div class="adm-rep"><div><b style="color:${col(r.uid)}">${esc(pname(r.uid))}</b> <small class="muted">${r.at?.toDate?r.at.toDate().toLocaleString(LOC,{timeZone:TZ,day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}):""} · ${esc(r.v||"")} · ${esc(r.tab||"")}</small></div><p>${esc(r.text||"")}</p><small class="muted">${esc(r.ua||"")}</small><button class="btn sm danger" data-repdel="${r.id}" type="button">Çözüldü, sil</button></div>`).join(""):'<small class="muted">Bildirim yok.</small>'}</div>`;
+    <div class="pf-sec"><h4>İstekler ve sorunlar ${reports.length?`<span class="pill-n">${reports.length}</span>`:""}</h4>${reports.length?reports.map(r=>`<div class="adm-rep"><div><b style="color:${col(r.uid)}">${esc(pname(r.uid))}</b> <span class="pill-k">${esc((REP_KINDS.find(x=>x[0]===r.kind)||REP_KINDS[0])[1])}</span> <small class="muted">${r.at?.toDate?r.at.toDate().toLocaleString(LOC,{timeZone:TZ,day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}):""} · ${esc(r.v||"")} · ${esc(r.tab||"")}</small></div><p>${esc(r.text||"")}</p><small class="muted">${esc(r.ua||"")}</small><button class="btn sm danger" data-repdel="${r.id}" type="button">Çözüldü, sil</button></div>`).join(""):'<small class="muted">Bildirim yok.</small>'}</div>`;
   $("#adm").innerHTML = summary + `
     <div class="pf-sec"><h4>Lig</h4>
       <p class="muted" style="margin:0 0 8px">Şu anki lig <b>${dayNice(st,{day:"numeric",month:"long"})}</b> gecesinden beri sayılıyor${hist.length?`, ${hist.length} geçmiş lig var`:""}.</p>

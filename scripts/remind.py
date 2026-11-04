@@ -141,7 +141,7 @@ class Mailer:
             msg["Message-ID"] = make_msgid(domain=(self.user.split("@")[-1] if "@" in self.user else "nbatahmin.app"))
         if not msg["List-Unsubscribe"] and self.user:
             msg["List-Unsubscribe"] = f"<mailto:{self.user}?subject=unsubscribe>, <{SITE}>"
-        if self.user:
+        if self.user and not msg["Reply-To"]:
             msg["Reply-To"] = formataddr(("NBA Tahmin", self.user))
         # otomatik bildirim olduğunu açıkça söyleyen başlıklar (otomatik yanıtları da engeller)
         msg["Auto-Submitted"] = "auto-generated"
@@ -459,10 +459,32 @@ def lt_lock_mail(db, out):
 
 
 # ---------------------------------------------------------------- 2d) sorun bildirimleri -> yönetici
+KIND_TR = {"sorun": "Sorun", "istek": "İstek / öneri", "soru": "Soru", "diger": "Diğer"}
+
+
+def admin_mails(db):
+    """Gönderen Gmail hesabı + yöneticilerin onaylı mail adresleri (tekrarsız)."""
+    out = []
+    me = os.environ.get("GMAIL_USER", "").strip()
+    if me:
+        out.append(me)
+    try:
+        adm = db.collection("config").document("admin").get()
+        for uid in (adm.to_dict() or {}).get("uids", []) if adm.exists else []:
+            c = db.collection("contacts").document(uid).get()
+            c = c.to_dict() if c.exists else {}
+            e = (c or {}).get("email", "").strip()
+            if c.get("verified") and "@" in e and e.lower() not in [x.lower() for x in out]:
+                out.append(e)
+    except Exception as e:
+        print("yönetici adresleri alınamadı:", type(e).__name__)
+    return out
+
+
 def report_mail(db, mail):
-    """Yeni "sorun bildir" mesajlarını yöneticinin adresine (gönderen Gmail hesabı) bir kez yollar."""
-    to = os.environ.get("GMAIL_USER", "").strip()
-    if not to:
+    """Yeni istek / sorun bildirimlerini yöneticilere bir kez mail olarak yollar; yanıtla deyince bildirenin onaylı adresine gider."""
+    tos = admin_mails(db)
+    if not tos:
         return
     pl = None
     for r in db.collection("reports").stream():
@@ -473,12 +495,28 @@ def report_mail(db, mail):
         if pl is None:
             pl = {x.id: (x.to_dict() or {}).get("name", "?") for x in db.collection("players").stream()}
         who = pl.get(d.get("uid"), "?")
-        text = f"{who} bir sorun bildirdi (sürüm {d.get('v', '?')}, sekme {d.get('tab', '?')}, ekran {d.get('w', '?')} px):\n\n{d.get('text', '')}\n\n{d.get('ua', '')}"
-        inner = (f'<p style="margin:0 0 10px"><b>{escape(who)}</b> bir sorun bildirdi.</p>'
+        kind = KIND_TR.get(d.get("kind"), "Sorun")
+        reply = None
+        try:
+            c = db.collection("contacts").document(d.get("uid") or "-").get()
+            c = c.to_dict() if c.exists else {}
+            if c and c.get("verified") and "@" in (c.get("email") or ""):
+                reply = c["email"].strip()
+        except Exception:
+            pass
+        text = (f"{who} yeni bir bildirim gönderdi: {kind}\n(sürüm {d.get('v', '?')}, sekme {d.get('tab', '?')}, ekran {d.get('w', '?')} px)\n\n{d.get('text', '')}\n\n"
+                + (f"Yanıtla dersen cevabın {reply} adresine gider.\n" if reply else "Bu oyuncunun onaylı mail adresi yok; cevabı sitede ya da sohbette verebilirsin.\n") + f"\n{d.get('ua', '')}")
+        inner = (f'<p style="margin:0 0 10px"><b>{escape(who)}</b> yeni bir bildirim gönderdi: <b>{escape(kind)}</b></p>'
                  f'<p style="margin:0 0 10px;padding:10px;background:#f2f4f7;border-radius:8px;white-space:pre-wrap">{escape(d.get("text", ""))}</p>'
-                 f'<p style="margin:0 0 12px;color:#5f6b78;font-size:12px">Sürüm {escape(str(d.get("v", "?")))} · sekme {escape(str(d.get("tab", "?")))} · {escape(str(d.get("ua", "")))}</p>')
-        msg = build(to, f"Sorun bildirimi: {who}", text, card("Sorun bildirimi", "yönetim", inner, "Yönetim paneline git"), "", "bildirim")
-        if mail.send(msg) and not mail.dry:
+                 + (f'<p style="margin:0 0 10px">Yanıtla dersen cevabın <b>{escape(reply)}</b> adresine gider.</p>' if reply else '<p style="margin:0 0 10px">Bu oyuncunun onaylı mail adresi yok; cevabı sitede ya da sohbette verebilirsin.</p>')
+                 + f'<p style="margin:0 0 12px;color:#5f6b78;font-size:12px">Sürüm {escape(str(d.get("v", "?")))} · sekme {escape(str(d.get("tab", "?")))} · {escape(str(d.get("ua", "")))}</p>')
+        ok = False
+        for to in tos:
+            msg = build(to, f"{kind}: {who}", text, card(f"NBA Tahmin · {kind}", "yönetim", inner, "Yönetim paneline git"), "", "bildirim")
+            if reply:
+                msg["Reply-To"] = formataddr((who, reply))
+            ok = mail.send(msg) or ok
+        if ok and not mail.dry:
             ref.set({"at": firestore.SERVER_TIMESTAMP})
 
 

@@ -80,7 +80,8 @@ service cloud.firestore {
     match /reports/{id} {
       allow read, delete: if isAdmin();
       allow create: if isPlayer() && id.size() >= 10 && id.size() <= 40
-        && request.resource.data.keys().hasOnly(['uid', 'text', 'v', 'tab', 'ua', 'w', 'at'])
+        && request.resource.data.keys().hasOnly(['uid', 'kind', 'text', 'v', 'tab', 'ua', 'w', 'at'])
+        && (!('kind' in request.resource.data) || request.resource.data.kind in ['sorun', 'istek', 'soru', 'diger'])
         && request.resource.data.uid == request.auth.uid
         && str(request.resource.data.text, 1000)
         && request.resource.data.at == request.time;

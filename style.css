@@ -2006,3 +2006,13 @@ body.trial-on #alert.sticky{top:calc(var(--top-h) + var(--strip-h) + env(safe-ar
 .pf-st.on{background:var(--win,#2e9e6a);color:#fff}
 h3 .req{font-size:11.5px;font-weight:700;color:var(--muted);margin-left:6px;font-family:inherit}
 .ob-auto{margin-top:4px}
+
+/* 1.21.0 İstekler düğmesi ve formu */
+.req-btn{display:inline-flex;align-items:center;gap:6px}.req-btn svg{width:18px;height:18px;flex:none}
+@media (max-width:560px){ .req-btn span{display:none} .req-btn{width:38px;padding:0;justify-content:center} }
+@media (max-width:430px){ .req-btn{width:34px;height:34px} }
+@media (max-width:390px){ .rules-btn:not(.inv-btn):not(.req-btn){padding:0 5px;font-size:12px} .tb-right{gap:3px} .topbar .icon-btn,.inv-btn,.req-btn{width:32px;height:32px} }
+.rep-k{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+.rep-k button{border:1px solid var(--line);background:var(--panel-2);color:var(--ink);border-radius:999px;padding:7px 12px;font-weight:700;font-size:13.5px;cursor:pointer}
+.rep-k button[aria-pressed="true"]{border-color:var(--amber);background:color-mix(in srgb,var(--amber) 22%,var(--panel-2))}
+.pill-k{font-size:11.5px;font-weight:700;color:var(--muted);margin-left:4px}
