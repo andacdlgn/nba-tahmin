@@ -45,10 +45,11 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.19.0";
+const VERSION = "1.19.1";
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.19.1", d:"4 Kasım 2026", items:["Deneme haftası boyunca en üstte sabit, kapatılamayan bir \"DENEME HAFTASI\" şeridi var; asıl lige kaç gün kaldığını yazıyor, dokununca açıklama açılıyor."]},
   {v:"1.19.0", d:"4 Kasım 2026", items:["Deneme haftası: 4–8 Kasım deneme ligi. Puanlar 9 Kasım pazartesi kendiliğinden sıfırlanır, profiller kalır; deneme tablosu Geçmiş ligler'e geçer. Üstte şerit ve ilk girişte açıklama penceresi var, 9 Kasım'da \"Lig başladı\" penceresi çıkar.","Düzeltme: lig sıfırlanınca önceki uzun vade turlarının puanları artık yeni lige taşınmıyor."]},
   {v:"1.18.0", d:"4 Kasım 2026", items:["Sohbette yanıtla: mesajın altındaki Yanıtla ile cevap ver; alıntıya dokununca asıl mesaja gidilir.","@etiketleme: @ yazınca oyuncu listesi açılır. Seni anan ya da sana yanıt veren mesaj vurgulu görünür, baloncukta @ işareti çıkar.","Yazıyor… göstergesi, gönderdikten sonra 2 dakika içinde düzenleme, tıklanabilir bağlantılar.","Yönetici bir mesajı sohbetin üstüne sabitleyebilir.","🔔 düğmesiyle sohbeti sessize al: baloncukta yalnızca seni anan mesajlar sayılır."]},
   {v:"1.17.2", d:"4 Kasım 2026", items:["Sohbette her mesaj grubunun üstünde gönderenin adı ve avatarı görünüyor; kendi mesajlarında \"(sen)\" yazıyor.","Sohbetteki 5 saniyede bir mesaj sınırı kalktı."]},
@@ -2655,7 +2656,10 @@ function renderBanners(){
   const box=$("#banners"); if(!box) return;
   let html="";
   const tr=trialActive() ? trialOf() : null;
-  if(tr && Date.now()>+(lsGet("trialBar")||0)) html += `<div class="banner trial"><span class="bn-i">🧪</span><span class="bn-t"><b>Deneme haftası · ${dayNice(baseStart(),{day:"numeric",month:"long"})}–${dayNice(tr.end,{day:"numeric",month:"long"})}</b> Puanlar, rozetler ve istatistikler ${dayNice(shiftDay(tr.end,1),{day:"numeric",month:"long",weekday:"long"})} sıfırlanacak; profilin ve ayarların kalır. Asıl lig o gün başlıyor.</span><button class="bn-x" data-bn="trial" aria-label="Kapat">✕</button></div>`;
+  const strip=$("#trialStrip");
+  if(strip){ strip.classList.toggle("hide", !tr); document.body.classList.toggle("trial-on", !!tr);
+    if(tr){ const left=Math.max(0, Math.round((parseYmd(shiftDay(tr.end,1))-parseYmd(espnToday()))/864e5));
+      strip.innerHTML=`<span class="ts-tag">🧪 DENEME HAFTASI</span><span class="ts-t">${dayNice(baseStart(),{day:"numeric",month:"long"})}–${dayNice(tr.end,{day:"numeric",month:"long"})} · puanlar ${dayNice(shiftDay(tr.end,1),{day:"numeric",month:"long"})} pazartesi sıfırlanacak${left?` · asıl lige ${left} gün`:""}</span>`; } }
   const n=S.notice;
   if(n?.text && lsGet("noticeSeen")!==String(n.at)) html += `<div class="banner notice"><span class="bn-i">${ICON.megaphone}</span><span class="bn-t">${esc(n.text)}</span><button class="bn-x" data-bn="notice" aria-label="Kapat">✕</button></div>`;
   const later=+(lsGet("mailNudge")||0);
@@ -2668,11 +2672,11 @@ function renderBanners(){
     <span class="bn-acts"><button class="btn sm" data-bn="profile">Seç</button><button class="linkish" data-bn="plater">Sonra</button></span></div>`;
   box.innerHTML=html;
 }
+$("#trialStrip").onclick=()=>{ lsSet("trialPop_"+(S.league?.trial?.end||""), ""); try{ localStorage.removeItem("trialPop_"+(S.league?.trial?.end||"")); }catch(e){} maybeLeaguePop(); };
 $("#banners").addEventListener("click", e=>{
   const b=e.target.closest("[data-bn]"); if(!b) return;
   if(b.dataset.bn==="notice"){ lsSet("noticeSeen", String(S.notice?.at)); }
   if(b.dataset.bn==="later"){ lsSet("mailNudge", String(Date.now()+6*36e5)); }
-  if(b.dataset.bn==="trial"){ lsSet("trialBar", String(Date.now()+20*36e5)); }
   if(b.dataset.bn==="plater"){ lsSet("profileNudge", String(Date.now()+3*864e5)); }
   if(b.dataset.bn==="profile"){ openProfile("ayar"); setTimeout(()=>{ $(".pf-avtab")?.closest(".pf-sec")?.scrollIntoView({block:"start"}); }, 300); }
   if(b.dataset.bn==="mail"){ allPlayers().catch(()=>{}).finally(()=>openOnboard(5)); }
