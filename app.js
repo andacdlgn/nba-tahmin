@@ -45,10 +45,11 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.17.0";
+const VERSION = "1.17.1";
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.17.1", d:"4 Kasım 2026", items:["Sohbette mesaj yokken görünen gereksiz \"Daha eski mesajlar\" düğmesi kalktı; sohbet açılamazsa açık bir uyarı çıkıyor."]},
   {v:"1.17.0", d:"4 Kasım 2026", items:["Lig sohbeti: sağ alttaki baloncuktan herkesin yazdığı ortak sohbete gir. Mesajlar canlı akar, okunmamış mesaj sayısı baloncukta görünür.","Mesajlara emoji tepkisi bırakabilir, kendi mesajını silebilirsin. 5 saniyede bir mesaj, en fazla 500 karakter.","Sert küfür koruması: küfürler, kısaltmaları (amk, aq, oç, sg, mk…) ve harf oyunlarıyla yazılmış hâlleri sohbette ve maç yorumlarında yazılamıyor."]},
   {v:"1.16.1", d:"4 Kasım 2026", items:["Üst çubukta Davet et düğmesi: sana özel davet linkini gösteriyor; tek dokunuşla kopyala, WhatsApp'ta gönder ya da paylaş."]},
   {v:"1.16.0", d:"4 Kasım 2026", items:["Üst çubukta Kurallar'ın yanında ayrı bir Puanlama düğmesi: puan rehberi tek dokunuşla açılıyor.","Gecenin sorusu yenilendi (5 Kasım'dan itibaren): sorudaki sayı gecenin maç sayısına göre seçiliyor, cevap yaklaşık yarı yarıya. \"Ev sahipleri bütün maçlarını kazanır mı?\" gibi neredeyse kesin sorular kalktı."]},
@@ -4105,7 +4106,7 @@ $("#invBtn").onclick=()=>openInvite();
 // chat/{id}: {uid, t (≤500), at (sunucu saati), re:{uid:emoji}}. Son 100 mesaj canlı dinlenir; eskiler istenince yüklenir.
 // chatlim/{uid}: son mesaj saati; Firebase kuralı 5 saniyeden sık mesajı reddeder.
 const CHAT_MAX=500, CHAT_GAP=5000, CHAT_EMOJI=["👍","😂","🔥","😮","👏","💀"];
-S.chat=[]; S.chatOld=[]; S.chatMore=true;
+S.chat=[]; S.chatOld=[]; S.chatMore=false; S.chatErr=false;
 const chatTs = m => m.at?.toMillis ? m.at.toMillis() : Date.now();
 const chatSeen = () => { try{ return +localStorage.getItem("chatSeen")||0; }catch(e){ return 0; } };
 const setChatSeen = v => { try{ localStorage.setItem("chatSeen", String(v)); }catch(e){} };
@@ -4113,9 +4114,10 @@ function startChat(){
   if(S.chatUnsub) return;
   S.chatUnsub = onSnapshot(query(collection(S.db,"chat"), orderBy("at","desc"), limit(100)), snap => {
     S.chat = snap.docs.map(d=>({id:d.id, ...d.data({serverTimestamps:"estimate"})}));
-    if(snap.docs.length<100) S.chatMore=false; else S.chatLastDoc=snap.docs[snap.docs.length-1];
+    S.chatErr=false;
+    if(!S.chatOld.length){ S.chatMore = snap.docs.length>=100; if(S.chatMore) S.chatLastDoc=snap.docs[snap.docs.length-1]; }
     chatBadge(); if(S.chatOpen) paintChatList();
-  }, () => {});
+  }, () => { S.chatErr=true; S.chatUnsub=null; if(S.chatOpen) paintChatList(); });
 }
 function stopChat(){ if(S.chatUnsub){ S.chatUnsub(); S.chatUnsub=null; } S.chat=[]; S.chatOld=[]; chatBadge(); }
 function chatAll(){ const m=new Map(); for(const x of [...S.chatOld, ...S.chat]) m.set(x.id, x); return [...m.values()].sort((a,b)=>chatTs(a)-chatTs(b)); }
@@ -4149,7 +4151,8 @@ function paintChatList(keep){
   const box=$("#chList"); if(!box) return;
   const atEnd = box.scrollHeight-box.scrollTop-box.clientHeight < 80, oldH=box.scrollHeight, oldTop=box.scrollTop;
   const ms=chatAll(); let html=S.chatMore?`<button class="btn ch-more" id="chMore" type="button">Daha eski mesajlar</button>`:"", day="";
-  if(!ms.length) html+=`<p class="ch-empty">Henüz mesaj yok. İlk mesajı sen yaz.</p>`;
+  if(S.chatErr) html+=`<p class="ch-empty">Sohbet şu an açılamadı. Biraz sonra tekrar dene.</p>`;
+  else if(!ms.length) html+=`<p class="ch-empty">Henüz mesaj yok. İlk mesajı sen yaz.</p>`;
   ms.forEach((m,i)=>{ const d=chatDay(chatTs(m)); if(d!==day){ day=d; html+=`<div class="ch-day"><span>${d}</span></div>`; } html+=chatMsgHTML(m, d===chatDay(chatTs(ms[i-1]||{}))?ms[i-1]:null); });
   box.innerHTML=html;
   if(keep==="top") box.scrollTop = box.scrollHeight-oldH+oldTop;
@@ -4158,7 +4161,7 @@ function paintChatList(keep){
   if(ms.length) setChatSeen(Math.max(chatSeen(), chatTs(ms[ms.length-1])));
 }
 function openChat(){
-  S.chatOpen=true; const el=$("#chat"); el.classList.remove("hide"); document.body.style.overflow="hidden";
+  S.chatOpen=true; if(!S.chatUnsub) startChat(); const el=$("#chat"); el.classList.remove("hide"); document.body.style.overflow="hidden";
   try{ history.pushState({chat:1}, ""); }catch(e){}
   paintChatList(); $("#chList").scrollTop=$("#chList").scrollHeight; chatBadge();
   if(matchMedia("(min-width:700px)").matches) $("#chIn").focus();
@@ -4184,7 +4187,7 @@ async function sendChat(){
     b.set(doc(collection(S.db,"chat")), {uid:S.uid, t, at:serverTimestamp(), re:{}});
     S.chatLast=Date.now(); inp.value=""; chatCount(); await b.commit();
     $("#chList").scrollTop=$("#chList").scrollHeight;
-  }catch(e){ inp.value=inp.value||t; chatCount(); msg.textContent = e?.code==="permission-denied" ? "Gönderilemedi: 5 saniyede bir mesaj atılabilir ve küfür yazılamaz." : "Gönderilemedi, bağlantını kontrol edip tekrar dene."; }
+  }catch(e){ inp.value=inp.value||t; chatCount(); msg.textContent = e?.code==="permission-denied" ? "Gönderilemedi. Birkaç saniye bekleyip tekrar dene; sorun sürerse sohbet henüz açılmamış olabilir." : "Gönderilemedi, bağlantını kontrol edip tekrar dene."; S.chatLast=0; }
   btn.disabled=false; inp.focus();
 }
 function chatCount(){ const n=$("#chIn").value.length; $("#chCnt").textContent = n>CHAT_MAX-100 ? `${n}/${CHAT_MAX}` : ""; $("#chCnt").classList.toggle("over", n>CHAT_MAX);
