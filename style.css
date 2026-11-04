@@ -1930,7 +1930,7 @@ body.bars-hidden .chat-fab{transform:translateY(calc(var(--nav-h) + env(safe-are
 .ch-msg.cont{margin-top:3px}
 .ch-av{width:32px;flex:none}.ch-av .av{width:32px;height:32px;font-size:16px}
 .ch-b{max-width:78%;min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:16px 16px 16px 6px;padding:7px 11px 5px}
-.ch-msg.me{flex-direction:row-reverse}.ch-msg.me .ch-av{display:none}
+.ch-msg.me{flex-direction:row-reverse}.ch-msg.me .ch-n{text-align:right}.ch-n small{font-weight:600;color:var(--muted);font-size:11.5px}
 .ch-msg.me .ch-b{background:color-mix(in srgb,var(--amber) 22%,var(--panel));border-color:color-mix(in srgb,var(--amber) 40%,var(--line));border-radius:16px 16px 6px 16px}
 .ch-n{display:block;font-size:13px;margin-bottom:1px}
 .ch-t{font-size:15px;line-height:1.38;color:var(--ink);overflow-wrap:anywhere;white-space:normal}
@@ -1950,3 +1950,29 @@ body.bars-hidden .chat-fab{transform:translateY(calc(var(--nav-h) + env(safe-are
 .ch-send svg{width:21px;height:21px}.ch-send:disabled{opacity:.5}
 .ch-info{display:flex;justify-content:space-between;gap:10px;min-height:0}
 .ch-info small{font-size:12px;color:var(--lose,#c0392b);margin-top:4px}.ch-info #chCnt{color:var(--muted)}.ch-info #chCnt.over{color:var(--lose,#c0392b)}
+
+/* 1.18.0 sohbet: yanıt, etiket, yazıyor, sabit mesaj, sessize alma */
+.ch-mute{font-size:17px}.ch-mute[aria-pressed="true"]{opacity:.75}
+.chat-fab.muted{opacity:.85}
+.chat-n.ment{background:var(--amber);color:var(--on-amber,#1a1200)}
+.ch-pin{display:flex;align-items:center;gap:6px;padding:7px 12px;border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--amber) 12%,var(--panel))}
+.ch-pin.hide{display:none}
+.ch-pin-b{flex:1;min-width:0;display:flex;gap:8px;align-items:center;border:0;background:none;color:var(--ink);text-align:left;font-size:13.5px;cursor:pointer;padding:2px 0}
+.ch-pin-b>span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ch-q{display:block;width:100%;text-align:left;border:0;border-left:3px solid var(--amber);background:color-mix(in srgb,var(--ink) 6%,transparent);border-radius:8px;padding:4px 8px;margin:2px 0 5px;cursor:pointer;color:var(--ink);font-size:12.5px}
+.ch-q b{display:block;font-size:12px}.ch-q span{display:block;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ch-t a{color:var(--amber-ink,var(--amber));text-decoration:underline;overflow-wrap:anywhere}
+.ch-at{font-weight:800}.ch-at.me{background:color-mix(in srgb,var(--amber) 28%,transparent);border-radius:5px;padding:0 3px}
+.ch-msg.forme .ch-b{border-color:var(--amber);box-shadow:0 0 0 1px var(--amber) inset}
+.ch-msg.flash .ch-b{animation:chflash 1.2s ease}
+@keyframes chflash{0%,40%{background:color-mix(in srgb,var(--amber) 40%,var(--panel))}}
+.ch-meta{flex-wrap:wrap;row-gap:0}
+.ch-typing{font-size:12px;color:var(--muted);min-height:0;padding:0 4px}
+.ch-typing:not(:empty){margin-bottom:4px}
+.ch-ctx{display:flex;align-items:center;gap:8px;margin-bottom:6px;padding:6px 10px;border-radius:10px;border-left:3px solid var(--amber);background:var(--panel-2);font-size:13px}
+.ch-ctx.hide{display:none}.ch-ctx>span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ch-ment{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
+.ch-ment.hide{display:none}
+.ch-ment button{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--panel-2);border-radius:999px;padding:3px 10px 3px 3px;font-weight:700;font-size:13.5px;cursor:pointer}
+.ch-ment button.on{border-color:var(--amber)}
+.ch-ment .av{width:26px;height:26px;font-size:13px}

@@ -345,29 +345,49 @@ service cloud.firestore {
     match /chat/{id} {
       allow read: if isPlayer();
       allow create: if isPlayer()
-        && request.resource.data.keys().hasOnly(['uid', 't', 'at', 're']) && request.resource.data.keys().hasAll(['uid', 't', 'at', 're'])
+        && request.resource.data.keys().hasOnly(['uid', 't', 'at', 're', 'rp', 'mn']) && request.resource.data.keys().hasAll(['uid', 't', 'at', 're'])
+        // rp: yanıtlanan mesaj (id, gönderen, kısa alıntı); mn: etiketlenen oyuncular
+        && (!('rp' in request.resource.data) || (request.resource.data.rp is map && request.resource.data.rp.keys().hasOnly(['id', 'uid', 't'])
+            && str(request.resource.data.rp.id, 40) && str(request.resource.data.rp.uid, 128) && str(request.resource.data.rp.t, 120) && cleanChat(request.resource.data.rp.t)))
+        && (!('mn' in request.resource.data) || (request.resource.data.mn is list && request.resource.data.mn.size() <= 10))
         && request.resource.data.uid == request.auth.uid
         && str(request.resource.data.t, 500)
         && request.resource.data.at == request.time
         && request.resource.data.re == {}
-        && cleanChat(request.resource.data.t)
-        // hız sınırı: aynı yazımda chatlim/{uid} de bu ana güncellenmeli (5 saniyede bir)
-        && getAfter(/databases/$(database)/documents/chatlim/$(request.auth.uid)).data.at == request.time;
+        && cleanChat(request.resource.data.t);
       // tepki: herkes yalnızca kendi tepkisini koyar, değiştirir ya da kaldırır
-      allow update: if isPlayer()
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['re'])
-        && request.resource.data.re is map
-        && request.resource.data.re.diff(resource.data.re).affectedKeys().hasOnly([request.auth.uid])
-        && (!(request.auth.uid in request.resource.data.re) || request.resource.data.re[request.auth.uid] in ['👍', '😂', '🔥', '😮', '👏', '💀']);
+      // düzenleme: sahibi, gönderdikten sonraki 2 dakika içinde metni değiştirebilir (ed = düzenleme saati)
+      allow update: if isPlayer() && (
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['re'])
+          && request.resource.data.re is map
+          && request.resource.data.re.diff(resource.data.re).affectedKeys().hasOnly([request.auth.uid])
+          && (!(request.auth.uid in request.resource.data.re) || request.resource.data.re[request.auth.uid] in ['👍', '😂', '🔥', '😮', '👏', '💀']))
+        || (resource.data.uid == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['t', 'mn', 'ed'])
+          && request.resource.data.ed == request.time
+          && request.time < resource.data.at + duration.value(2, 'm')
+          && str(request.resource.data.t, 500) && cleanChat(request.resource.data.t)
+          && (!('mn' in request.resource.data) || (request.resource.data.mn is list && request.resource.data.mn.size() <= 10))));
       allow delete: if (signedIn() && resource.data.uid == request.auth.uid) || isAdmin();
     }
-    match /chatlim/{uid} {
-      allow read: if signedIn() && request.auth.uid == uid;
-      allow create: if signedIn() && request.auth.uid == uid
+    // yazıyor göstergesi: herkes yalnızca kendi kaydını yazar ve siler
+    match /typing/{uid} {
+      allow read: if isPlayer();
+      allow create, update: if isPlayer() && request.auth.uid == uid
         && request.resource.data.keys().hasOnly(['at']) && request.resource.data.at == request.time;
-      allow update: if signedIn() && request.auth.uid == uid
-        && request.resource.data.keys().hasOnly(['at']) && request.resource.data.at == request.time
-        && request.time > resource.data.at + duration.value(5, 's');
+      allow delete: if signedIn() && request.auth.uid == uid;
+    }
+    // sabit mesaj: yalnızca yönetici yazar (id boşsa sabit mesaj yok)
+    match /chatpin/{d} {
+      allow read: if isPlayer();
+      allow write: if isAdmin() && d == 'main'
+        && request.resource.data.keys().hasOnly(['id', 'uid', 't', 'by', 'at']) && request.resource.data.id is string
+        && (request.resource.data.id == '' || (str(request.resource.data.t, 140) && request.resource.data.at == request.time));
+    }
+    // eski sürüm (1.17.1 ve öncesi) mesajla birlikte bunu da yazar; hız sınırı kalktı, yalnızca uyumluluk için duruyor
+    match /chatlim/{uid} {
+      allow write: if signedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['at']) && request.resource.data.at == request.time;
     }
 
     // talk/{maçId}_{uid}: maç kartına emoji tepki ve kısa yorum (laf atma). Herkes görür, sahibi yazar.

@@ -45,12 +45,14 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.17.1";
+const VERSION = "1.18.0";
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.18.0", d:"4 Kasım 2026", items:["Sohbette yanıtla: mesajın altındaki Yanıtla ile cevap ver; alıntıya dokununca asıl mesaja gidilir.","@etiketleme: @ yazınca oyuncu listesi açılır. Seni anan ya da sana yanıt veren mesaj vurgulu görünür, baloncukta @ işareti çıkar.","Yazıyor… göstergesi, gönderdikten sonra 2 dakika içinde düzenleme, tıklanabilir bağlantılar.","Yönetici bir mesajı sohbetin üstüne sabitleyebilir.","🔔 düğmesiyle sohbeti sessize al: baloncukta yalnızca seni anan mesajlar sayılır."]},
+  {v:"1.17.2", d:"4 Kasım 2026", items:["Sohbette her mesaj grubunun üstünde gönderenin adı ve avatarı görünüyor; kendi mesajlarında \"(sen)\" yazıyor.","Sohbetteki 5 saniyede bir mesaj sınırı kalktı."]},
   {v:"1.17.1", d:"4 Kasım 2026", items:["Sohbette mesaj yokken görünen gereksiz \"Daha eski mesajlar\" düğmesi kalktı; sohbet açılamazsa açık bir uyarı çıkıyor."]},
-  {v:"1.17.0", d:"4 Kasım 2026", items:["Lig sohbeti: sağ alttaki baloncuktan herkesin yazdığı ortak sohbete gir. Mesajlar canlı akar, okunmamış mesaj sayısı baloncukta görünür.","Mesajlara emoji tepkisi bırakabilir, kendi mesajını silebilirsin. 5 saniyede bir mesaj, en fazla 500 karakter.","Sert küfür koruması: küfürler, kısaltmaları (amk, aq, oç, sg, mk…) ve harf oyunlarıyla yazılmış hâlleri sohbette ve maç yorumlarında yazılamıyor."]},
+  {v:"1.17.0", d:"4 Kasım 2026", items:["Lig sohbeti: sağ alttaki baloncuktan herkesin yazdığı ortak sohbete gir. Mesajlar canlı akar, okunmamış mesaj sayısı baloncukta görünür.","Mesajlara emoji tepkisi bırakabilir, kendi mesajını silebilirsin. Mesaj en fazla 500 karakter.","Sert küfür koruması: küfürler, kısaltmaları (amk, aq, oç, sg, mk…) ve harf oyunlarıyla yazılmış hâlleri sohbette ve maç yorumlarında yazılamıyor."]},
   {v:"1.16.1", d:"4 Kasım 2026", items:["Üst çubukta Davet et düğmesi: sana özel davet linkini gösteriyor; tek dokunuşla kopyala, WhatsApp'ta gönder ya da paylaş."]},
   {v:"1.16.0", d:"4 Kasım 2026", items:["Üst çubukta Kurallar'ın yanında ayrı bir Puanlama düğmesi: puan rehberi tek dokunuşla açılıyor.","Gecenin sorusu yenilendi (5 Kasım'dan itibaren): sorudaki sayı gecenin maç sayısına göre seçiliyor, cevap yaklaşık yarı yarıya. \"Ev sahipleri bütün maçlarını kazanır mı?\" gibi neredeyse kesin sorular kalktı."]},
   {v:"1.15.0", d:"4 Kasım 2026", items:["Profil analizi: sayıyla fark tahmininde ±3 tutturma oranı, ortalama şaşma ve farkı az mı çok mu tahmin ettiğin.","Puanların nereden geldi ve sezon özeti: sürpriz ekini, devamlılık bonusunu ve yedek tahmini ayrı gösteriyor.","Tahminler'de gece özeti: Gecenin sürprizi ve onu bilenler.","Alt bilgideki puan özeti güncellendi, puanlama rehberine bağlantı."]},
@@ -4103,13 +4105,14 @@ async function openInvite(){
 $("#invBtn").onclick=()=>openInvite();
 
 /* ====================================================== lig sohbeti */
-// chat/{id}: {uid, t (≤500), at (sunucu saati), re:{uid:emoji}}. Son 100 mesaj canlı dinlenir; eskiler istenince yüklenir.
-// chatlim/{uid}: son mesaj saati; Firebase kuralı 5 saniyeden sık mesajı reddeder.
-const CHAT_MAX=500, CHAT_GAP=5000, CHAT_EMOJI=["👍","😂","🔥","😮","👏","💀"];
-S.chat=[]; S.chatOld=[]; S.chatMore=false; S.chatErr=false;
+// chat/{id}: {uid, t (≤500), at (sunucu saati), re:{uid:emoji}, rp:{id,uid,t} yanıt, mn:[uid] etiketlenenler, ed: düzenleme saati}.
+// Son 100 mesaj canlı dinlenir; eskiler istenince yüklenir. typing/{uid}: yazıyor göstergesi. chatpin/main: yöneticinin sabitlediği mesaj.
+const CHAT_MAX=500, CHAT_EMOJI=["👍","😂","🔥","😮","👏","💀"], CHAT_EDIT=2*60e3, TYPING_TTL=7000;
+S.chat=[]; S.chatOld=[]; S.chatMore=false; S.chatErr=false; S.chatPin=null; S.typing={};
 const chatTs = m => m.at?.toMillis ? m.at.toMillis() : Date.now();
-const chatSeen = () => { try{ return +localStorage.getItem("chatSeen")||0; }catch(e){ return 0; } };
-const setChatSeen = v => { try{ localStorage.setItem("chatSeen", String(v)); }catch(e){} };
+const chatSeen = () => +(lsGet("chatSeen")||0) || 0;
+const setChatSeen = v => lsSet("chatSeen", String(v));
+const chatMuted = () => lsGet("chatMute")==="1";
 function startChat(){
   if(S.chatUnsub) return;
   S.chatUnsub = onSnapshot(query(collection(S.db,"chat"), orderBy("at","desc"), limit(100)), snap => {
@@ -4118,31 +4121,59 @@ function startChat(){
     if(!S.chatOld.length){ S.chatMore = snap.docs.length>=100; if(S.chatMore) S.chatLastDoc=snap.docs[snap.docs.length-1]; }
     chatBadge(); if(S.chatOpen) paintChatList();
   }, () => { S.chatErr=true; S.chatUnsub=null; if(S.chatOpen) paintChatList(); });
+  if(!S.pinUnsub) S.pinUnsub = onSnapshot(doc(S.db,"chatpin","main"), d => { S.chatPin = d.exists() && d.data().id ? d.data() : null; paintPin(); }, () => {});
 }
-function stopChat(){ if(S.chatUnsub){ S.chatUnsub(); S.chatUnsub=null; } S.chat=[]; S.chatOld=[]; chatBadge(); }
+function stopChat(){ for(const k of ["chatUnsub","pinUnsub","typUnsub"]) if(S[k]){ S[k](); S[k]=null; } S.chat=[]; S.chatOld=[]; S.chatPin=null; chatBadge(); }
 function chatAll(){ const m=new Map(); for(const x of [...S.chatOld, ...S.chat]) m.set(x.id, x); return [...m.values()].sort((a,b)=>chatTs(a)-chatTs(b)); }
 function chatBadge(){
   const fab=$("#chatFab"); if(!fab) return;
   fab.classList.toggle("hide", !S.uid);
-  const seen=chatSeen(), n=S.chatOpen ? 0 : S.chat.filter(m=>m.uid!==S.uid && chatTs(m)>seen).length;
-  const b=$("#chatN"); b.textContent = n>99 ? "99+" : n; b.classList.toggle("hide", !n);
-  fab.setAttribute("aria-label", n ? `Lig sohbeti, ${n} yeni mesaj` : "Lig sohbeti");
+  const seen=chatSeen(), fresh=S.chatOpen ? [] : S.chat.filter(m=>m.uid!==S.uid && chatTs(m)>seen);
+  const men=fresh.filter(m=>(m.mn||[]).includes(S.uid)||m.rp?.uid===S.uid).length, muted=chatMuted();
+  const n = muted ? men : fresh.length, b=$("#chatN");
+  b.textContent = men ? `@${muted?"":" "+(n>99?"99+":n)}`.trim() : (n>99 ? "99+" : n);
+  b.classList.toggle("hide", !n); b.classList.toggle("ment", !!men);
+  fab.classList.toggle("muted", muted);
+  fab.setAttribute("aria-label", n ? `Lig sohbeti, ${n} yeni mesaj${men?", seni anan var":""}` : "Lig sohbeti");
 }
 const chatDK = d => d.toLocaleDateString("en-CA",{timeZone:TZ});
 const chatDay = ms => { const d=new Date(ms), k=chatDK(d), t=chatDK(new Date()), y=chatDK(new Date(Date.now()-864e5));
   return k===t ? "Bugün" : k===y ? "Dün" : d.toLocaleDateString(LOC,{timeZone:TZ, day:"numeric", month:"long", weekday:"long"}); };
+// @etiketler ve bağlantılar: önce metin kaçırılır, sonra işaretlenir
+const chatNames = () => S.order.map(u=>[u, pname(u)]).filter(x=>x[1]).sort((a,b)=>b[1].length-a[1].length);
+const reEsc = x => x.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
+// tek geçişte en uzun ad önce eşleşir ("@Ali Can" varken "@Ali" ayrıca sayılmaz)
+function chatAtRx(escaped){ const ns=chatNames(); if(!ns.length) return null;
+  return {rx:new RegExp("@("+ns.map(([u,n])=>reEsc(escaped?esc(n):n)).join("|")+")(?![\\p{L}\\p{N}])","giu"), ns}; }
+const chatWho = (ns, hit, escaped) => ns.find(([u,n])=>(escaped?esc(n):n).toLocaleLowerCase("tr")===hit.toLocaleLowerCase("tr"));
+function chatMentions(t){ const r=chatAtRx(false); if(!r) return []; const out=new Set();
+  for(const m of t.matchAll(r.rx)){ const w=chatWho(r.ns, m[1], false); if(w) out.add(w[0]); } return [...out].slice(0,10); }
+function chatRich(t){
+  let h=esc(t);
+  h=h.replace(/(https?:\/\/[^\s<]+[^\s<.,;:!?)\]'"])/g, u=>`<a href="${u}" target="_blank" rel="noopener nofollow">${u.length>48?u.slice(0,45)+"…":u}</a>`);
+  const r=chatAtRx(true);
+  if(r) h=h.replace(r.rx, (all, nm)=>{ const w=chatWho(r.ns, nm, true); return w ? `<span class="ch-at ${w[0]===S.uid?"me":""}" style="color:${col(w[0])}">@${esc(pname(w[0]))}</span>` : all; });
+  return h.replace(/\n/g,"<br>");
+}
 function chatMsgHTML(m, prev){
-  const mine=m.uid===S.uid, same=prev && prev.uid===m.uid && chatTs(m)-chatTs(prev)<5*60e3;
+  const mine=m.uid===S.uid, same=prev && prev.uid===m.uid && chatTs(m)-chatTs(prev)<5*60e3 && !m.rp;
   const re=m.re||{}, cnt={}; for(const [u,e] of Object.entries(re)) if(CHAT_EMOJI.includes(e)) (cnt[e]=cnt[e]||[]).push(u);
   const chips=Object.entries(cnt).map(([e,us])=>`<button class="ch-re ${us.includes(S.uid)?"on":""}" data-re="${e}" data-m="${m.id}" type="button" title="${esc(us.map(pname).join(", "))}">${e}<b>${us.length}</b></button>`).join("");
-  const canDel = mine || S.isAdmin;
-  return `<div class="ch-msg ${mine?"me":""} ${same?"cont":""}" data-id="${m.id}">
-    ${same||mine ? `<span class="ch-av"></span>` : `<span class="ch-av">${avatar(m.uid)}</span>`}
+  const forMe = !mine && ((m.mn||[]).includes(S.uid) || m.rp?.uid===S.uid);
+  const canEdit = mine && Date.now()-chatTs(m) < CHAT_EDIT - 5000;
+  const pinned = S.chatPin?.id===m.id;
+  return `<div class="ch-msg ${mine?"me":""} ${same?"cont":""} ${forMe?"forme":""}" data-id="${m.id}">
+    <span class="ch-av">${same ? "" : avatar(m.uid)}</span>
     <div class="ch-b">
-      ${same||mine ? "" : `<b class="ch-n" style="color:${col(m.uid)}">${esc(pname(m.uid))}</b>`}
-      <div class="ch-t">${esc(m.t).replace(/\n/g,"<br>")}</div>
-      <div class="ch-meta"><span class="ch-tm">${timeTR(new Date(chatTs(m)))}</span>
-        <button class="ch-act" data-pick="${m.id}" type="button" aria-label="Tepki ver">☺︎+</button>${canDel?`<button class="ch-act" data-del="${m.id}" type="button" aria-label="Mesajı sil">Sil</button>`:""}</div>
+      ${same ? "" : `<b class="ch-n" style="color:${col(m.uid)}">${esc(pname(m.uid))}${mine?` <small>(sen)</small>`:""}</b>`}
+      ${m.rp?`<button class="ch-q" data-goto="${esc(m.rp.id)}" type="button"><b style="color:${col(m.rp.uid)}">${esc(pname(m.rp.uid))}</b><span>${esc(m.rp.t)}</span></button>`:""}
+      <div class="ch-t">${chatRich(m.t)}</div>
+      <div class="ch-meta"><span class="ch-tm">${timeTR(new Date(chatTs(m)))}${m.ed?" · düzenlendi":""}${pinned?" · 📌":""}</span>
+        <button class="ch-act" data-pick="${m.id}" type="button" aria-label="Tepki ver">☺︎+</button>
+        <button class="ch-act" data-rep="${m.id}" type="button">Yanıtla</button>
+        ${canEdit?`<button class="ch-act" data-edit="${m.id}" type="button">Düzenle</button>`:""}
+        ${S.isAdmin?`<button class="ch-act" data-pin="${m.id}" type="button">${pinned?"Sabitlemeyi kaldır":"Sabitle"}</button>`:""}
+        ${mine||S.isAdmin?`<button class="ch-act" data-del="${m.id}" type="button" aria-label="Mesajı sil">Sil</button>`:""}</div>
       ${chips?`<div class="ch-res">${chips}</div>`:""}
       ${S.chatPick===m.id?`<div class="ch-pick">${CHAT_EMOJI.map(e=>`<button data-re="${e}" data-m="${m.id}" type="button" aria-pressed="${re[S.uid]===e}">${e}</button>`).join("")}</div>`:""}
     </div></div>`;
@@ -4159,60 +4190,151 @@ function paintChatList(keep){
   else if(keep==="stay" || !atEnd) box.scrollTop=oldTop;
   else box.scrollTop=box.scrollHeight;
   if(ms.length) setChatSeen(Math.max(chatSeen(), chatTs(ms[ms.length-1])));
+  paintPin();
+}
+function paintPin(){
+  const el=$("#chPin"); if(!el) return; const p=S.chatPin;
+  el.classList.toggle("hide", !p);
+  if(p) el.innerHTML=`<button class="ch-pin-b" data-goto="${esc(p.id)}" type="button"><span class="ch-pin-i">📌</span><span><b style="color:${col(p.uid)}">${esc(pname(p.uid))}</b> ${esc(p.t)}</span></button>${S.isAdmin?`<button class="ch-act" id="chUnpin" type="button" aria-label="Sabitlemeyi kaldır">✕</button>`:""}`;
+}
+function paintMute(){ const b=$("#chMute"); if(!b) return; const m=chatMuted(); b.textContent = m ? "🔕" : "🔔"; b.setAttribute("aria-pressed", m); b.title = m ? "Sessizde: yalnızca seni anan mesajlar sayılır" : "Yeni mesajlar baloncukta sayılır"; b.setAttribute("aria-label", b.title); }
+/* yazıyor göstergesi: sohbet açıkken dinlenir */
+function startTyping(){
+  if(S.typUnsub) return;
+  S.typUnsub = onSnapshot(collection(S.db,"typing"), snap => { S.typing={}; snap.docs.forEach(d=>{ const a=d.data({serverTimestamps:"estimate"}).at; if(a?.toMillis) S.typing[d.id]=a.toMillis(); }); paintTyping(); }, () => {});
+  clearInterval(S.typTick); S.typTick=setInterval(paintTyping, 2000);
+}
+function stopTyping(){ if(S.typUnsub){ S.typUnsub(); S.typUnsub=null; } clearInterval(S.typTick); clearTyping(); }
+function paintTyping(){
+  const el=$("#chTyping"); if(!el) return; const now=Date.now();
+  const who=Object.entries(S.typing).filter(([u,t])=>u!==S.uid && now-t<TYPING_TTL && S.players[u]).map(([u])=>pname(u));
+  el.textContent = !who.length ? "" : who.length===1 ? `${who[0]} yazıyor…` : who.length===2 ? `${who[0]} ve ${who[1]} yazıyor…` : `${who.length} kişi yazıyor…`;
+}
+function noteTyping(){
+  const now=Date.now(); if(!$("#chIn").value.trim()) return clearTyping();
+  if(now-(S.typSent||0) < 4000) return; S.typSent=now;
+  setDoc(doc(S.db,"typing",S.uid), {at:serverTimestamp()}).catch(()=>{});
+}
+function clearTyping(){ if(!S.typSent || !S.uid) return; S.typSent=0; deleteDoc(doc(S.db,"typing",S.uid)).catch(()=>{}); }
+/* yanıt ve düzenleme çubuğu */
+function paintCtx(){
+  const el=$("#chCtx"), r=S.chatReply, ed=S.chatEdit;
+  el.classList.toggle("hide", !r && !ed);
+  if(ed) el.innerHTML=`<span><b>Mesajını düzenliyorsun</b></span><button class="ch-act" id="chCtxX" type="button" aria-label="Vazgeç">✕</button>`;
+  else if(r) el.innerHTML=`<span><b style="color:${col(r.uid)}">${esc(pname(r.uid))}</b> adlı kişiye yanıt: ${esc(r.t)}</span><button class="ch-act" id="chCtxX" type="button" aria-label="Vazgeç">✕</button>`;
+}
+function cancelCtx(){ if(S.chatEdit){ $("#chIn").value=""; chatCount(); } S.chatReply=null; S.chatEdit=null; paintCtx(); }
+/* @ önerileri */
+function paintMent(){
+  const inp=$("#chIn"), el=$("#chMent"), before=inp.value.slice(0, inp.selectionStart ?? inp.value.length);
+  const m=before.match(/(^|\s)@([^\s@]{0,20})$/);
+  if(!m){ el.classList.add("hide"); S.mentList=[]; return; }
+  const q=m[2].toLocaleLowerCase("tr");
+  S.mentList=S.order.filter(u=>u!==S.uid && pname(u).toLocaleLowerCase("tr").startsWith(q)).slice(0,6);
+  el.classList.toggle("hide", !S.mentList.length);
+  el.innerHTML=S.mentList.map((u,i)=>`<button type="button" data-ment="${u}" class="${i===0?"on":""}">${avatar(u)}<span style="color:${col(u)}">${esc(pname(u))}</span></button>`).join("");
+}
+function pickMent(u){
+  const inp=$("#chIn"), pos=inp.selectionStart ?? inp.value.length, before=inp.value.slice(0,pos), after=inp.value.slice(pos);
+  const nb=before.replace(/@([^\s@]{0,20})$/, "@"+pname(u)+" ");
+  inp.value=nb+after; inp.focus(); inp.setSelectionRange(nb.length, nb.length); $("#chMent").classList.add("hide"); S.mentList=[]; chatCount();
 }
 function openChat(){
-  S.chatOpen=true; if(!S.chatUnsub) startChat(); const el=$("#chat"); el.classList.remove("hide"); document.body.style.overflow="hidden";
+  S.chatOpen=true; if(!S.chatUnsub) startChat(); startTyping(); const el=$("#chat"); el.classList.remove("hide"); document.body.style.overflow="hidden";
   try{ history.pushState({chat:1}, ""); }catch(e){}
-  paintChatList(); $("#chList").scrollTop=$("#chList").scrollHeight; chatBadge();
+  paintMute(); paintCtx(); paintChatList(); $("#chList").scrollTop=$("#chList").scrollHeight; chatBadge();
   if(matchMedia("(min-width:700px)").matches) $("#chIn").focus();
 }
 function closeChat(fromPop){
   if(!S.chatOpen) return; S.chatOpen=false; S.chatPick=null; $("#chat").classList.add("hide"); document.body.style.overflow="";
+  stopTyping(); $("#chMent").classList.add("hide");
   const ms=S.chat; if(ms.length) setChatSeen(Math.max(chatSeen(), ...ms.map(chatTs)));
   chatBadge(); if(!fromPop && history.state?.chat){ S.popSkip=true; history.back(); }
 }
 addEventListener("popstate", ()=>{ if(S.chatOpen && !history.state?.chat) closeChat(true); });
-document.addEventListener("keydown", e => { if(e.key==="Escape" && S.chatOpen) closeChat(); });
+document.addEventListener("keydown", e => { if(e.key==="Escape" && S.chatOpen){ if(S.chatReply||S.chatEdit) return cancelCtx(); closeChat(); } });
+addEventListener("pagehide", ()=>clearTyping());
 async function sendChat(){
   const inp=$("#chIn"), msg=$("#chMsg"), t=inp.value.replace(/\s+$/,"").replace(/^\s+/,"");
   if(!t) return;
   if(t.length>CHAT_MAX){ msg.textContent=`Mesaj en fazla ${CHAT_MAX} karakter olabilir.`; return; }
   if(chatProblem(t)){ msg.textContent="Bu mesajda küfür ya da hakaret var, gönderilmedi. Sohbette küfürlü kısaltmalar (amk, aq, oç…) da yazılamıyor."; return; }
-  const wait = CHAT_GAP - (Date.now()-(S.chatLast||0));
-  if(wait>0){ msg.textContent=`Biraz yavaş: ${Math.ceil(wait/1000)} saniye sonra tekrar gönderebilirsin.`; return; }
   const btn=$("#chSend"); btn.disabled=true; msg.textContent="";
+  const mn=chatMentions(t), edit=S.chatEdit, rp=S.chatReply;
   try{
-    const b=writeBatch(S.db);
-    b.set(doc(S.db,"chatlim",S.uid), {at:serverTimestamp()});
-    b.set(doc(collection(S.db,"chat")), {uid:S.uid, t, at:serverTimestamp(), re:{}});
-    S.chatLast=Date.now(); inp.value=""; chatCount(); await b.commit();
-    $("#chList").scrollTop=$("#chList").scrollHeight;
-  }catch(e){ inp.value=inp.value||t; chatCount(); msg.textContent = e?.code==="permission-denied" ? "Gönderilemedi. Birkaç saniye bekleyip tekrar dene; sorun sürerse sohbet henüz açılmamış olabilir." : "Gönderilemedi, bağlantını kontrol edip tekrar dene."; S.chatLast=0; }
+    inp.value=""; chatCount(); $("#chMent").classList.add("hide");
+    if(edit){
+      S.chatEdit=null; paintCtx();
+      await updateDoc(doc(S.db,"chat",edit), {t, mn, ed:serverTimestamp()});
+    } else {
+      const data={uid:S.uid, t, at:serverTimestamp(), re:{}};
+      if(mn.length) data.mn=mn;
+      if(rp) data.rp={id:rp.id, uid:rp.uid, t:rp.t};
+      S.chatReply=null; paintCtx();
+      await setDoc(doc(collection(S.db,"chat")), data);
+      $("#chList").scrollTop=$("#chList").scrollHeight;
+    }
+    clearTyping();
+  }catch(e){
+    inp.value=inp.value||t; chatCount(); if(edit){ S.chatEdit=edit; } else if(rp){ S.chatReply=rp; } paintCtx();
+    msg.textContent = edit && e?.code==="permission-denied" ? "Düzenleme süresi (2 dakika) doldu." : e?.code==="permission-denied" ? "Gönderilemedi. Sayfayı yenileyip tekrar dene." : "Gönderilemedi, bağlantını kontrol edip tekrar dene.";
+  }
   btn.disabled=false; inp.focus();
 }
 function chatCount(){ const n=$("#chIn").value.length; $("#chCnt").textContent = n>CHAT_MAX-100 ? `${n}/${CHAT_MAX}` : ""; $("#chCnt").classList.toggle("over", n>CHAT_MAX);
   const inp=$("#chIn"); inp.style.height="auto"; inp.style.height=Math.min(120, inp.scrollHeight)+"px"; }
+function chatGoto(id){
+  const el=$(`#chList .ch-msg[data-id="${CSS.escape(id)}"]`);
+  if(!el) return toast("Bu mesaj artık görünmüyor.");
+  el.scrollIntoView({block:"center", behavior:"smooth"}); el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash");
+}
 $("#chatFab").onclick=()=>openChat();
 $("#chClose").onclick=()=>closeChat();
 $("#chSend").onclick=()=>sendChat();
-$("#chIn").addEventListener("input", chatCount);
-$("#chIn").addEventListener("keydown", e => { if(e.key==="Enter" && !e.shiftKey && !e.isComposing && matchMedia("(hover:hover)").matches){ e.preventDefault(); sendChat(); } });
+$("#chMute").onclick=()=>{ lsSet("chatMute", chatMuted()?"0":"1"); paintMute(); chatBadge(); toast(chatMuted()?"Sohbet sessizde: baloncukta yalnızca seni anan mesajlar sayılır.":"Sohbet bildirimleri açık."); };
+$("#chIn").addEventListener("input", ()=>{ chatCount(); paintMent(); noteTyping(); });
+$("#chIn").addEventListener("click", paintMent);
+$("#chIn").addEventListener("blur", ()=>setTimeout(()=>{ if(document.activeElement?.closest?.("#chMent")) return; $("#chMent").classList.add("hide"); }, 200));
+$("#chIn").addEventListener("keydown", e => {
+  if(S.mentList?.length && !$("#chMent").classList.contains("hide") && (e.key==="Tab" || (e.key==="Enter" && !e.shiftKey))){ e.preventDefault(); return pickMent(S.mentList[0]); }
+  if(e.key==="Enter" && !e.shiftKey && !e.isComposing && matchMedia("(hover:hover)").matches){ e.preventDefault(); sendChat(); }
+});
+$("#chMent").addEventListener("mousedown", e => e.preventDefault());
+$("#chMent").addEventListener("click", e => { const b=e.target.closest("[data-ment]"); if(b) pickMent(b.dataset.ment); });
+$("#chCtx").addEventListener("click", e => { if(e.target.closest("#chCtxX")) cancelCtx(); });
+$("#chPin").addEventListener("click", async e => {
+  if(e.target.closest("#chUnpin")){ try{ await setDoc(doc(S.db,"chatpin","main"), {id:""}); }catch(x){ toast("Kaldırılamadı."); } return; }
+  const g=e.target.closest("[data-goto]"); if(g) chatGoto(g.dataset.goto);
+});
 $("#chList").addEventListener("click", async e => {
   if(e.target.closest("#chMore")){
     if(!S.chatLastDoc) return; const qd=await getDocs(query(collection(S.db,"chat"), orderBy("at","desc"), startAfter(S.chatLastDoc), limit(100))).catch(()=>null); if(!qd) return;
     S.chatOld.push(...qd.docs.map(d=>({id:d.id, ...d.data()}))); if(qd.docs.length<100) S.chatMore=false; else S.chatLastDoc=qd.docs[qd.docs.length-1];
     return paintChatList("top");
   }
+  if(e.target.closest("a[href]")) return;
+  const find = id => chatAll().find(x=>x.id===id);
+  const g=e.target.closest("[data-goto]"); if(g) return chatGoto(g.dataset.goto);
   const pk=e.target.closest("[data-pick]"); if(pk){ S.chatPick = S.chatPick===pk.dataset.pick ? null : pk.dataset.pick; return paintChatList("stay"); }
+  const rpb=e.target.closest("[data-rep]"); if(rpb){ const m=find(rpb.dataset.rep); if(!m) return;
+    if(S.chatEdit){ S.chatEdit=null; $("#chIn").value=""; }
+    S.chatReply={id:m.id, uid:m.uid, t:m.t.replace(/\s+/g," ").slice(0,100)}; paintCtx(); $("#chIn").focus(); return; }
+  const eb=e.target.closest("[data-edit]"); if(eb){ const m=find(eb.dataset.edit); if(!m) return;
+    if(Date.now()-chatTs(m) >= CHAT_EDIT) return toast("Düzenleme süresi (2 dakika) doldu.");
+    S.chatReply=null; S.chatEdit=m.id; const inp=$("#chIn"); inp.value=m.t; chatCount(); paintCtx(); inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); return; }
+  const pb=e.target.closest("[data-pin]"); if(pb){ const m=find(pb.dataset.pin); if(!m) return;
+    try{ await setDoc(doc(S.db,"chatpin","main"), S.chatPin?.id===m.id ? {id:""} : {id:m.id, uid:m.uid, t:m.t.replace(/\s+/g," ").slice(0,140), by:S.uid, at:serverTimestamp()}); toast(S.chatPin?.id===m.id?"Sabitleme kaldırıldı.":"Mesaj sabitlendi."); }catch(x){ toast("Sabitlenemedi."); }
+    return; }
   const r=e.target.closest("[data-re]"); if(r){
-    const m=chatAll().find(x=>x.id===r.dataset.m); if(!m) return; const mine=(m.re||{})[S.uid];
+    const m=find(r.dataset.m); if(!m) return; const mine=(m.re||{})[S.uid];
     S.chatPick=null;
     try{ await updateDoc(doc(S.db,"chat",m.id), {[`re.${S.uid}`]: mine===r.dataset.re ? deleteField() : r.dataset.re}); }catch(x){ toast("Tepki kaydedilemedi."); }
     return paintChatList("stay");
   }
   const d=e.target.closest("[data-del]"); if(d){
     if(d.dataset.sure!=="1"){ d.dataset.sure="1"; d.textContent="Emin misin?"; setTimeout(()=>{ if(d.isConnected){ d.dataset.sure=""; d.textContent="Sil"; } }, 3000); return; }
-    try{ await deleteDoc(doc(S.db,"chat",d.dataset.del)); S.chatOld=S.chatOld.filter(x=>x.id!==d.dataset.del); paintChatList("stay"); }catch(x){ toast("Silinemedi."); }
+    const id=d.dataset.del;
+    try{ await deleteDoc(doc(S.db,"chat",id)); S.chatOld=S.chatOld.filter(x=>x.id!==id); if(S.chatPin?.id===id && S.isAdmin) setDoc(doc(S.db,"chatpin","main"), {id:""}).catch(()=>{}); paintChatList("stay"); }catch(x){ toast("Silinemedi."); }
   }
 });
 
