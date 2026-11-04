@@ -45,10 +45,11 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.19.4";
+const VERSION = "1.19.5";
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.19.5", d:"4 Kasım 2026", items:["Düzeltme: deneme haftası penceresindeki \"Anladım, oynamaya başla\" düğmesi pencereyi kapatmıyordu.","Bir pencere kapatılamaz durumda kalmasın diye her yeni pencere kilitsiz açılıyor."]},
   {v:"1.19.4", d:"4 Kasım 2026", items:["Kayıtta mail adresi artık atlanamıyor; onay kodu istersen sonra Profil → Ayarlar'dan girilebiliyor. Kod girilene kadar hiçbir mail gönderilmiyor.","Favori takım adımında Takımım sekmesi anlatılıyor.","Oyuncu adlarında son ek düzeltmesi: \"III\" yerine \"Murphy III\", \"Jr.\" yerine \"Jackson Jr.\" yazıyor."]},
   {v:"1.19.3", d:"4 Kasım 2026", items:["Güvenlik sorusu artık \"en sevdiğin\" takım ve oyuncuyu sormuyor: tahmin edilemesin diye seninle alakasız bir gizli takım ve gizli oyuncu seçmen isteniyor."]},
   {v:"1.19.2", d:"4 Kasım 2026", items:["Üstteki puan panosu az oyuncu varken de sıralama listesi olarak görünüyor (iki kişilik VS görünümü kalktı)."]},
@@ -1728,6 +1729,7 @@ async function openBox(g){
   $("#shBody").innerHTML = `<h3 id="shTitle">${esc(g.away.name)} ${g.away.score??""} – ${g.home.score??""} ${esc(g.home.name)}</h3><p class="muted" style="margin-top:-6px">${gameStatusTR(g)} · SA: isabet-deneme, 3S: üçlük, SB: serbest atış</p>${table("away")}${table("home")}`;
 }
 function openSheet(html){ if($("#sheet").classList.contains("hide")){ try{ history.pushState({sheet:1}, ""); }catch(e){} }
+  S.sheetLocked=false; $("#shClose").classList.remove("hide");
   $("#shBody").innerHTML=html; $("#sheet").classList.remove("hide"); $$("#sheet, #sheet *").forEach(el=>{ if(el.scrollTop) el.scrollTop=0; }); document.body.style.overflow="hidden"; $("#shClose").focus(); }
 function closeSheet(fromPop){ if(S.sheetLocked){ if(fromPop) try{ history.pushState({sheet:1}, ""); }catch(e){} return; }
   if($("#sheet").classList.contains("hide")) return;
@@ -1825,7 +1827,7 @@ function maybeLeaguePop(){
   const nice=(d,o={day:"numeric",month:"long"})=>dayNice(d,o), go=shiftDay(t.end,1);
   if(trialActive() && !lsGet("trialPop_"+t.end)){
     lsSet("trialPop_"+t.end,"1");
-    return openSheet(`<div class="rules lg-pop"><div class="lg-ico">🧪</div><h3 id="shTitle">Bu hafta deneme haftası</h3>
+    openSheet(`<div class="rules lg-pop"><div class="lg-ico">🧪</div><h3 id="shTitle">Bu hafta deneme haftası</h3>
       <p><b>${nice(baseStart())} – ${nice(t.end)}</b> arası deneme ligi. Tahmin yap, puan topla, siteyi tanı: her şey gerçeği gibi sayılıyor.</p>
       <p><b>${nice(go,{day:"numeric",month:"long",weekday:"long"})}</b> puanlar, rozetler ve istatistikler sıfırlanacak, asıl lig o gün başlayacak. Hesabın, profilin, avatarın ve ayarların olduğu gibi kalır. Deneme haftasının tablosu "Geçmiş ligler"de saklanır.</p>
       <button class="btn-primary" type="button" id="lgPopOk">Anladım, oynamaya başla</button></div>`);
@@ -3805,11 +3807,10 @@ function secPicker(box, setup){
   return { value: () => (st.team && st.pid) ? {team:st.team, playerId:st.pid} : null, focus: () => sel.focus() };
 }
 function openRecoverySheet(required){
-  S.sheetLocked = required;
-  $("#shClose").classList.toggle("hide", required);
   openSheet(`<h3 id="shTitle">Güvenlik sorusu</h3>
     <p class="muted">${required?"Şifreni unutursan sıfırlayabilmen için bir kez seçmen gerekiyor.":"Yeni cevabın eskisinin yerine geçer."} Seçtiğin takım ve oyuncuyu kimseye söyleme.</p>
     <div id="recBox"></div><p class="err" id="recErr"></p><button class="btn-primary" id="recSave" type="button">Kaydet</button>`);
+  S.sheetLocked = required; $("#shClose").classList.toggle("hide", required);
   const pk = secPicker($("#recBox"), true);
   $("#recSave").onclick = async () => {
     const v = pk.value(); if(!v){ $("#recErr").textContent = "Takımı seç ve listeden bir oyuncuya dokun."; return; }
