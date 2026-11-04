@@ -4,7 +4,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, connectAuthEmulator }
   from "https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, collection, query, where, writeBatch, serverTimestamp, Timestamp, arrayUnion, connectFirestoreEmulator }
+import { getFirestore, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, collection, query, where, writeBatch, serverTimestamp, Timestamp, arrayUnion, connectFirestoreEmulator, onSnapshot, orderBy, limit, startAfter, deleteField }
   from "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js";
 
 const $ = s => document.querySelector(s);
@@ -45,10 +45,11 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.16.1";
+const VERSION = "1.17.0";
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.17.0", d:"4 Kasım 2026", items:["Lig sohbeti: sağ alttaki baloncuktan herkesin yazdığı ortak sohbete gir. Mesajlar canlı akar, okunmamış mesaj sayısı baloncukta görünür.","Mesajlara emoji tepkisi bırakabilir, kendi mesajını silebilirsin. 5 saniyede bir mesaj, en fazla 500 karakter.","Sert küfür koruması: küfürler, kısaltmaları (amk, aq, oç, sg, mk…) ve harf oyunlarıyla yazılmış hâlleri sohbette ve maç yorumlarında yazılamıyor."]},
   {v:"1.16.1", d:"4 Kasım 2026", items:["Üst çubukta Davet et düğmesi: sana özel davet linkini gösteriyor; tek dokunuşla kopyala, WhatsApp'ta gönder ya da paylaş."]},
   {v:"1.16.0", d:"4 Kasım 2026", items:["Üst çubukta Kurallar'ın yanında ayrı bir Puanlama düğmesi: puan rehberi tek dokunuşla açılıyor.","Gecenin sorusu yenilendi (5 Kasım'dan itibaren): sorudaki sayı gecenin maç sayısına göre seçiliyor, cevap yaklaşık yarı yarıya. \"Ev sahipleri bütün maçlarını kazanır mı?\" gibi neredeyse kesin sorular kalktı."]},
   {v:"1.15.0", d:"4 Kasım 2026", items:["Profil analizi: sayıyla fark tahmininde ±3 tutturma oranı, ortalama şaşma ve farkı az mı çok mu tahmin ettiğin.","Puanların nereden geldi ve sezon özeti: sürpriz ekini, devamlılık bonusunu ve yedek tahmini ayrı gösteriyor.","Tahminler'de gece özeti: Gecenin sürprizi ve onu bilenler.","Alt bilgideki puan özeti güncellendi, puanlama rehberine bağlantı."]},
@@ -258,6 +259,7 @@ EN_RX.push(
   [/^Sen tek başına (.+) dedin$/, "Only you picked $1"], [/^Azınlıktasın \((.+)\)$/, "You're in the minority ($1)"], [/^(\d+) kez$/, "$1 times"], [/^(\d+)\/(\d+) tuttu$/, "$1/$2 hit"],
   [/^(\d+) oyuncunun seçimi$/, "picks of $1 players"], [/^Bu gece (\d+) maç var\.(.*)$/, "$1 games tonight.$2"], [/^Takım (\d+)-(\d+)$/, "Team $1-$2"], [/^takım (\d+)-(\d+)$/, "team $1-$2"],
   [/^(\d+) maçlık gece; eşik, cevap yarı yarıya olsun diye maç sayısına göre seçildi\.$/, "$1-game night; the number is set by tonight's game count so the answer is roughly 50/50."],
+  [/^Biraz yavaş: (\d+) saniye sonra tekrar gönderebilirsin\.$/, "Slow down: you can send again in $1 s."], [/^Mesaj en fazla (\d+) karakter olabilir\.$/, "Messages can be up to $1 characters."],
   [/^(\d+) sayı$/, "$1 pts"], [/^(.+) baremi$/, "$1 range"], [/^Lige getirdiği: (.+)$/, "Brought in: $1"],
 );
 // tarih ve saatler İngilizce yazılsın
@@ -1366,10 +1368,53 @@ $("#dayPlayer").addEventListener("click", e => {
   saveDaily({q:b.dataset.q});
 });
 
+/* ====================================================== küfür koruması (sohbet, maç yorumları) */
+// Harf oyunları (0→o, 1→i, 4→a, $→s…), tekrarlanan harfler (amkkk), aralara konan nokta/boşluk (a.m.k, a m k),
+// s yerine z/x (zikeyim), "s2m" türü yazımlar ve kısaltmalar (amk, aq, oç, sg, mk, sktr…) yakalanır.
+// Firebase kuralları da en bariz olanları ayrıca engeller, yani site atlatılarak da yazılamaz.
+const CH_F = s => s.toLocaleLowerCase("tr").replace(/\S+/g, w => /[a-zçğışöüâîû]/.test(w) ? w.replace(/[0-9@$!|€]/g, c=>LEET[c]) : " ").normalize("NFD").replace(/[\u0300-\u036f]/g,"");   // ı korunur
+const CH_SQ = s => s.replace(/(.)\1+/g, "$1");
+// kelime bu köklerle BAŞLIYORSA yasak (tekrarlı harfler sadeleştirilmiş hâliyle)
+const CH_ROOT = ["amcik","amck","amcuk","amina","amini","aminda","amindan","aminoglu","amk","amq","aq","awk","orospu","orosbu","oruspu","orspu","orsp","orosp","orostop",
+  "yarak","yarag","yrak","yarram","yaramin","dalyarak","daltasak","tasak","tasag","dasak","dasag","pezeven","pezevek","pzvnk","pzv","kahpe","kaltak","kevase","fahise",
+  "gavat","gavad","yavsak","yavsag","yavusak","serefsiz","srfsz","surtuk","ibne","ipne","ibine","ibina","pust","godos","gotveren","gotelek","gotlek","gotlalesi","gotos","gotun","gotune",
+  "siktir","sikti","siker","sikey","sikim","sikik","sikis","sikiy","sikin","sikip","sikme","sikmi","sikse","siksin","sikec","sikic","sikiir","sikiim","sikko","siko","sike",
+  "sktr","sktir","skerim","skeyim","skiyim","skrm","skim","skem","skcem","skecem","sksin","sksn","skyim","skym","hsktr","hasiktir","zikey","zikim","zikik","zikiim","ziker","xik",
+  "ananisik","ananizi","anasini","anasinin","avradin","bacini","bacina","sulalen","ecdadini","veledizina","weledizina","itoglu",
+  "fuck","fuk","motherf","madafak","bitch","biatch","cunt","whore","slut","nigg","fagg","asshole","pussy","dick","porn","bok"];
+// yalnızca TEK BAŞINA kelime olarak yasak olanlar (başka kelimelerin içinde de geçtikleri için)
+const CH_WORD = new Set(["am","amn","amm","amna","mk","mq","oc","ocuu","pic","pici","picin","picler","sg","sie","sik","skm","sker","yrk","yrrk","anan","anani","ananin","anana","ananiz","ebeni","ebenin","got","gt","gtn","gtne","pic","sex","seks","boka","boku","bokum","boktan","fck","wtf"]);
+// zararsız olup köklerle başlayan kelimeler
+const CH_OK = /^(fukara|sikke|sikkel|sikil|sikint|sikisik|sikistir|sikca|amk?ca|aqua|bokser|boks|dicke?ns|picnic|pick|pust?ula|siko?loj|godoss?$)/;
+// birleşik (boşluksuz) metinde aranacak, kelime aralarına bölünse de yakalanacak uzun kökler
+const CH_JOIN = ["orospu","siktir","amcik","aminakoy","aminako","pezevenk","serefsiz","ananisik","anasinisik","gotveren","dalyarak","motherfuck","fuck"];
+function chatProblem(t){
+  if(!t) return false;
+  const low=t.toLocaleLowerCase("tr");
+  if(/(^|[^a-z0-9])s+2+[a-zçğışöü]/.test(low) || /🖕/u.test(t)) return true;          // s2m, s2k, orta parmak
+  const f1=CH_F(t), f2=f1.replace(/ı/g,"i");
+  const words = f2.split(/[^a-z]+/).filter(Boolean);
+  // a.m.k / a m k gibi tek harflere bölünmüş yazım: art arda gelen tek harfleri birleştir
+  const runs=[]; let cur="";
+  for(const w of f2.split(/[^a-z]+/)){ if(w.length===1) cur+=w; else { if(cur.length>1) runs.push(cur); cur=""; } }
+  if(cur.length>1) runs.push(cur);
+  // "sık-" ile başlayan zararsız kelimeler (sıkıldım, sıkıcı) Türkçe harfle yazılınca engellenmesin
+  const sikOk = new Set(f1.split(/[^a-zı]+/).filter(w=>/^s[ıi]*k/.test(w) && w.includes("ı")).map(w=>w.replace(/ı/g,"i")));
+  const all=[...words, ...runs];
+  for(let i=0;i<all.length;i++){
+    const w=all[i], q=CH_SQ(w);
+    if(CH_OK.test(w) || sikOk.has(w)) continue;
+    if(q==="am" && i>0 && all[i-1]==="i") continue;                      // İngilizce "I am"
+    if(CH_WORD.has(w) || CH_WORD.has(q)) return true;
+    if(CH_ROOT.some(r=>q.startsWith(CH_SQ(r)) || w.startsWith(r))) return true;
+  }
+  const joined=CH_SQ(f2.replace(/[^a-z]/g,""));
+  return CH_JOIN.some(x=>joined.includes(CH_SQ(x)));
+}
+
 /* ====================================================== laf atma */
 const TALK_EMOJI = ["😂","🔥","🤡","😱","👏","💀","🎯","🙏"];
-const textProblem = t => { const f=foldName(t), joined=squeeze(f.replace(/[^a-z]/g,"")), words=f.split(/[^a-z]+/).filter(Boolean).map(squeeze);
-  return BAD_SUB.some(x=>joined.includes(x)) || words.some(w=>BAD_WORD.has(w)); };
+const textProblem = t => chatProblem(t);
 // Hakkında satırı için ek kontrol: argo / hakaret kökleri (harf oyunlarına karşı sadeleştirilmiş metinde aranır)
 const BIO_BAD = ["salak","aptal","gerizekal","mal ","dangalak","pic","pust","kodum","gavat","yavsak","serefsiz","orospu","sik","amk","aq ","oc ","got","yarak","yarrak","ibne","kahpe","pezevenk","fuck","shit","bitch","dick","pussy","bastard"];
 function bioProblem(t){
@@ -4056,6 +4101,118 @@ async function openInvite(){
 }
 $("#invBtn").onclick=()=>openInvite();
 
+/* ====================================================== lig sohbeti */
+// chat/{id}: {uid, t (≤500), at (sunucu saati), re:{uid:emoji}}. Son 100 mesaj canlı dinlenir; eskiler istenince yüklenir.
+// chatlim/{uid}: son mesaj saati; Firebase kuralı 5 saniyeden sık mesajı reddeder.
+const CHAT_MAX=500, CHAT_GAP=5000, CHAT_EMOJI=["👍","😂","🔥","😮","👏","💀"];
+S.chat=[]; S.chatOld=[]; S.chatMore=true;
+const chatTs = m => m.at?.toMillis ? m.at.toMillis() : Date.now();
+const chatSeen = () => { try{ return +localStorage.getItem("chatSeen")||0; }catch(e){ return 0; } };
+const setChatSeen = v => { try{ localStorage.setItem("chatSeen", String(v)); }catch(e){} };
+function startChat(){
+  if(S.chatUnsub) return;
+  S.chatUnsub = onSnapshot(query(collection(S.db,"chat"), orderBy("at","desc"), limit(100)), snap => {
+    S.chat = snap.docs.map(d=>({id:d.id, ...d.data({serverTimestamps:"estimate"})}));
+    if(snap.docs.length<100) S.chatMore=false; else S.chatLastDoc=snap.docs[snap.docs.length-1];
+    chatBadge(); if(S.chatOpen) paintChatList();
+  }, () => {});
+}
+function stopChat(){ if(S.chatUnsub){ S.chatUnsub(); S.chatUnsub=null; } S.chat=[]; S.chatOld=[]; chatBadge(); }
+function chatAll(){ const m=new Map(); for(const x of [...S.chatOld, ...S.chat]) m.set(x.id, x); return [...m.values()].sort((a,b)=>chatTs(a)-chatTs(b)); }
+function chatBadge(){
+  const fab=$("#chatFab"); if(!fab) return;
+  fab.classList.toggle("hide", !S.uid);
+  const seen=chatSeen(), n=S.chatOpen ? 0 : S.chat.filter(m=>m.uid!==S.uid && chatTs(m)>seen).length;
+  const b=$("#chatN"); b.textContent = n>99 ? "99+" : n; b.classList.toggle("hide", !n);
+  fab.setAttribute("aria-label", n ? `Lig sohbeti, ${n} yeni mesaj` : "Lig sohbeti");
+}
+const chatDK = d => d.toLocaleDateString("en-CA",{timeZone:TZ});
+const chatDay = ms => { const d=new Date(ms), k=chatDK(d), t=chatDK(new Date()), y=chatDK(new Date(Date.now()-864e5));
+  return k===t ? "Bugün" : k===y ? "Dün" : d.toLocaleDateString(LOC,{timeZone:TZ, day:"numeric", month:"long", weekday:"long"}); };
+function chatMsgHTML(m, prev){
+  const mine=m.uid===S.uid, same=prev && prev.uid===m.uid && chatTs(m)-chatTs(prev)<5*60e3;
+  const re=m.re||{}, cnt={}; for(const [u,e] of Object.entries(re)) if(CHAT_EMOJI.includes(e)) (cnt[e]=cnt[e]||[]).push(u);
+  const chips=Object.entries(cnt).map(([e,us])=>`<button class="ch-re ${us.includes(S.uid)?"on":""}" data-re="${e}" data-m="${m.id}" type="button" title="${esc(us.map(pname).join(", "))}">${e}<b>${us.length}</b></button>`).join("");
+  const canDel = mine || S.isAdmin;
+  return `<div class="ch-msg ${mine?"me":""} ${same?"cont":""}" data-id="${m.id}">
+    ${same||mine ? `<span class="ch-av"></span>` : `<span class="ch-av">${avatar(m.uid)}</span>`}
+    <div class="ch-b">
+      ${same||mine ? "" : `<b class="ch-n" style="color:${col(m.uid)}">${esc(pname(m.uid))}</b>`}
+      <div class="ch-t">${esc(m.t).replace(/\n/g,"<br>")}</div>
+      <div class="ch-meta"><span class="ch-tm">${timeTR(new Date(chatTs(m)))}</span>
+        <button class="ch-act" data-pick="${m.id}" type="button" aria-label="Tepki ver">☺︎+</button>${canDel?`<button class="ch-act" data-del="${m.id}" type="button" aria-label="Mesajı sil">Sil</button>`:""}</div>
+      ${chips?`<div class="ch-res">${chips}</div>`:""}
+      ${S.chatPick===m.id?`<div class="ch-pick">${CHAT_EMOJI.map(e=>`<button data-re="${e}" data-m="${m.id}" type="button" aria-pressed="${re[S.uid]===e}">${e}</button>`).join("")}</div>`:""}
+    </div></div>`;
+}
+function paintChatList(keep){
+  const box=$("#chList"); if(!box) return;
+  const atEnd = box.scrollHeight-box.scrollTop-box.clientHeight < 80, oldH=box.scrollHeight, oldTop=box.scrollTop;
+  const ms=chatAll(); let html=S.chatMore?`<button class="btn ch-more" id="chMore" type="button">Daha eski mesajlar</button>`:"", day="";
+  if(!ms.length) html+=`<p class="ch-empty">Henüz mesaj yok. İlk mesajı sen yaz.</p>`;
+  ms.forEach((m,i)=>{ const d=chatDay(chatTs(m)); if(d!==day){ day=d; html+=`<div class="ch-day"><span>${d}</span></div>`; } html+=chatMsgHTML(m, d===chatDay(chatTs(ms[i-1]||{}))?ms[i-1]:null); });
+  box.innerHTML=html;
+  if(keep==="top") box.scrollTop = box.scrollHeight-oldH+oldTop;
+  else if(keep==="stay" || !atEnd) box.scrollTop=oldTop;
+  else box.scrollTop=box.scrollHeight;
+  if(ms.length) setChatSeen(Math.max(chatSeen(), chatTs(ms[ms.length-1])));
+}
+function openChat(){
+  S.chatOpen=true; const el=$("#chat"); el.classList.remove("hide"); document.body.style.overflow="hidden";
+  try{ history.pushState({chat:1}, ""); }catch(e){}
+  paintChatList(); $("#chList").scrollTop=$("#chList").scrollHeight; chatBadge();
+  if(matchMedia("(min-width:700px)").matches) $("#chIn").focus();
+}
+function closeChat(fromPop){
+  if(!S.chatOpen) return; S.chatOpen=false; S.chatPick=null; $("#chat").classList.add("hide"); document.body.style.overflow="";
+  const ms=S.chat; if(ms.length) setChatSeen(Math.max(chatSeen(), ...ms.map(chatTs)));
+  chatBadge(); if(!fromPop && history.state?.chat){ S.popSkip=true; history.back(); }
+}
+addEventListener("popstate", ()=>{ if(S.chatOpen && !history.state?.chat) closeChat(true); });
+document.addEventListener("keydown", e => { if(e.key==="Escape" && S.chatOpen) closeChat(); });
+async function sendChat(){
+  const inp=$("#chIn"), msg=$("#chMsg"), t=inp.value.replace(/\s+$/,"").replace(/^\s+/,"");
+  if(!t) return;
+  if(t.length>CHAT_MAX){ msg.textContent=`Mesaj en fazla ${CHAT_MAX} karakter olabilir.`; return; }
+  if(chatProblem(t)){ msg.textContent="Bu mesajda küfür ya da hakaret var, gönderilmedi. Sohbette küfürlü kısaltmalar (amk, aq, oç…) da yazılamıyor."; return; }
+  const wait = CHAT_GAP - (Date.now()-(S.chatLast||0));
+  if(wait>0){ msg.textContent=`Biraz yavaş: ${Math.ceil(wait/1000)} saniye sonra tekrar gönderebilirsin.`; return; }
+  const btn=$("#chSend"); btn.disabled=true; msg.textContent="";
+  try{
+    const b=writeBatch(S.db);
+    b.set(doc(S.db,"chatlim",S.uid), {at:serverTimestamp()});
+    b.set(doc(collection(S.db,"chat")), {uid:S.uid, t, at:serverTimestamp(), re:{}});
+    S.chatLast=Date.now(); inp.value=""; chatCount(); await b.commit();
+    $("#chList").scrollTop=$("#chList").scrollHeight;
+  }catch(e){ inp.value=inp.value||t; chatCount(); msg.textContent = e?.code==="permission-denied" ? "Gönderilemedi: 5 saniyede bir mesaj atılabilir ve küfür yazılamaz." : "Gönderilemedi, bağlantını kontrol edip tekrar dene."; }
+  btn.disabled=false; inp.focus();
+}
+function chatCount(){ const n=$("#chIn").value.length; $("#chCnt").textContent = n>CHAT_MAX-100 ? `${n}/${CHAT_MAX}` : ""; $("#chCnt").classList.toggle("over", n>CHAT_MAX);
+  const inp=$("#chIn"); inp.style.height="auto"; inp.style.height=Math.min(120, inp.scrollHeight)+"px"; }
+$("#chatFab").onclick=()=>openChat();
+$("#chClose").onclick=()=>closeChat();
+$("#chSend").onclick=()=>sendChat();
+$("#chIn").addEventListener("input", chatCount);
+$("#chIn").addEventListener("keydown", e => { if(e.key==="Enter" && !e.shiftKey && !e.isComposing && matchMedia("(hover:hover)").matches){ e.preventDefault(); sendChat(); } });
+$("#chList").addEventListener("click", async e => {
+  if(e.target.closest("#chMore")){
+    if(!S.chatLastDoc) return; const qd=await getDocs(query(collection(S.db,"chat"), orderBy("at","desc"), startAfter(S.chatLastDoc), limit(100))).catch(()=>null); if(!qd) return;
+    S.chatOld.push(...qd.docs.map(d=>({id:d.id, ...d.data()}))); if(qd.docs.length<100) S.chatMore=false; else S.chatLastDoc=qd.docs[qd.docs.length-1];
+    return paintChatList("top");
+  }
+  const pk=e.target.closest("[data-pick]"); if(pk){ S.chatPick = S.chatPick===pk.dataset.pick ? null : pk.dataset.pick; return paintChatList("stay"); }
+  const r=e.target.closest("[data-re]"); if(r){
+    const m=chatAll().find(x=>x.id===r.dataset.m); if(!m) return; const mine=(m.re||{})[S.uid];
+    S.chatPick=null;
+    try{ await updateDoc(doc(S.db,"chat",m.id), {[`re.${S.uid}`]: mine===r.dataset.re ? deleteField() : r.dataset.re}); }catch(x){ toast("Tepki kaydedilemedi."); }
+    return paintChatList("stay");
+  }
+  const d=e.target.closest("[data-del]"); if(d){
+    if(d.dataset.sure!=="1"){ d.dataset.sure="1"; d.textContent="Emin misin?"; setTimeout(()=>{ if(d.isConnected){ d.dataset.sure=""; d.textContent="Sil"; } }, 3000); return; }
+    try{ await deleteDoc(doc(S.db,"chat",d.dataset.del)); S.chatOld=S.chatOld.filter(x=>x.id!==d.dataset.del); paintChatList("stay"); }catch(x){ toast("Silinemedi."); }
+  }
+});
+
 // Şifre sıfırlama isteğinin sonucunu bekle (GitHub görevi birkaç dakikada bir çalışır)
 const RESET_MSG = {
   ok:      ["ok",   "Şifren değişti. Yeni şifrenle giriş yapabilirsin."],
@@ -4382,7 +4539,7 @@ if("serviceWorker" in navigator && location.protocol==="https:") navigator.servi
   { const last=lsGet("lastUser"); if(last && S.players[last]){ S.lgUser=last; $("#inName").value=pname(last); } }
   setAuthMode(Q.get("davet") ? "join" : "login"); paintAuthInvite(); renderAuthLive();
   onAuthStateChanged(S.auth, async user=>{
-    if(!user){ S.uid=null; $("#app").classList.add("hide"); $("#me").classList.add("hide"); $("#srch").classList.add("hide"); $("#invBtn").classList.add("hide"); $("#auth").classList.remove("hide"); paintLgPick(); showResetWait(); dispatchEvent(new Event("app-ready")); return; }
+    if(!user){ S.uid=null; $("#app").classList.add("hide"); $("#me").classList.add("hide"); $("#srch").classList.add("hide"); $("#invBtn").classList.add("hide"); stopChat(); closeChat(); $("#auth").classList.remove("hide"); paintLgPick(); showResetWait(); dispatchEvent(new Event("app-ready")); return; }
     S.uid=user.uid;
     if(S.joinP) await S.joinP.catch(()=>{});
     if(S.players?.[S.uid]) S.order=[S.uid, ...S.order.filter(u=>u!==S.uid)];
@@ -4395,7 +4552,7 @@ if("serviceWorker" in navigator && location.protocol==="https:") navigator.servi
         await signOut(S.auth); return; }
     }
     $("#auth").classList.add("hide"); $("#app").classList.remove("hide");
-    $("#me").classList.remove("hide"); $("#srch").classList.remove("hide"); $("#invBtn").classList.remove("hide"); paintMe(); applyTheme();
+    $("#me").classList.remove("hide"); $("#srch").classList.remove("hide"); $("#invBtn").classList.remove("hide"); later(()=>{ startChat(); chatBadge(); }); paintMe(); applyTheme();
     S.statFor=S.uid;
     $("#foot").innerHTML=`Kazanan +1 (sürprizde +2 / +3) · Fark ±3 +1 · En skorer +1 · Banko 2 kat / -1 · Günün oyuncusu +3 · Gecenin sorusu +1 · Haftada 4 gece +2<br><button class="linkish ver" id="pgFoot" type="button">📖 Puanlama rehberi</button><br>Veriler ESPN'den alınır. Maç varken 30 saniyede bir yenilenir.<br><button class="linkish ver" id="verBtn" type="button">Sürüm ${VERSION} · Yenilikler</button> · <button class="linkish ver" id="repBtn" type="button">Sorun bildir</button> · <button class="linkish ver" id="langBtn" type="button">${LANG==="en"?"Türkçe":"English"}</button>`;
     $("#verBtn").onclick=()=>openNews(true); $("#repBtn").onclick=()=>openReport(); $("#langBtn").onclick=()=>setLang(LANG==="en"?"tr":"en");

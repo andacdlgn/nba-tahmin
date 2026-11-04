@@ -337,6 +337,39 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Lig sohbeti: chat/{id} = {uid, t (≤500), at (sunucu saati), re {uid: emoji}}. Yalnızca lig oyuncuları okur/yazar.
+    // Küfür: ayrıntılı kontrol sitede; burada kısaltmalar ve en bariz kökler ayrıca engellenir.
+    function cleanChat(t) {
+      return !t.lower().matches('(?s).*((^|[^\\p{L}])(amk|amq|aq|mk|oç|sg|sie|piç|amına|amını|amcık|ananı|anan|göt|s2[a-zçğışöü]|sktr|skrm|skm)([^\\p{L}]|$)|siktir|sikerim|sikeyim|sikiyim|sikik|orospu|orosbu|yarrak|dalyarak|amınako|aminako|amcık|amcik|pezevenk|kahpe|kaltak|yavşak|şerefsiz|serefsiz|ibne|götveren|fuck|bitch|cunt|nigg|faggot|whore).*');
+    }
+    match /chat/{id} {
+      allow read: if isPlayer();
+      allow create: if isPlayer()
+        && request.resource.data.keys().hasOnly(['uid', 't', 'at', 're']) && request.resource.data.keys().hasAll(['uid', 't', 'at', 're'])
+        && request.resource.data.uid == request.auth.uid
+        && str(request.resource.data.t, 500)
+        && request.resource.data.at == request.time
+        && request.resource.data.re == {}
+        && cleanChat(request.resource.data.t)
+        // hız sınırı: aynı yazımda chatlim/{uid} de bu ana güncellenmeli (5 saniyede bir)
+        && getAfter(/databases/$(database)/documents/chatlim/$(request.auth.uid)).data.at == request.time;
+      // tepki: herkes yalnızca kendi tepkisini koyar, değiştirir ya da kaldırır
+      allow update: if isPlayer()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['re'])
+        && request.resource.data.re is map
+        && request.resource.data.re.diff(resource.data.re).affectedKeys().hasOnly([request.auth.uid])
+        && (!(request.auth.uid in request.resource.data.re) || request.resource.data.re[request.auth.uid] in ['👍', '😂', '🔥', '😮', '👏', '💀']);
+      allow delete: if (signedIn() && resource.data.uid == request.auth.uid) || isAdmin();
+    }
+    match /chatlim/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow create: if signedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['at']) && request.resource.data.at == request.time;
+      allow update: if signedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['at']) && request.resource.data.at == request.time
+        && request.time > resource.data.at + duration.value(5, 's');
+    }
+
     // talk/{maçId}_{uid}: maç kartına emoji tepki ve kısa yorum (laf atma). Herkes görür, sahibi yazar.
     match /talk/{tid} {
       allow read: if signedIn();
