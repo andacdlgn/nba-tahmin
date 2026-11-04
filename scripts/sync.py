@@ -415,7 +415,7 @@ def league_awards(sc, games, players, today, league_start):
         lst.append({"k": "skorer", "i": "🔥", "t": "Skorer ustası", "d": "En skoreri en çok bilen", "u": w, "v": f"{v} maç", "pts": 2})
         w, v = best(lambda x: x["mg"])
         lst.append({"k": "fark", "i": "📏", "t": "Fark ustası", "d": "Farkı en çok tutturan", "u": w, "v": f"{v} maç", "pts": 2})
-        title = "Ekim-Kasım ödülleri" if mk == "202611" else f"{AY[m - 1]} ödülleri"
+        title = f"{AY[m - 1]} ödülleri"   # lig Kasım'da başladığı için Ekim'in son günleri Kasım'a sayılır
         out[mk] = {"title": title, "list": lst}
     return out
 
