@@ -2018,3 +2018,4 @@ h3 .req{font-size:11.5px;font-weight:700;color:var(--muted);margin-left:6px;font
 .rep-k button[aria-pressed="true"]{border-color:var(--amber);background:color-mix(in srgb,var(--amber) 22%,var(--panel-2))}
 .pill-k{font-size:11.5px;font-weight:700;color:var(--muted);margin-left:4px}
 .pf-del{border:1px solid color-mix(in srgb,var(--lose,#c0392b) 45%,var(--line));border-radius:14px;padding:12px}.pf-del h4{color:var(--lose,#c0392b)}
+.inv-note{font-size:13.5px;line-height:1.5;padding:9px 11px;margin:8px 0 10px;border-radius:10px;border-left:3px solid var(--amber);background:var(--panel-2);color:var(--ink)}

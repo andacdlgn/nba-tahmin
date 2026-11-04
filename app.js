@@ -45,10 +45,11 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.21.1";
+const VERSION = "1.21.2";
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.21.2", d:"4 Kasım 2026", items:["Davet mesajında bu gecenin ilk kilit saati ve deneme haftası bilgisi yazıyor.","Mail adresi onaylanmamış olanlara daha açık bir hatırlatma: neden gerekli olduğu ve kodun nasıl girileceği."]},
   {v:"1.21.1", d:"4 Kasım 2026", items:["Profil → Ayarlar'ın en altında \"Profilimi sil\": hesabını ve bütün verini kalıcı olarak silebilirsin.","Giriş ekranında \"Giriş yapan\" kartındaki fotoğraf artık yuvarlak, basık görünmüyor."]},
   {v:"1.21.0", d:"4 Kasım 2026", items:["Üst çubukta İstekler düğmesi: sorun, istek, öneri ya da soru yaz; doğrudan lig yöneticisinin mailine gider, yönetici yanıtlayınca cevap senin mailine gelir."]},
   {v:"1.20.0", d:"4 Kasım 2026", items:["Otomatik tahmin (eski adıyla yedek tahmin) kayıt sırasında zorunlu bir seçim oldu; Profil → Ayarlar'ın en üstünde açık/kapalı durumu görünüyor.","Kurallar ve Puanlama rehberi baştan gözden geçirildi: otomatik tahmin, deneme haftası, sohbet, mail ve konferans sıralaması puanları eklendi; playoff'ta neyin katlandığı netleşti."]},
@@ -2691,7 +2692,7 @@ function renderBanners(){
   const n=S.notice;
   if(n?.text && lsGet("noticeSeen")!==String(n.at)) html += `<div class="banner notice"><span class="bn-i">${ICON.megaphone}</span><span class="bn-t">${esc(n.text)}</span><button class="bn-x" data-bn="notice" aria-label="Kapat">✕</button></div>`;
   const later=+(lsGet("mailNudge")||0);
-  if(S.contactLoaded && !S.contact?.verified && Date.now()>later) html += `<div class="banner nudge"><span class="bn-i">${ICON.mail}</span><span class="bn-t"><b>${S.contact?.email?"Mail adresini onayla":"Mail adresini ekle"}</b> Onaylı adres olmadan hatırlatma maili gelmez ve şifreni unutursan kodla sıfırlayamazsın.</span>
+  if(S.contactLoaded && !S.contact?.verified && Date.now()>later) html += `<div class="banner nudge"><span class="bn-i">${ICON.mail}</span><span class="bn-t"><b>${S.contact?.email?"Mail onay kodunu gir":"Mail adresini ekle"}</b> ${S.contact?.email?"Adresin kayıtlı ama onaylanmadı. Kodu girmezsen hiçbir mail gelmez; şifreni unutursan mail ile sıfırlayamazsın.":"Onaylı adres olmadan hatırlatma maili gelmez ve şifreni unutursan kodla sıfırlayamazsın."}</span>
     <span class="bn-acts"><button class="btn sm" data-bn="mail">${S.contact?.email?"Onayla":"Ekle"}</button><button class="linkish" data-bn="later">Sonra</button></span></div>`;
   // Profilini özelleştirmemiş olana (favori takım ya da avatar seçmemiş) hatırlatma
   const me=S.players[S.uid];
@@ -4083,15 +4084,17 @@ function openOnboard(step){
   }
   if(step===5){
     const em=S.contact?.email||"", rem=S.contact?.remind ?? true, wk=S.contact?.weekly ?? true;
-    openSheet(`${S.onboard?stepBar(5):""}<h3 id="shTitle">Mail adresin</h3>
+    const unver = !!em && !S.contact?.verified;
+    openSheet(`${S.onboard?stepBar(5):""}<h3 id="shTitle">${unver?"Mail adresini onayla":"Mail adresin"}</h3>
+      ${unver?`<div class="inv-note">📩 <b>${esc(em)}</b> kayıtlı ama henüz onaylanmadı. Onaylamazsan hatırlatma ve haftalık özet gelmez; şifreni unutursan mail ile sıfırlayamazsın, sadece güvenlik sorusu kalır. "Kodu tekrar gönder"e bas, gelen 6 haneli kodu gir. Kod gelmezse spam klasörüne bak.</div>`:""}
       <p class="muted">Mail adresini yaz, sana 6 haneli bir onay kodu gönderelim. Kodu <b>şimdi</b> girebilir ya da <b>sonra Profil → Ayarlar'dan</b> girebilirsin. <b>Kodu girene kadar sana hiçbir mail gelmez</b> (hatırlatma, haftalık özet, şifre sıfırlama). Adresini yalnızca sen görürsün.</p>
       <label class="fld"><span>E-posta</span><input id="obMail" type="email" autocomplete="email" inputmode="email" placeholder="ornek@gmail.com" value="${esc(em)}"></label>
       <div class="ob-opts"><b>Hangi mailler gelsin?</b> <small class="muted">İsteğe bağlı, sonra Ayarlar'dan değiştirebilirsin.</small>
         <label class="ob-chk"><input type="checkbox" id="obRemind" ${rem?"checked":""}><span>Eksik tahmin ve sakatlık hatırlatmaları</span></label>
         <label class="ob-chk"><input type="checkbox" id="obWeekly" ${wk?"checked":""}><span>Pazartesi haftalık özet</span></label>
         <label class="ob-chk dis"><input type="checkbox" checked disabled><span>Şifre sıfırlama kodu (her zaman)</span></label></div>
-      <button class="btn-primary" id="obSend" type="button">Kaydet ve onay kodu gönder</button>
-      <div id="obCodeBox" class="hide"><div class="fld"><span>Maildeki 6 haneli kod</span><input id="obCode" inputmode="numeric" maxlength="6" autocomplete="one-time-code" data-show="1" aria-label="Onay kodu"></div>
+      <button class="btn-primary" id="obSend" type="button">${unver?"Kodu tekrar gönder":"Kaydet ve onay kodu gönder"}</button>
+      <div id="obCodeBox" class="${unver?"":"hide"}"><div class="fld"><span>Maildeki 6 haneli kod</span><input id="obCode" inputmode="numeric" maxlength="6" autocomplete="one-time-code" data-show="1" aria-label="Onay kodu"></div>
         <button class="btn-primary" id="obOk" type="button">Onayla ve bitir</button></div>
       <p class="muted" id="obMsg" style="margin-top:8px"></p>
       <button class="linkish ob-skip ${em?"":"hide"}" id="obSkip" type="button">Kodu sonra gireceğim</button>`);
@@ -4168,13 +4171,22 @@ function paintAuthInvite(){
   if(r && S.players[r]){ el.classList.remove("hide"); el.innerHTML=`${avatar(r,"lg")}<span><b>${esc(pname(r))}</b> seni NBA Tahmin ligine davet etti.<small>Aşağıdan birkaç adımda katılabilirsin.</small></span>`; }
   else if(S.jw.inv){ el.classList.remove("hide"); el.innerHTML=`<span class="av lg">🏀</span><span><b>NBA Tahmin ligine davet edildin.</b><small>Aşağıdan birkaç adımda katılabilirsin.</small></span>`; }
 }
+// Davet mesajı: bu gecenin ilk kilidi (geçmediyse) ve deneme haftası bilgisiyle
+function inviteNote(){
+  const D=S.days[S.today], first=D?.games?.length ? D.games[0].nightLock : null, out=[];
+  if(first && first.getTime()>Date.now()) out.push(`Bu gecenin ilk maçı ${timeTR(first)}'de kilitleniyor; ondan önce katılırsan bu geceden oynarsın.`);
+  const t=trialActive?.() ? trialOf() : null;
+  if(t) out.push(`Bu hafta deneme haftası, asıl lig ${dayNice(shiftDay(t.end,1),{day:"numeric",month:"long"})}'da başlıyor.`);
+  return out;
+}
+const inviteText = url => [`${pname(S.uid)} seni NBA Tahmin'e davet ediyor! Her gece NBA maçlarına tahmin yapıp puan topluyoruz.`, ...inviteNote(), `Katılmak için: ${url}`].join(" ");
 // Davet linki: herkes kendi linkini paylaşır (ref = davet eden); kaç kişiyi getirdiği profilde görünür
 const invitedBy = u => S.order.filter(x=>S.players[x]?.ref===u);
 async function shareInvite(msgEl){
   if(!S.invite){ try{ const r=await getDoc(doc(S.db,"config","secret")); S.invite=r.data()?.invite||""; }catch(e){} }
   if(!S.invite){ if(msgEl) msgEl.textContent="Davet kodu alınamadı."; return; }
   const url=`${location.origin}${location.pathname}?davet=${encodeURIComponent(S.invite)}&ref=${S.uid}`;
-  const text=`${pname(S.uid)} seni NBA Tahmin'e davet ediyor! Her gece maçlara tahmin yapıyoruz: ${url}`;
+  const text=inviteText(url);
   try{ if(navigator.share){ await navigator.share({title:"NBA Tahmin", text, url}); return; } }catch(e){ if(e.name==="AbortError") return; }
   try{ await navigator.clipboard.writeText(url); if(msgEl) msgEl.textContent="Link kopyalandı."; else toast("Davet linkin kopyalandı."); }catch(e){ if(msgEl) msgEl.textContent=url; }
 }
@@ -4188,9 +4200,10 @@ async function openInvite(){
   openSheet(`<div class="rules inv-sh"><h3 id="shTitle">Arkadaşını davet et</h3><p class="muted">Link hazırlanıyor…</p></div>`);
   const url=await inviteUrl(), box=$("#sheet .inv-sh"); if(!box) return;
   if(!url){ box.innerHTML=`<h3 id="shTitle">Arkadaşını davet et</h3><p>Davet linki şu an alınamadı. Biraz sonra tekrar dene.</p>`; return; }
-  const text=`${pname(S.uid)} seni NBA Tahmin'e davet ediyor! Her gece maçlara tahmin yapıyoruz: ${url}`, mine=invitedBy(S.uid);
+  const text=inviteText(url), mine=invitedBy(S.uid), note=inviteNote();
   box.innerHTML=`<h3 id="shTitle">Arkadaşını davet et</h3>
     <p>Bu link sana özel. Linkle gelen kişiye davet kodu sorulmaz, birkaç adımda lige katılır ve profilinde "Lige getirdiği" olarak senin adınla görünür.</p>
+    ${note.length?`<div class="inv-note">⏰ ${note.map(esc).join("<br>")}<br><small class="muted">Bu bilgi WhatsApp ve paylaşma mesajına da ekleniyor.</small></div>`:""}
     <div class="inv-row"><input id="invUrl" readonly value="${esc(url)}" aria-label="Davet linki"><button class="btn" id="invCopy" type="button">${ICON.link}Kopyala</button></div>
     <div class="inv-acts"><a class="btn" id="invWa" href="https://wa.me/?text=${encodeURIComponent(text)}" target="_blank" rel="noopener">WhatsApp'ta gönder</a>${navigator.share?`<button class="btn" id="invShare" type="button">Başka bir uygulamayla paylaş</button>`:""}</div>
     <small class="muted" id="invMsg">${mine.length?`Şimdiye kadar ${mine.length} kişiyi getirdin: ${mine.map(x=>esc(pname(x))).join(", ")}.`:"Henüz linkinle kimse katılmadı."}</small>`;
