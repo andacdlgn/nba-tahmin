@@ -371,6 +371,12 @@ service cloud.firestore {
           && (!('mn' in request.resource.data) || (request.resource.data.mn is list && request.resource.data.mn.size() <= 10))));
       allow delete: if (signedIn() && resource.data.uid == request.auth.uid) || isAdmin();
     }
+    // profil silme isteği: oyuncu yalnızca kendisi için ister; arka plan görevi hesabı ve verisini siler
+    match /deleteReq/{uid} {
+      allow read: if false;
+      allow create: if isPlayer() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['at']) && request.resource.data.at == request.time;
+    }
     // yazıyor göstergesi: herkes yalnızca kendi kaydını yazar ve siler
     match /typing/{uid} {
       allow read: if isPlayer();

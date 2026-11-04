@@ -45,10 +45,11 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.21.0";
+const VERSION = "1.21.1";
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.21.1", d:"4 Kasım 2026", items:["Profil → Ayarlar'ın en altında \"Profilimi sil\": hesabını ve bütün verini kalıcı olarak silebilirsin.","Giriş ekranında \"Giriş yapan\" kartındaki fotoğraf artık yuvarlak, basık görünmüyor."]},
   {v:"1.21.0", d:"4 Kasım 2026", items:["Üst çubukta İstekler düğmesi: sorun, istek, öneri ya da soru yaz; doğrudan lig yöneticisinin mailine gider, yönetici yanıtlayınca cevap senin mailine gelir."]},
   {v:"1.20.0", d:"4 Kasım 2026", items:["Otomatik tahmin (eski adıyla yedek tahmin) kayıt sırasında zorunlu bir seçim oldu; Profil → Ayarlar'ın en üstünde açık/kapalı durumu görünüyor.","Kurallar ve Puanlama rehberi baştan gözden geçirildi: otomatik tahmin, deneme haftası, sohbet, mail ve konferans sıralaması puanları eklendi; playoff'ta neyin katlandığı netleşti."]},
   {v:"1.19.5", d:"4 Kasım 2026", items:["Düzeltme: deneme haftası penceresindeki \"Anladım, oynamaya başla\" düğmesi pencereyi kapatmıyordu.","Bir pencere kapatılamaz durumda kalmasın diye her yeni pencere kilitsiz açılıyor."]},
@@ -4542,7 +4543,10 @@ function paintProfile(){
       <button class="btn" id="pfMailSave" style="margin-top:10px">Tercihleri kaydet</button><small class="muted" id="pfMailMsg"></small></div>
     <div class="pf-sec"><button class="btn admin-btn" id="histBtn" type="button">${ICON.list}Tahmin geçmişim</button></div>
     ${S.isAdmin?`<div class="pf-sec"><button class="btn admin-btn" id="adminBtn" type="button">${ICON.tools}Yönetim paneli</button></div>`:""}
-    <div class="pf-sec pf-acts"><button class="btn" id="secChange">Güvenlik sorusunu değiştir</button><button class="btn" id="logout">Çıkış yap</button></div>`;
+    <div class="pf-sec pf-acts"><button class="btn" id="secChange">Güvenlik sorusunu değiştir</button><button class="btn" id="logout">Çıkış yap</button></div>
+    ${S.isAdmin?"":`<div class="pf-sec pf-del"><h4>Profilimi sil</h4><small class="muted" style="display:block;margin:0 0 8px">Hesabın, bütün tahminlerin, uzun vade seçimlerin, sohbet mesajların ve mail adresin <b>kalıcı olarak</b> silinir; puan tablosundan çıkarsın. Geri alınamaz. Aynı adla sonra yeniden kayıt olabilirsin.</small>
+      <div class="adm-row"><input id="pfDelOk" class="adm-in" maxlength="40" autocomplete="off" placeholder="Onay için adını yaz: ${esc(me.name||"")}"><button class="btn danger" id="pfDel" type="button">Profilimi sil</button></div>
+      <small class="err" id="pfDelErr"></small></div>`}`;
   if(!ALLP) allPlayers().then(()=>paintProfile()).catch(()=>{});
   box.onclick = e => {
     const c=e.target.closest("[data-col]"); if(c) return saveProfile({color:c.dataset.col});
@@ -4572,6 +4576,15 @@ function paintProfile(){
     $("#pfBioErr").textContent=""; await saveProfile({bio:v}); toast(v?"Hakkında yazın kaydedildi.":"Hakkında yazın kaldırıldı.");
   };
   $("#logout").onclick=async()=>{ closeSheet(); S.contact=null; await signOut(S.auth); applyTheme(); };
+  $("#pfDel")?.addEventListener("click", ()=>{
+    const v=($("#pfDelOk").value||"").trim(), nm=(S.players[S.uid]?.name||"").trim();
+    if(!nm || v.toLocaleLowerCase("tr")!==nm.toLocaleLowerCase("tr")){ $("#pfDelErr").textContent=`Onaylamak için kutuya adını (${nm}) yaz.`; return; }
+    confirmBtn($("#pfDel"), "Emin misin? Tekrar dokun", async()=>{
+      try{ await setDoc(doc(S.db,"deleteReq",S.uid), {at:serverTimestamp()});
+        closeSheet(); toast("Profilin siliniyor; yarım dakika içinde tamamen kaldırılır. Görüşmek üzere!", 5000);
+        setTimeout(async()=>{ S.contact=null; try{ await signOut(S.auth); }catch(e){} applyTheme(); }, 1500);
+      }catch(e){ $("#pfDelErr").textContent="İstek gönderilemedi, tekrar dene."; } });
+  });
   if(!S.contact && !S.contactLoading){
     S.contactLoading=true;
     getDoc(doc(S.db,"contacts",S.uid)).then(r=>{ S.contactLoading=false; S.contact = r.exists() ? r.data() : {email:"",remind:false}; if($("#pfMail")){ $("#pfMail").value=S.contact.email||""; $("#pfRemind").checked=!!S.contact.remind; $("#pfWeekly").checked=!!S.contact.weekly; paintMail(); } }).catch(()=>{ S.contactLoading=false; });
