@@ -45,7 +45,7 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.21.11";
+const VERSION = "1.21.12";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
@@ -1079,7 +1079,7 @@ function gameCard(g){
     const rows = ord.map(u => { const p = D.picks[g.id]?.[u]; return p ? pickCell(g, p, u, D.daily[u]?.confGame===g.id) : `<div class="prow" style="--pc:${col(u)}"><span class="who">${esc(pname(u))}</span><span class="pk muted">Tahmin yapmadı</span><span class="pts">0</span></div>`; }).join("");
     body += lineScore(g) + flowChart(g) + seriesBox(g) + shareBar(D,g) + `<div class="plist">${rows}</div>`;
     const tops = g.state==="post" ? topsOf(g) : liveTops(g);
-    body += `<div class="g-foot"><span class="leaders">${tops?`En skorer: <b>${tops.map(x=>esc(x.name)).join(", ")}</b> ${tops[0].pts} sayı`:""}</span><span class="g-links">${g.state==="post"?`<button class="linkish" data-act="collapse" data-g="${g.id}">Küçült</button>`:""}<button class="linkish" data-act="box" data-g="${g.id}">İstatistikler</button></span></div>` + (g.state!=="pre" ? talkHTML(g) : "");
+    body += `<div class="g-foot"><span class="leaders">${tops?`En skorer${tops.length>1?"ler":""}: <b>${tops.map(x=>esc(x.name)).join(" ve ")}</b> ${tops.length>1?`(${tops.length>2?"hepsi":"ikisi de"} ${tops[0].pts} sayı)`:tops[0].pts+" sayı"}`:""}</span><span class="g-links">${g.state==="post"?`<button class="linkish" data-act="collapse" data-g="${g.id}">Küçült</button>`:""}<button class="linkish" data-act="box" data-g="${g.id}">İstatistikler</button></span></div>` + (g.state!=="pre" ? talkHTML(g) : "");
   }
   const conf = !lock ? `<button class="conf-btn" data-act="conf" data-g="${g.id}" aria-pressed="${confHere}" ${confLocked&&!confHere?"disabled":""} title="Günün bankosu: kazananı bilirsen +2, bilemezsen -1">★ ${confHere?"Banko":"Banko yap"}</button>`
     : confHere ? `<span class="conf-btn" aria-pressed="true">★ Banko</span>` : "";
@@ -2077,7 +2077,7 @@ function renderAyrisma(){
       ${shareBar(D,g)}<div class="fo-body">${sideBox(g,"away",picks)}<div class="fo-vs"><span>VS</span></div>${sideBox(g,"home",picks)}</div>
       ${g.state!=="pre"?(()=>{ const df=Math.abs((g.home.score??0)-(g.away.score??0)), b=bucketOf(g,df), lead=(g.home.score??0)>(g.away.score??0)?g.home.abbr:g.away.abbr;
         return `<div class="fo-res"><div class="fo-ri"><small>${g.state==="post"?"Fark":"Şu anki fark"}</small><b>${df ? `${esc(lead)} +${df}` : "Eşit"}</b><span class="fo-bar">${df && !isRules2(g)?`${b} baremi`:""}</span></div>
-          <div class="fo-ri"><small>${g.state==="post"?"En skorer":"Şu an en skorer"}</small><b>${tops?tops.map(x=>esc(x.name)).join(", "):"—"}</b><span class="fo-bar">${tops?`${tops[0].pts} sayı`:""}</span></div></div>`; })():""}
+          <div class="fo-ri"><small>${g.state==="post"?"En skorer":"Şu an en skorer"}</small><b class="fo-tops">${tops?tops.map(x=>`<span>${esc(x.name)}</span>`).join(""):"—"}</b><span class="fo-bar">${tops&&tops.length>1?"eşit · ":""}${tops?`${tops[0].pts} sayı`:""}</span></div></div>`; })():""}
       ${none.length?`<div class="fo-foot"><span class="muted">Tahmin yapmayan: ${none.map(u=>`<button class="linkish fo-hs" data-hsu="${u}" type="button">${esc(pname(u))}</button>`).join(", ")}</span></div>`:""}</div>`;
   };
   const grp = (t, list, open=true) => list.length ? `<details class="th-grp" ${open?"open":""}><summary><b>${t}</b><span>${list.length} maç</span></summary><div class="split">${list.map(card).join("")}</div></details>` : "";

@@ -2049,3 +2049,5 @@ body.bars-moving .nav{pointer-events:auto}
 body.bars-hidden .chat-fab{transform:none}
 .lb-row .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .lb-row .nm-real{display:block;font-size:12px;font-weight:600;color:var(--board-muted);line-height:1.2;margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fo-ri b.fo-tops span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fo-ri b.fo-tops{white-space:normal}
