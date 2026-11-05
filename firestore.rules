@@ -33,7 +33,7 @@ service cloud.firestore {
         && (!('favTeam' in d) || (d.favTeam is string && d.favTeam.size() <= 5))
         && (!('theme' in d) || d.theme in ['default', 'team'])
         // av: avatar görseli. '' ya da 't:LAL' (takım logosu) ya da 'p:1234567' (oyuncu fotoğrafı)
-        && (!('av' in d) || (d.av is string && d.av.matches('^(t:[A-Z]{2,4}|p:[0-9]{3,10})?$')))
+        && (!('av' in d) || (d.av is string && d.av.matches('^(t:[A-Z]{2,4}|p:[0-9]{3,10}|w:[0-9]{3,10})?$')))
         // bio: profildeki "Hakkında" satırı (en fazla 60 karakter, bariz küfürler engellenir; ayrıntılı kontrol sitede)
         && (!('bio' in d) || (d.bio is string && d.bio.size() <= 60
             && !d.bio.lower().matches('.*(orospu|siktir|sikerim|sikeyim|yarrak|am[iı]nak|amc[iı]k|ibne|pezevenk|kahpe|[sş]erefsiz|fuck|bitch|nigg|faggot).*')))

@@ -45,12 +45,13 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.21.7";
+const VERSION = "1.21.8";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.21.8", d:"5 Kasım 2026", items:["Avatarlara WNBA eklendi: 2026 sezonunun en skorer 15 oyuncusu (A'ja Wilson, Caitlin Clark, Paige Bueckers…)."]},
   {v:"1.21.7", d:"5 Kasım 2026", items:["Gerçek ad: Profil → Ayarlar'dan adını değiştirebilirsin; giriş adın da birlikte değişir, şifren aynı kalır. Kayıtlı oyunculara bir kez soruluyor."]},
   {v:"1.21.6", d:"5 Kasım 2026", items:["Kayıtta ilk adım artık \"Gerçek adın\" diye soruyor; takma ad yerine takım adı kullanılıyor. Adın ilk harfi kendiliğinden büyüyor."]},
   {v:"1.21.5", d:"5 Kasım 2026", items:["Gecenin sorusu cevaplanınca Evet/Hayır düğmeleri gizleniyor, \"Değiştir\" ile yeniden açılıyor.","Görsel düzeltmeler: Günün oyuncusu ve skorer fotoğrafları kaymıyor, alt menüde simgeler ve yazılar aynı hizada.","Bağlantı yavaşken oturumun kendiliğinden kapanması engellendi."]},
@@ -675,7 +676,13 @@ const FACE = id => `https://a.espncdn.com/combiner/i?img=/i/headshots/nba/player
 const faceImg = (id, cls="face") => id ? `<img class="${cls}" src="${FACE(id)}" alt="" loading="lazy">` : "";
 const HEADSHOT = id => `https://a.espncdn.com/combiner/i?img=/i/headshots/nba/players/full/${id}.png&w=160&h=117&scale=crop&cquality=70`;
 // Avatar yalnızca basketbolcu olabilir ("p:id"); eski takım logosu ve emoji avatarları gösterilmez, baş harfler görünür
-const avImg = av => { const m=/^p:(\w+)$/.exec(av||""); return m ? `<img class="av-img" src="${HEADSHOT(m[1])}" alt="" loading="lazy">` : ""; };
+// WNBA: 2026 normal sezonunun en çok sayı ortalaması tutturan 15 oyuncusu (ESPN istatistikleri, ESPN oyuncu numarasıyla)
+const WSTARS = [["3149391","A'ja Wilson"],["3142191","Kelsey Mitchell"],["4433403","Caitlin Clark"],["2998938","Kahleah Copper"],["4433730","Paige Bueckers"],
+  ["3904576","Marina Mabrey"],["2998928","Breanna Stewart"],["4433791","Olivia Miles"],["3058901","Allisha Gray"],["4065870","Jackie Young"],
+  ["4398674","Rhyne Howard"],["2529205","Kayla McBride"],["1068","Nneka Ogwumike"],["5220150","Dominique Malonga"],["4398911","Shakira Austin"]];
+const WHEADSHOT = id => `https://a.espncdn.com/combiner/i?img=/i/headshots/wnba/players/full/${id}.png&w=160&h=117&scale=crop&cquality=70`;
+const avImg = av => { const m=/^([pw]):(\w+)$/.exec(av||""); return m ? `<img class="av-img" src="${m[1]==="w"?WHEADSHOT(m[2]):HEADSHOT(m[2])}" alt="" loading="lazy">` : ""; };
+const wnbaAvs = (attr, cur) => WSTARS.map(([id,n])=>`<button class="pf-av" ${attr}="w:${id}" aria-pressed="${cur===`w:${id}`}" title="${esc(n)} (WNBA)"><img src="${WHEADSHOT(id)}" alt="" loading="lazy"><small>${esc(surname(n))}</small></button>`).join("");
 const avatar = (u, cls="") => { const p=S.players[u]||{}; const h=honors(); const img=avImg(p.av);
   const crown = h.week===u ? `<span class="av-crown" title="Geçen haftanın şampiyonu">👑</span>` : "";
   const star = h.night===u ? `<span class="av-star" title="Son gecenin kazananı">★</span>` : "";
@@ -4076,7 +4083,7 @@ function openOnboard(step){
       <h3 style="margin-top:18px">Favori takımın</h3><p class="muted">Alt menüde bu takıma özel <b>Takımım</b> sekmesi açılır: maçlarını, oyuncularını, sakatlıklarını ve sıralamasını oradan takip edersin. Uygulamanın renkleri de bu takıma göre olur. Sonra Ayarlar'dan değiştirebilirsin.</p>
       <div class="tm-grid ob-teams">${teams.map(t=>`<button class="tg" data-obt="${t.a}" aria-pressed="${S.ob.team===t.a}" style="--tc:${tcol(t.a)}"><span class="tg-l"><img src="${LOGO_SMALL(t.a)}" alt=""></span><b>${esc(t.n.split(" ").slice(-1)[0])}</b></button>`).join("") || `<p class="muted">Takımlar yükleniyor…</p>`}</div>
       <h3 style="margin-top:18px">Avatarın</h3><p class="muted">Bir basketbolcu seç; sıralamada ve tahtada adının yanında fotoğrafı görünür. Sonra profilinden değiştirebilir, listede olmayan bir oyuncuyu da arayabilirsin.</p>
-      <div class="pf-avs ob-avs">${STARS.map(([id,n])=>`<button class="pf-av" data-oba="p:${id}" aria-pressed="${S.ob.av===`p:${id}`}"><img src="${HEADSHOT(id)}" alt="" loading="lazy"><small>${esc(surname(n))}</small></button>`).join("")}</div>
+      <div class="pf-avs ob-avs">${STARS.map(([id,n])=>`<button class="pf-av" data-oba="p:${id}" aria-pressed="${S.ob.av===`p:${id}`}"><img src="${HEADSHOT(id)}" alt="" loading="lazy"><small>${esc(surname(n))}</small></button>`).join("")}</div><small class="muted" style="display:block;margin:10px 0 6px;font-weight:700">WNBA · 2026 sezonunun en skorerleri</small><div class="pf-avs ob-avs ob-avs-w">${wnbaAvs("data-oba", S.ob.av)}</div>
       <h3 style="margin-top:18px">Otomatik tahmin <small class="req">zorunlu seçim</small></h3><p class="muted">Bir gece hiç tahmin yapmayı unutursan senin yerine her maçta ESPN'in favorisi seçilsin mi? Doğru çıkan <b>her 2 kazanan 1 puan</b> getirir; fark, skorer ve banko yoktur. Sonra Profil → Ayarlar'dan değiştirebilirsin.</p>
       <div class="seg2 ob-auto"><button type="button" data-oap="1" aria-pressed="${S.ob.auto===true}">Açık</button><button type="button" data-oap="0" aria-pressed="${S.ob.auto===false}">Kapalı</button></div>
       <p class="err" id="obErr"></p><button class="btn-primary" id="obNext" type="button">Devam</button>`);
@@ -4088,7 +4095,7 @@ function openOnboard(step){
       $("#obClubErr").textContent = p || (v ? "✓ Uygun." : ""); $("#obClubErr").className = "hint "+(p?"bad":v?"good":""); return p; };
     clubInp.oninput=checkClub; if(clubInp.value) checkClub();
     $("#sheet .ob-teams").onclick=e=>{ const b=e.target.closest("[data-obt]"); if(!b) return; S.ob.team=b.dataset.obt; openOnboard(4); };
-    $("#sheet .ob-avs").onclick=e=>{ const b=e.target.closest("[data-oba]"); if(!b) return; S.ob.av=b.dataset.oba; $$("#sheet [data-oba]").forEach(x=>x.setAttribute("aria-pressed", x===b)); };
+    $$("#sheet .ob-avs").forEach(g=>g.onclick=e=>{ const b=e.target.closest("[data-oba]"); if(!b) return; S.ob.av=b.dataset.oba; $$("#sheet [data-oba]").forEach(x=>x.setAttribute("aria-pressed", x===b)); });
     $("#obNext").onclick=async()=>{
       const club=clubInp.value.trim().replace(/\s+/g," ");
       if(!club){ $("#obErr").textContent="Bir takım adı yaz."; clubInp.focus(); return; }
@@ -4596,6 +4603,8 @@ function paintProfile(){
       <div class="pf-avs" id="pfAvs">${(()=>{ const cur=(/^p:(\w+)$/.exec(me.av||"")||[])[1]; const list=[...(cur && !STARS.some(x=>x[0]===cur) ? [[cur,(ALLP?.players||[]).find(x=>x.id===cur)?.n||""]] : []), ...STARS];
         return list.map(([id,n])=>`<button class="pf-av" data-av="p:${id}" aria-pressed="${me.av===`p:${id}`}" title="${esc(n)}"><img src="${HEADSHOT(id)}" alt="" loading="lazy"><small>${esc(surname(n))}</small></button>`).join(""); })()}</div>
         <small class="muted">Liste: CBS Sports'un 2026-27 sezonu ilk 50 oyuncusu. Başka bir oyuncu için yukarıdan ara.</small>
+      <h4 style="margin-top:14px;font-size:15px">WNBA <small class="muted" style="font-weight:600">2026 sezonunun en skorer 15 oyuncusu</small></h4>
+      <div class="pf-avs" id="pfAvsW">${wnbaAvs("data-av", me.av)}</div>
       ${avImg(me.av)?`<button class="linkish" data-emo="" style="font-size:13px">Fotoğrafı kaldır</button>`:""}</div>
     <div class="pf-sec"><h4>Favori takım</h4><small class="muted">Avatarının köşesinde küçük logosu görünür; site renklerini de buna göre seçebilirsin. Güvenlik sorusundan bağımsızdır.</small>
       <div class="pf-teams"><button class="pf-tm none" data-tm="" aria-pressed="${!me.favTeam}">Yok</button>${teams.map(t=>`<button class="pf-tm" data-tm="${t.a}" aria-pressed="${me.favTeam===t.a}" title="${esc(t.n)}"><img src="${LOGO_SMALL(t.a)}" alt="${esc(t.n)}"></button>`).join("")}</div></div>
