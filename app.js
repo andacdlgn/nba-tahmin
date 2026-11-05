@@ -45,12 +45,13 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.21.3";
+const VERSION = "1.21.4";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.21.4", d:"5 Kasım 2026", items:["Mobil açılış düzeltmesi: hızlandırma için eklenen telefon önbelleği (servis çalışanı) kaldırıldı; eski ve yeni dosyaların karışıp bazı bölümlerin yüklenmemesine yol açıyordu.","Maç ve puan verisi önce sitenin kendi sunucusundan geliyor (telefonda ek bağlantı yok).","Sakatlıklar ve kadrolar artık açılıştan hemen sonra yükleniyor; dokunma sırasında ekranın donabildiği bir durum düzeltildi."]},
   {v:"1.21.3", d:"5 Kasım 2026", items:["Mobilde (özellikle Safari'de) geç ya da boş açılma düzeltmesi: yavaş veya erişilemeyen veri adresi siteyi artık kilitlemiyor, en fazla 3 sn bekleyip sitenin kendi kopyasına geçiyor.","Açılış takılırsa boş ekran yerine \"Tekrar dene\" düğmesi çıkıyor."]},
   {v:"1.21.2", d:"4 Kasım 2026", items:["Davet mesajında bu gecenin ilk kilit saati ve deneme haftası bilgisi yazıyor.","Mail adresi onaylanmamış olanlara daha açık bir hatırlatma: neden gerekli olduğu ve kodun nasıl girileceği."]},
   {v:"1.21.1", d:"4 Kasım 2026", items:["Profil → Ayarlar'ın en altında \"Profilimi sil\": hesabını ve bütün verini kalıcı olarak silebilirsin.","Giriş ekranında \"Giriş yapan\" kartındaki fotoğraf artık yuvarlak, basık görünmüyor."]},
@@ -1100,7 +1101,7 @@ function lastMeetHTML(g){
   const m=ms[0]; return `<small class="ib-meet">Son karşılaşma (${dayNice(m.day,{day:"numeric",month:"short"})}): <b>${esc(m.away.abbr)} ${m.away.score}–${m.home.score} ${esc(m.home.abbr)}</b>${ms.length>1?` · bu sezon ${ms.filter(x=>x.winner===g.away.abbr).length}-${ms.filter(x=>x.winner===g.home.abbr).length}`:""}</small>`;
 }
 function infoBox(g){
-  if(!S.inj && !loadInj.p && !infoBox.wait){ infoBox.wait=true; later(()=>loadInj().then(()=>render()).catch(()=>{}), Math.max(0, 2000-(Date.now()-S.bootAt))); }
+  if(!S.inj && !loadInj.p && !infoBox.wait){ infoBox.wait=true; later(()=>loadInj().then(()=>render()).catch(()=>{}), Math.max(0, 600-(Date.now()-S.bootAt))); }
   const s = S.sums[g.id]?.data;
   let inner = `<span class="ib-loading">Maç öncesi bilgiler yükleniyor…</span>`;
   if(s){
@@ -1484,10 +1485,10 @@ function openTalk(g){
 S.rosterAt = {};
 // Açılışta acil olmayan işler: ilk ekran çizildikten sonra, tarayıcı boşalınca
 S.bootAt = Date.now();
-const later = (fn, ms=1500) => setTimeout(()=>{ if("requestIdleCallback" in window) requestIdleCallback(()=>fn(), {timeout:1500}); else fn(); }, ms);
+const later = (fn, ms=600) => setTimeout(()=>{ if("requestIdleCallback" in window) requestIdleCallback(()=>fn(), {timeout:800}); else fn(); }, ms);
 async function refreshInjuries(D){
   if(refreshInjuries.busy) return;
-  if(Date.now()-S.bootAt < 2500){ if(!refreshInjuries.wait){ refreshInjuries.wait=true; later(()=>{ refreshInjuries.wait=false; refreshInjuries(D); }, 2500); } return; }
+  if(Date.now()-S.bootAt < 800){ if(!refreshInjuries.wait){ refreshInjuries.wait=true; later(()=>{ refreshInjuries.wait=false; refreshInjuries(D); }, 800); } return; }
   const open=D.games.filter(g=>!started(g)); if(!open.length) return;
   const teams=open.flatMap(g=>[g.away,g.home]).filter(t=>!S.rosterAt[t.id] || Date.now()-S.rosterAt[t.id]>20*60e3);
   if(!teams.length) return;
@@ -3667,7 +3668,7 @@ function movePill(){
 }
 addEventListener("resize", movePill);
 // parmak ekrandayken ve dokunuştan hemen sonra yeniden çizme bekletilir
-addEventListener("pointerdown", ()=>{ S.touching=true; clearTimeout(S.touchT); }, {passive:true, capture:true});
+addEventListener("pointerdown", ()=>{ S.touching=true; clearTimeout(S.touchT); S.touchT=setTimeout(()=>{ S.touching=false; if(render.pending){ render.pending=false; render(); } }, 1000); }, {passive:true, capture:true});
 const touchEnd=()=>{ clearTimeout(S.touchT); S.touchT=setTimeout(()=>{ S.touching=false; if(render.pending){ render.pending=false; render(); } }, 30); };
 addEventListener("pointerup", touchEnd, {passive:true, capture:true}); addEventListener("pointercancel", touchEnd, {passive:true, capture:true});
 $("#boardStrip")?.addEventListener("click", ()=>{ S.boardOpen = S.boardOpen===S.tab ? null : S.tab; renderBoardStrip(); });
@@ -3692,12 +3693,11 @@ $("#dayPrev").onclick=()=>{ S.day=shiftDay(S.day,-1); showDay(); };
 $("#dayNext").onclick=()=>{ S.day=shiftDay(S.day,1); showDay(); };
 
 async function loadArchive(){
-  const base = (() => { const h=location.hostname; if(!h.endsWith(".github.io")) return "data/";
+  // Önce sitenin kendi kopyası (aynı sunucu, telefonda ek bağlantı kurulmaz); gelmezse GitHub'daki ham dosya
+  const raw = (() => { const h=location.hostname; if(!h.endsWith(".github.io")) return "";
     const owner=h.split(".")[0], seg=location.pathname.split("/").filter(Boolean)[0];
     return `https://raw.githubusercontent.com/${owner}/${seg && !seg.includes(".")?seg:h}/main/data/`; })();
-  // raw.githubusercontent.com bazı mobil operatörlerde yavaş ya da kapalı: 3 sn içinde gelmezse sitenin kendi kopyası kullanılır
-  const get = async n => { if(S.rawSlow && base!=="data/") return getJSON("data/"+n+"?t="+Date.now()).catch(()=>null);
-    try{ return await getJSON(base+n+"?t="+Date.now(), 3000); }catch(e){ if(base!=="data/") S.rawSlow=true; return getJSON("data/"+n+"?t="+Date.now()).catch(()=>null); } };
+  const get = async n => { try{ return await getJSON("data/"+n+"?t="+Date.now(), 6000); }catch(e){ return raw ? getJSON(raw+n+"?t="+Date.now(), 6000).catch(()=>null) : null; } };
   const [g,p,s] = await Promise.all([get("games.json"), get("players.json"), get("scores.json")]);
   if(g) S.arch.games=g; if(p) S.pstats=p.p||{}; if(s) S.arch.scores={days:{},games:{},totals:{},weeks:{},...s};
   S.archRaw = S.arch.scores;
@@ -4808,7 +4808,10 @@ function installBanner(){
   $("#instOk")?.addEventListener("click", async()=>{ el.remove(); try{ installEvt.prompt(); await installEvt.userChoice; }catch(e){} installEvt=null; });
 }
 /* ====================================================== başlangıç */
-if("serviceWorker" in navigator && location.protocol==="https:") navigator.serviceWorker.register("sw.js").catch(()=>{});
+// Servis çalışanı kaldırıldı (mobilde eski/yeni dosya karışmasına yol açıyordu): telefonda kalmışsa silinir, önbelleği temizlenir
+if("serviceWorker" in navigator){ navigator.serviceWorker.getRegistrations?.().then(rs=>{ if(!rs.length) return;
+  rs.forEach(r=>r.update().catch(()=>{}).finally(()=>r.unregister().catch(()=>{})));
+  if("caches" in window) caches.keys().then(ks=>ks.forEach(k=>caches.delete(k))).catch(()=>{}); }).catch(()=>{}); }
 (async()=>{
   // Hız: bugünün maç listesi Firebase ve giriş beklenmeden hemen istenir
   { const d=espnToday(); S.preSB = {day:d, p:espn(`/scoreboard?dates=${d}&limit=50`).catch(()=>null)}; }
