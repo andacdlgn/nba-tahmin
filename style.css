@@ -2019,3 +2019,19 @@ h3 .req{font-size:11.5px;font-weight:700;color:var(--muted);margin-left:6px;font
 .pill-k{font-size:11.5px;font-weight:700;color:var(--muted);margin-left:4px}
 .pf-del{border:1px solid color-mix(in srgb,var(--lose,#c0392b) 45%,var(--line));border-radius:14px;padding:12px}.pf-del h4{color:var(--lose,#c0392b)}
 .inv-note{font-size:13.5px;line-height:1.5;padding:9px 11px;margin:8px 0 10px;border-radius:10px;border-left:3px solid var(--amber);background:var(--panel-2);color:var(--ink)}
+
+/* 1.21.5 hizalama düzeltmeleri */
+/* günün oyuncusu: yüz fotoğrafı daireyi tam doldursun (".dp .ico img" genişliği eziyordu) */
+.dp .ico img.dp-face{width:100%;height:100%;max-width:none;object-fit:cover;object-position:50% 15%;border-radius:50%}
+/* skorer düğmesindeki yüz: yuvarlak ve ortalı (".scorer-btn img" dikdörtgen yapıyordu) */
+.scorer-btn img.sb-face{width:36px;height:36px;border-radius:50%;object-fit:cover;object-position:50% 15%}
+/* alt menü: bütün simgeler aynı boyut ve aynı satırda, yazılar tek satır */
+.nav a{justify-content:flex-start;padding-top:11px;white-space:nowrap;gap:4px}
+.nav a > svg,.nav-team{width:22px;height:22px;margin:0;flex:none;display:block}
+.nav-team{display:flex}
+.nav-team img,.nav-team svg{width:22px;height:22px;margin:0}
+.nav-pill{top:7px;height:30px}
+@media (max-width:420px){ .nav a > svg,.nav-team,.nav-team img,.nav-team svg{width:21px;height:21px} .nav a{padding-top:12px} }
+/* gecenin sorusu: cevap verildiyse kısa görünüm */
+.q-ans{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;border-radius:10px;background:var(--panel-2);border:1px solid var(--line)}
+.q-ans .linkish{font-weight:700}

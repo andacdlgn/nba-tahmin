@@ -45,12 +45,13 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.21.4";
+const VERSION = "1.21.5";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.21.5", d:"5 Kasım 2026", items:["Gecenin sorusu cevaplanınca Evet/Hayır düğmeleri gizleniyor, \"Değiştir\" ile yeniden açılıyor.","Görsel düzeltmeler: Günün oyuncusu ve skorer fotoğrafları kaymıyor, alt menüde simgeler ve yazılar aynı hizada.","Bağlantı yavaşken oturumun kendiliğinden kapanması engellendi."]},
   {v:"1.21.4", d:"5 Kasım 2026", items:["Mobil açılış düzeltmesi: hızlandırma için eklenen telefon önbelleği (servis çalışanı) kaldırıldı; eski ve yeni dosyaların karışıp bazı bölümlerin yüklenmemesine yol açıyordu.","Maç ve puan verisi önce sitenin kendi sunucusundan geliyor (telefonda ek bağlantı yok).","Sakatlıklar ve kadrolar artık açılıştan hemen sonra yükleniyor; dokunma sırasında ekranın donabildiği bir durum düzeltildi."]},
   {v:"1.21.3", d:"5 Kasım 2026", items:["Mobilde (özellikle Safari'de) geç ya da boş açılma düzeltmesi: yavaş veya erişilemeyen veri adresi siteyi artık kilitlemiyor, en fazla 3 sn bekleyip sitenin kendi kopyasına geçiyor.","Açılış takılırsa boş ekran yerine \"Tekrar dene\" düğmesi çıkıyor."]},
   {v:"1.21.2", d:"4 Kasım 2026", items:["Davet mesajında bu gecenin ilk kilit saati ve deneme haftası bilgisi yazıyor.","Mail adresi onaylanmamış olanlara daha açık bir hatırlatma: neden gerekli olduğu ve kodun nasıl girileceği."]},
@@ -1388,6 +1389,10 @@ function questionCard(){
   const D=S.days[S.day]; if(!D?.games.length) return "";
   const q=questionOf(S.day), locked=D.games.some(started), mine=D.daily[S.uid]?.q;
   const lbl = v => v==="y" ? "Evet" : "Hayır";
+  // cevap verildiyse düğmeler gizlenir; "Değiştir" ile yeniden açılır
+  if(!locked && mine && !S.qEdit) return `<div class="qcard q-done"><span class="ico">${ICON.question}</span><span class="tx"><b>Gecenin sorusu</b><span class="qt">${q.t}</span>
+    <span class="q-ans"><span>Cevabın: <b>${lbl(mine)}</b></span><button class="linkish" data-qedit type="button">Değiştir</button></span>
+    <small>Gecenin ilk maçından 10 dk önceye kadar değiştirebilirsin.</small></span></div>`;
   if(!locked) return `<div class="qcard"><span class="ico">${ICON.question}</span><span class="tx"><b>Gecenin sorusu</b><span class="qt">${q.t}</span>
     <span class="qbtns"><button data-q="y" aria-pressed="${mine==="y"}">Evet</button><button data-q="n" aria-pressed="${mine==="n"}">Hayır</button></span>
     <small>Doğru cevap +1. Gecenin ilk maçından 10 dk önce kilitlenir.</small>${q.n?`<small>${q.n} maçlık gece; eşik, cevap yarı yarıya olsun diye maç sayısına göre seçildi.</small>`:""}</span></div>`;
@@ -1399,9 +1404,10 @@ function questionCard(){
     ${r?.final?`<span class="qres">Cevap: <b>${lbl(r.ans)}</b></span>`:""}<span class="qrows">${rows}</span></span></div>`;
 }
 $("#dayPlayer").addEventListener("click", e => {
+  if(e.target.closest("[data-qedit]")){ S.qEdit=true; return render(); }
   const b=e.target.closest("[data-q]"); if(!b) return;
   const D=S.days[S.day]; if(D.games.some(started)) return toast("Soru kilitlendi (gecenin ilk maçından 10 dk önce).");
-  saveDaily({q:b.dataset.q});
+  S.qEdit=false; saveDaily({q:b.dataset.q});
 });
 
 /* ====================================================== küfür koruması (sohbet, maç yorumları) */
@@ -2472,7 +2478,7 @@ function statsBody(u, {badges=false}={}){
     ${kpi(`${dpHit}/${dps.length}`,"Günün oyuncusu",null)}
     ${kpi(`${qHit}/${qs.length}`,"Gecenin sorusu",null)}
     ${(()=>{ const ds=allDays().filter(d=>dayPoints(d)[u]?.n); const t=ds.reduce((s,d)=>s+(dayPoints(d)[u]?.pts||0),0); return kpi(ds.length?(t/ds.length).toFixed(1):"–",`Gece başına ortalama puan (${ds.length} gece)`,null); })()}</div>`;
-  const totals=[["Kazanan (banko dahil)",recs.reduce((s,x)=>s+x.r.w,0)],["Fark",mOk],["En skorer",sOk],["Günün oyuncusu",dpHit*2],["Gecenin sorusu",qHit],["Playoff serileri",srPts]].filter(([l,v])=>v || !/Playoff/.test(l));
+  const totals=[["Kazanan (banko dahil)",recs.reduce((s,x)=>s+x.r.w,0)],["Fark",mOk],["En skorer",sOk],["Günün oyuncusu",dpHit*3],["Gecenin sorusu",qHit],["Playoff serileri",srPts]].filter(([l,v])=>v || !/Playoff/.test(l));
   const tmax=Math.max(1,...totals.map(x=>x[1]));
   html += `<div class="sec-title"><h2>Puanların nereden geliyor</h2></div><div class="box">${totals.map(([l,v])=>`<div style="margin:6px 0"><div style="display:flex;justify-content:space-between;font-size:14px"><span>${l}</span><b>${v}</b></div><div class="bar2"><i style="width:${Math.max(0,v)/tmax*100}%;background:${col(u)}"></i></div></div>`).join("")}</div>`;
   if(badges) html += `<div class="sec-title"><h2>Rozetler</h2><span class="aside">${badgesOf(u).filter(b=>b.n).length}/${BADGES.length}</span></div>${badgeHTML(badgesOf(u))}`;
@@ -4830,12 +4836,18 @@ if("serviceWorker" in navigator){ navigator.serviceWorker.getRegistrations?.().t
     if(S.joinP) await S.joinP.catch(()=>{});
     if(S.players?.[S.uid]) S.order=[S.uid, ...S.order.filter(u=>u!==S.uid)];
     else await loadPlayers().catch(()=>{});
-    if(!S.players[S.uid]){ // kayıt yarıda kaldıysa
+    if(!S.players[S.uid]){ // kayıt yarıda kaldıysa ya da bağlantı yavaşsa
       await new Promise(r=>setTimeout(r,800)); await loadPlayers().catch(()=>{});
       if(!S.players[S.uid]){
-        const ban = await getDoc(doc(S.db,"banned",S.uid)).then(r=>r.exists()).catch(()=>false);
-        $("#authErr").textContent = ban ? "Bu hesap ligden çıkarıldı. Oyunu kuran kişiyle konuş." : "Hesap bulunamadı. Tekrar katılmayı dene.";
-        await signOut(S.auth); return; }
+        // Oturum yalnızca hesabın gerçekten olmadığı SUNUCUDAN doğrulanınca kapatılır; bağlantı hatasında oturum korunur
+        let exists=null; for(let i=0;i<3 && exists===null;i++){ exists = await getDoc(doc(S.db,"players",S.uid)).then(r=>r.exists()).catch(()=>null); if(exists===null) await new Promise(r=>setTimeout(r,1500)); }
+        if(exists===null){ $("#auth").classList.remove("hide"); $("#authErr").innerHTML=`Bağlantı yavaş, bilgilerin alınamadı. <button class="linkish" type="button" onclick="location.reload()">Tekrar dene</button>`; dispatchEvent(new Event("app-ready")); return; }
+        if(exists){ await loadPlayers().catch(()=>{}); if(!S.players[S.uid]){ location.reload(); return; } }
+        else {
+          const ban = await getDoc(doc(S.db,"banned",S.uid)).then(r=>r.exists()).catch(()=>false);
+          $("#authErr").textContent = ban ? "Bu hesap ligden çıkarıldı. Oyunu kuran kişiyle konuş." : "Hesap bulunamadı. Tekrar katılmayı dene.";
+          await signOut(S.auth); return; }
+      }
     }
     $("#auth").classList.add("hide"); $("#app").classList.remove("hide");
     $("#me").classList.remove("hide"); $("#srch").classList.remove("hide"); $("#invBtn").classList.remove("hide"); later(()=>{ startChat(); chatBadge(); }); paintMe(); applyTheme();
