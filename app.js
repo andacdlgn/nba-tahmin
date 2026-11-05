@@ -45,12 +45,13 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.21.8";
+const VERSION = "1.21.9";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.21.9", d:"5 Kasım 2026", items:["Pencereler artık art arda açılmıyor: bir açılışta en fazla bir bilgilendirme penceresi çıkıyor, sen bir pencere açtıysan (ör. Kurallar) hiç çıkmıyor. Kapatınca arkasından yenisi açılmıyor.","Deneme haftası penceresi en üstteki şeride dokununca her zaman açılıyor."]},
   {v:"1.21.8", d:"5 Kasım 2026", items:["Avatarlara WNBA eklendi: 2026 sezonunun en skorer 15 oyuncusu (A'ja Wilson, Caitlin Clark, Paige Bueckers…)."]},
   {v:"1.21.7", d:"5 Kasım 2026", items:["Gerçek ad: Profil → Ayarlar'dan adını değiştirebilirsin; giriş adın da birlikte değişir, şifren aynı kalır. Kayıtlı oyunculara bir kez soruluyor."]},
   {v:"1.21.6", d:"5 Kasım 2026", items:["Kayıtta ilk adım artık \"Gerçek adın\" diye soruyor; takma ad yerine takım adı kullanılıyor. Adın ilk harfi kendiliğinden büyüyor."]},
@@ -162,9 +163,7 @@ function maybeNews(){
   const seen=lsGet("newsSeen");
   if(!seen){ lsSet("newsSeen", VERSION); return; }   // ilk kez gelen için gösterme
   if(seen===VERSION) return;
-  const go=(n=0)=>{ if(!$("#sheet").classList.contains("hide") || S.onboard || S.obStep){ if(n<40) setTimeout(()=>go(n+1),3000); return; }
-    lsSet("newsSeen", VERSION); openNews(); };
-  setTimeout(go, 3000);
+  autoPop(5, ()=>lsGet("newsSeen")!==VERSION, ()=>{ lsSet("newsSeen", VERSION); openNews(); });
 }
 const LOGO_SMALL = a => `logos/${String(a).toLowerCase()}.png`;
 const LOGO_FULL  = a => `https://a.espncdn.com/i/teamlogos/nba/500/${String(a).toLowerCase()}.png`;
@@ -746,8 +745,7 @@ function openCeremony(k){
 function maybeCeremony(){
   const ks=Object.keys(S.arch.scores.awards||{}).sort(); if(!ks.length) return; const k=ks.at(-1);
   if(lsGet("cerSeen")===k) return;
-  const go=(n=0)=>{ if(!$("#sheet").classList.contains("hide") || S.onboard || S.obStep){ if(n<40) setTimeout(()=>go(n+1),3000); return; } lsSet("cerSeen",k); openCeremony(k); };
-  setTimeout(go, 4500);
+  autoPop(4, ()=>lsGet("cerSeen")!==k, ()=>{ lsSet("cerSeen",k); openCeremony(k); });
 }
 function seasonBreakdown(){
   const days = new Set(Object.keys(S.arch.scores.days||{}));
@@ -1769,7 +1767,7 @@ async function openBox(g){
   };
   $("#shBody").innerHTML = `<h3 id="shTitle">${esc(g.away.name)} ${g.away.score??""} – ${g.home.score??""} ${esc(g.home.name)}</h3><p class="muted" style="margin-top:-6px">${gameStatusTR(g)} · SA: isabet-deneme, 3S: üçlük, SB: serbest atış</p>${table("away")}${table("home")}`;
 }
-function openSheet(html){ if($("#sheet").classList.contains("hide")){ try{ history.pushState({sheet:1}, ""); }catch(e){} }
+function openSheet(html){ S.sheetCount=(S.sheetCount||0)+1; if($("#sheet").classList.contains("hide")){ try{ history.pushState({sheet:1}, ""); }catch(e){} }
   S.sheetLocked=false; $("#shClose").classList.remove("hide");
   $("#shBody").innerHTML=html; $("#sheet").classList.remove("hide"); $$("#sheet, #sheet *").forEach(el=>{ if(el.scrollTop) el.scrollTop=0; }); document.body.style.overflow="hidden"; $("#shClose").focus(); }
 function closeSheet(fromPop){ if(S.sheetLocked){ if(fromPop) try{ history.pushState({sheet:1}, ""); }catch(e){} return; }
@@ -1860,10 +1858,25 @@ function openScoringGuide(){
 <button class="btn-primary" id="pgOk" type="button">Anladım</button>`}</div>`);
   $("#pgOk").onclick=()=>closeSheet();
 }
+/* Kendiliğinden açılan pencereler: art arda açılıp "pencere kapanmıyor" hissi vermesinler diye
+   bir açılışta EN FAZLA BİRİ gösterilir, o da yalnızca o ana kadar hiç pencere açılmadıysa (kullanıcı Kurallar'ı açtıysa hiçbiri).
+   Gösterilmeyenler sonraki açılışta sırası gelince çıkar. Öncelik küçük olan önce. */
+S.autoPopQ=[];
+function autoPop(prio, check, open){
+  S.autoPopQ.push({prio, check, open});
+  clearTimeout(S.autoPopT); S.autoPopT=setTimeout(runAutoPop, 2500);
+}
+function runAutoPop(){
+  if(S.autoPopDone || S.onboard || S.obStep || S.chatOpen || (S.sheetCount||0)>0 || !$("#sheet").classList.contains("hide")) return;
+  const q=S.autoPopQ.sort((a,b)=>a.prio-b.prio).find(x=>{ try{ return x.check(); }catch(e){ return false; } });
+  if(!q) return; S.autoPopDone=true; q.open();
+}
 // Deneme haftasında ilk girişte bir kez; deneme bitince ilk girişte bir kez "Lig başladı"
-function maybeLeaguePop(){
-  if(!S.uid || S.onboard) return;
-  if(!$("#sheet").classList.contains("hide")) return setTimeout(maybeLeaguePop, 4000);
+function leaguePopDue(){ const t=S.league?.trial; if(!S.uid || !t?.end) return false; const go=shiftDay(t.end,1);
+  return (trialActive() && !lsGet("trialPop_"+t.end)) || ((t.done || espnToday()>t.end) && !lsGet("leagueGo_"+go) && espnToday()<=shiftDay(go,13)); }
+function maybeLeaguePop(){ autoPop(2, leaguePopDue, showLeaguePop); }
+function showLeaguePop(){
+  if(!S.uid) return;
   const t=S.league?.trial; if(!t?.end) return;
   const nice=(d,o={day:"numeric",month:"long"})=>dayNice(d,o), go=shiftDay(t.end,1);
   if(trialActive() && !lsGet("trialPop_"+t.end)){
@@ -1903,7 +1916,7 @@ async function maybeArchiveTrial(){
   }catch(e){ S.lsRange=null; }
   S.trialArchiving=false; applyLeague(); render();
 }
-function maybeScoringGuide(){ if(lsGet("pg1141") || S.onboard) return; if(!$("#sheet").classList.contains("hide")){ return setTimeout(maybeScoringGuide, 4000); } lsSet("pg1141","1"); openScoringGuide(); }
+function maybeScoringGuide(){ autoPop(6, ()=>!lsGet("pg1141"), ()=>{ lsSet("pg1141","1"); openScoringGuide(); }); }
 function openRules(){
   openSheet(`<div class="rules"><h3 id="shTitle">Kurallar</h3><button class="btn pg-open" id="pgOpen" type="button">📖 Puanlama rehberi: bütün puanlar örnekleriyle</button>
     <p>Her gece o gecenin bütün NBA maçları için üç tahmin yaparsın: <b>kazanan takım</b>, <b>fark</b> (iki takım arasındaki sayı farkı) ve <b>maçın en skoreri</b>. Bir maçın tahmini, üçü de seçilip kaydedilince geçerli olur.</p>
@@ -2570,9 +2583,8 @@ function countUp(){
 // Geceyi tek başına kazanınca bir kez konfeti
 // Gece bitince kazanan bir kez sahneye çıkar (kendin kazandıysan konfeti zaten çıkıyor)
 // Yedek tahmin: bir gece hiç tahmin yapmazsan ESPN favorileri senin yerine girer; doğru bildiği her 2 kazanan 1 puan
-function maybeAskAuto(){
-  const me=S.players[S.uid]; if(!me || "autoPick" in me || S.onboard || lsGet("autoAsk")) return;
-  if(!$("#sheet").classList.contains("hide")) return;
+function maybeAskAuto(){ autoPop(7, ()=>{ const me=S.players[S.uid]; return me && !("autoPick" in me) && !lsGet("autoAsk"); }, showAskAuto); }
+function showAskAuto(){
   lsSet("autoAsk","1");
   openSheet(`<h3 id="shTitle">Otomatik tahmin açılsın mı?</h3><p>Bir gece hiç tahmin yapmayı unutursan senin yerine her maçta ESPN'in favorisi seçilir. Doğru çıkan her <b>2 kazanan için 1 puan</b> alırsın; fark, skorer ve banko yedekte yoktur. Böylece unuttuğun gece tablodan kopmazsın, ama tahmin yapan her zaman daha çok kazanır.</p>
     <p class="muted">İstediğin zaman profilinden değiştirebilirsin.</p><div class="pf-btns"><button class="btn" id="apNo" type="button">Hayır</button><button class="btn-primary" id="apYes" type="button">Evet, açılsın</button></div>`);
@@ -2726,7 +2738,7 @@ function renderBanners(){
     <span class="bn-acts"><button class="btn sm" data-bn="profile">Seç</button><button class="linkish" data-bn="plater">Sonra</button></span></div>`;
   box.innerHTML=html;
 }
-$("#trialStrip").onclick=()=>{ lsSet("trialPop_"+(S.league?.trial?.end||""), ""); try{ localStorage.removeItem("trialPop_"+(S.league?.trial?.end||"")); }catch(e){} maybeLeaguePop(); };
+$("#trialStrip").onclick=()=>{ try{ localStorage.removeItem("trialPop_"+(S.league?.trial?.end||"")); }catch(e){} showLeaguePop(); };
 $("#banners").addEventListener("click", e=>{
   const b=e.target.closest("[data-bn]"); if(!b) return;
   if(b.dataset.bn==="notice"){ lsSet("noticeSeen", String(S.notice?.at)); }
@@ -4161,11 +4173,10 @@ const MAIL_ASK_EVERY = 4*36e5;
 function maybeAskMail(){
   if(S.onboard || !S.contact) return;
   if(!needClub() && !(needMail() && Date.now() - +(lsGet("mailAsk")||0) > MAIL_ASK_EVERY)) return;
-  const go=(n=0)=>{ if(S.onboard || S.obStep) return;
-    if(!$("#sheet").classList.contains("hide")){ if(n<30) setTimeout(()=>go(n+1), 3000); return; }
+  autoPop(1, ()=>needClub() || (needMail() && Date.now() - +(lsGet("mailAsk")||0) > MAIL_ASK_EVERY), ()=>{
     if(!needClub()) lsSet("mailAsk", String(Date.now()));
-    allPlayers().catch(()=>{}).finally(()=>openOnboard(needClub() ? 4 : 5)); };
-  setTimeout(go, 1200);
+    S.obStep = S.obStep || 1;   // allPlayers beklenirken başka pencere açılmasın
+    allPlayers().catch(()=>{}).finally(()=>{ S.obStep=0; openOnboard(needClub() ? 4 : 5); }); });
 }
 
 // Nasıl oynanır: 3 kaydırmalı kart
@@ -4218,9 +4229,8 @@ async function renameMe(v, msgEl){
   say("İstek sırada; biraz sonra sayfayı yenileyip kontrol et."); return false;
 }
 // Eski oyunculara bir kez: ligde görünen ad artık gerçek ad
-function maybeRealName(){
-  if(!S.uid || S.onboard || S.isAdmin || lsGet("realName1")) return;
-  if(!$("#sheet").classList.contains("hide")) return setTimeout(maybeRealName, 5000);
+function maybeRealName(){ autoPop(3, ()=>S.uid && !S.isAdmin && !lsGet("realName1"), showRealName); }
+function showRealName(){
   lsSet("realName1","1");
   openSheet(`<h3 id="shTitle">Ligde gerçek adlar</h3><p>Herkes birbirini tanısın diye ligde artık <b>gerçek adını</b> kullanıyoruz; takma ad için <b>takım adın</b> var.</p>
     <p class="muted">Şu an ligde adın: <b>${esc(pname(S.uid))}</b>. Gerçek adın değilse şimdi düzelt; girişte de yeni adı yazacaksın, şifren aynı kalır.</p>
@@ -4906,7 +4916,9 @@ if("serviceWorker" in navigator){ navigator.serviceWorker.getRegistrations?.().t
     route(); showDay(); Promise.resolve(refresh()).catch(()=>{}).finally(()=>dispatchEvent(new Event("app-ready")));
     if(S.onboard){ if(S.joinP) await S.joinP.catch(()=>{}); await loadPlayers().catch(()=>{}); allPlayers().catch(()=>{}).finally(()=>openOnboard(4)); }
     else checkRecovery();
-    loadLT(); setTimeout(installBanner, 6000); maybeNews(); maybeCeremony(); later(markSeen, 3000); setTimeout(()=>later(maybeLeaguePop,0), 3000); setTimeout(()=>later(maybeScoringGuide,0), 4500); setTimeout(()=>later(maybeAskAuto, 0), 9000); setTimeout(()=>later(maybeRealName, 0), 6000);
+    loadLT(); setTimeout(installBanner, 6000); later(markSeen, 3000);
+    // bilgilendirme pencereleri sıraya girer; açılıştan ~3 sn sonra en önemlisi (varsa) bir tane açılır
+    setTimeout(()=>{ maybeNews(); maybeCeremony(); maybeLeaguePop(); maybeScoringGuide(); maybeAskAuto(); maybeRealName(); }, 600);
     later(()=>{ getDoc(doc(S.db,"config","admin")).then(()=>{ S.isAdmin=true; maybeArchiveTrial(); }).catch(()=>{ S.isAdmin=false; });
       getDoc(doc(S.db,"config","secret")).then(r=>{ S.invite=r.data()?.invite||""; }).catch(()=>{});
       allPlayers().catch(()=>{}); }, 2000);
