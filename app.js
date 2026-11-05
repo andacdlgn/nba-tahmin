@@ -45,12 +45,13 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.21.5";
+const VERSION = "1.21.6";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.21.6", d:"5 Kasım 2026", items:["Kayıtta ilk adım artık \"Gerçek adın\" diye soruyor; takma ad yerine takım adı kullanılıyor. Adın ilk harfi kendiliğinden büyüyor."]},
   {v:"1.21.5", d:"5 Kasım 2026", items:["Gecenin sorusu cevaplanınca Evet/Hayır düğmeleri gizleniyor, \"Değiştir\" ile yeniden açılıyor.","Görsel düzeltmeler: Günün oyuncusu ve skorer fotoğrafları kaymıyor, alt menüde simgeler ve yazılar aynı hizada.","Bağlantı yavaşken oturumun kendiliğinden kapanması engellendi."]},
   {v:"1.21.4", d:"5 Kasım 2026", items:["Mobil açılış düzeltmesi: hızlandırma için eklenen telefon önbelleği (servis çalışanı) kaldırıldı; eski ve yeni dosyaların karışıp bazı bölümlerin yüklenmemesine yol açıyordu.","Maç ve puan verisi önce sitenin kendi sunucusundan geliyor (telefonda ek bağlantı yok).","Sakatlıklar ve kadrolar artık açılıştan hemen sonra yükleniyor; dokunma sırasında ekranın donabildiği bir durum düzeltildi."]},
   {v:"1.21.3", d:"5 Kasım 2026", items:["Mobilde (özellikle Safari'de) geç ya da boş açılma düzeltmesi: yavaş veya erişilemeyen veri adresi siteyi artık kilitlemiyor, en fazla 3 sn bekleyip sitenin kendi kopyasına geçiyor.","Açılış takılırsa boş ekran yerine \"Tekrar dene\" düğmesi çıkıyor."]},
@@ -1932,7 +1933,7 @@ function openRules(){
     <h4>Deneme haftası</h4>
     <p>Lig deneme haftasıyla başlarsa o hafta her şey gerçeği gibi sayılır, ama haftanın sonunda puanlar, rozetler ve istatistikler sıfırlanır; hesabın, profilin ve ayarların kalır. Deneme haftasının tablosu "Geçmiş ligler"de saklanır. Deneme süresince sayfanın en üstünde çizgili bir "Deneme haftası" şeridi görünür.</p>
     <h4>Yeni oyuncu</h4>
-    <p>Davet linkiyle siteye girip "Yeni oyuncu" adımlarını izlersin: adın, 6 haneli şifren, güvenlik sorusu (gizli takım ve gizli oyuncu), takım adın, favori takımın, avatarın, otomatik tahmin tercihin ve mail adresin. Linkle gelmediysen davet kodu da sorulur. Mail adresi zorunludur; onay kodunu hemen ya da sonra Profil → Ayarlar'dan girebilirsin. Kod girilene kadar sana hiçbir mail (hatırlatma, haftalık özet, şifre sıfırlama kodu) gelmez.</p>
+    <p>Davet linkiyle siteye girip "Yeni oyuncu" adımlarını izlersin: gerçek adın, 6 haneli şifren, güvenlik sorusu (gizli takım ve gizli oyuncu), takım adın, favori takımın, avatarın, otomatik tahmin tercihin ve mail adresin. Linkle gelmediysen davet kodu da sorulur. Mail adresi zorunludur; onay kodunu hemen ya da sonra Profil → Ayarlar'dan girebilirsin. Kod girilene kadar sana hiçbir mail (hatırlatma, haftalık özet, şifre sıfırlama kodu) gelmez.</p>
     <h4>Sohbet ve yorumlar</h4>
     <p>Sağ alttaki baloncuktan lig sohbetine girersin: mesajlara yanıt verebilir, @ ile birini etiketleyebilir, emoji tepkisi bırakabilir, kendi mesajını gönderdikten sonraki 2 dakika içinde düzenleyebilir, istediğin zaman silebilirsin. Maçlar kilitlendikten sonra maç kartlarına da emoji ve kısa yorum bırakılabilir. Sohbette ve yorumlarda küfür, kısaltmaları (amk, aq, oç…) ve hakaret yazılamaz.</p>
     <p class="muted" style="margin-top:18px;font-size:12px;text-align:center">Sürüm ${VERSION}</p></div>`);
@@ -3994,18 +3995,19 @@ $("#authForm").addEventListener("submit", async e=>{
 
 /* ---------- yeni oyuncu: adım adım kayıt (1 ad, 2 şifre, 3 güvenlik sorusu; katıldıktan sonra 4 takım ve avatar, 5 mail) */
 S.jw = {step:1, name:"", pin:"", inv:Q.get("davet")||"", ref:Q.get("ref")||""};
-const JSTEPS = ["Adın","Şifren","Güvenlik sorusu","Takım ve avatar","Mail adresin"];
+const JSTEPS = ["Gerçek adın","Şifren","Güvenlik sorusu","Takım ve avatar","Mail adresin"];
 const stepBar = n => `<div class="jw-bar">${JSTEPS.map((t,i)=>`<i class="${i<n?"on":""}"></i>`).join("")}</div><div class="jw-step">Adım ${n}/5 · ${JSTEPS[n-1]}</div>`;
 function paintJoin(){
   const box=$("#joinBox"), j=S.jw;
   if(j.step===1){
-    box.innerHTML = stepBar(1) + `<label class="fld"><span>Ligde görünecek adın</span><input id="jwName" maxlength="40" autocomplete="username" placeholder="ör. Andaç" value="${esc(j.name)}"></label>
-      <small class="hint" id="jwNameHint">Büyük harfle başlamalı. Küfür, argo ya da hakaret içeremez.</small>
+    box.innerHTML = stepBar(1) + `<label class="fld"><span>Gerçek adın</span><input id="jwName" maxlength="40" autocomplete="username" autocapitalize="words" placeholder="ör. Andaç" value="${esc(j.name)}"></label>
+      <small class="hint" id="jwNameHint">Arkadaşlarının seni tanıyacağı gerçek adın; giriş yaparken de bunu yazacaksın. Takma ad değil: takımına birazdan ayrı bir isim vereceksin. Aynı adda biri varsa soyadının baş harfini ekle (ör. Ali K.).</small>
       ${j.inv ? "" : `<label class="fld"><span>Davet kodu</span><input id="jwInv" autocomplete="off" maxlength="40" placeholder="Seni davet edenden al" value="${esc(j.inv)}"></label>`}
       <p class="err" id="jwErr"></p><button class="btn-primary" id="jwNext" type="button">İleri</button>`;
     const inp=$("#jwName"), hint=$("#jwNameHint");
-    const check=()=>{ const v=inp.value.trim(); const p = !v ? null : nameProblem(v) || (nameTaken(v) ? "Bu ad alınmış. Sen isen Giriş sekmesinden gir." : null);
-      hint.textContent = p || (v ? "✓ Bu ad uygun." : "Büyük harfle başlamalı. Küfür, argo ya da hakaret içeremez."); hint.className = "hint "+(p?"bad":v?"good":""); return p; };
+    inp.addEventListener("input", ()=>{ const v=inp.value; if(v && v[0]!==v[0].toLocaleUpperCase("tr")){ const p=inp.selectionStart; inp.value=v[0].toLocaleUpperCase("tr")+v.slice(1); inp.setSelectionRange(p,p); } });
+    const check=()=>{ const v=inp.value.trim(); const p = !v ? null : nameProblem(v) || (nameTaken(v) ? "Bu ad alınmış. Sen isen Giriş sekmesinden gir; değilsen soyadının baş harfini ekle (ör. Ali K.)." : null);
+      hint.textContent = p || (v ? "✓ Bu ad uygun." : "Arkadaşlarının seni tanıyacağı gerçek adın; giriş yaparken de bunu yazacaksın. Takma ad değil: takımına birazdan ayrı bir isim vereceksin."); hint.className = "hint "+(p?"bad":v?"good":""); return p; };
     inp.oninput=check; check(); setTimeout(()=>inp.focus(),50);
     $("#jwNext").onclick=()=>{ const v=inp.value.trim(); const p=nameProblem(v) || (nameTaken(v)?"Bu ad alınmış.":null); if(p) return $("#jwErr").textContent=p;
       const inv=j.inv || $("#jwInv")?.value.trim(); if(!inv) return $("#jwErr").textContent="Davet kodunu gir.";
@@ -4068,7 +4070,7 @@ function openOnboard(step){
   if(step===4){
     const me=S.players[S.uid]||{}; S.ob = S.ob || {club:me.club||"", team:me.favTeam||"", av:avImg(me.av)?me.av:"", auto:("autoPick" in me) ? !!me.autoPick : null};
     const teams=(ALLP?.teams||[]).slice().sort((a,b)=>a.n.localeCompare(b.n,"tr"));
-    openSheet(`${S.onboard?stepBar(4):""}<h3 id="shTitle">Takım adın</h3><p class="muted">Ligde adının altında görünür (ör. Kyle Korver Sevenler Derneği). Zorunlu.</p>
+    openSheet(`${S.onboard?stepBar(4):""}<h3 id="shTitle">Takım adın</h3><p class="muted">Ligdeki takma adın: gerçek adının altında görünür ve istediğin kadar yaratıcı olabilir (ör. Kyle Korver Sevenler Derneği). Zorunlu; sonra Profil → Ayarlar'dan değiştirebilirsin.</p>
       <input id="obClub" class="adm-in" style="width:100%" maxlength="40" placeholder="ör. Kyle Korver Sevenler Derneği" value="${esc(S.ob.club||"")}"><small class="hint" id="obClubErr"></small>
       <h3 style="margin-top:18px">Favori takımın</h3><p class="muted">Alt menüde bu takıma özel <b>Takımım</b> sekmesi açılır: maçlarını, oyuncularını, sakatlıklarını ve sıralamasını oradan takip edersin. Uygulamanın renkleri de bu takıma göre olur. Sonra Ayarlar'dan değiştirebilirsin.</p>
       <div class="tm-grid ob-teams">${teams.map(t=>`<button class="tg" data-obt="${t.a}" aria-pressed="${S.ob.team===t.a}" style="--tc:${tcol(t.a)}"><span class="tg-l"><img src="${LOGO_SMALL(t.a)}" alt=""></span><b>${esc(t.n.split(" ").slice(-1)[0])}</b></button>`).join("") || `<p class="muted">Takımlar yükleniyor…</p>`}</div>
@@ -4543,7 +4545,7 @@ function paintProfile(){
       <div class="seg2"><button data-ap="1" aria-pressed="${!!me.autoPick}">Açık</button><button data-ap="0" aria-pressed="${!me.autoPick}">Kapalı</button></div></div>
     <div class="pf-sec"><h4>Arkadaşını davet et</h4><small class="muted">Linkinle katılan herkes profilinde "Lige getirdiği" olarak görünür.${myInv.length?` Şimdiye kadar ${myInv.length} kişi getirdin: ${myInv.map(x=>esc(pname(x))).join(", ")}.`:""}</small>
       <button class="btn" id="pfInvite" type="button" style="margin-top:8px">${ICON.link}Davet linkimi paylaş</button><small class="muted" id="pfInvMsg"></small></div>
-    <div class="pf-sec"><h4>Takım adın</h4><small class="muted">Sıralamada ve profilinde adının altında görünür (ör. Kyle Korver Sevenler Derneği). En fazla 40 karakter; küfür, argo ve hakaret yazılamaz.</small>
+    <div class="pf-sec"><h4>Takım adın</h4><small class="muted">Ligdeki takma adın: sıralamada ve profilinde gerçek adının altında görünür (ör. Kyle Korver Sevenler Derneği). En fazla 40 karakter; küfür, argo ve hakaret yazılamaz.</small>
       <div class="adm-row" style="margin-top:6px"><input id="pfClub" class="adm-in" maxlength="40" placeholder="ör. Kyle Korver Sevenler Derneği" value="${esc(me.club||"")}"><button class="btn" id="pfClubSave" type="button">Kaydet</button></div>
       <small class="err" id="pfClubErr"></small></div>
     <div class="pf-sec"><h4>Hakkında</h4><small class="muted">Profilinde adının altında görünür. En fazla 60 karakter; küfür, argo ve hakaret yazılamaz.</small>
