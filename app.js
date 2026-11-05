@@ -45,7 +45,7 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.21.9";
+const VERSION = "1.21.10";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
@@ -1774,7 +1774,7 @@ function closeSheet(fromPop){ if(S.sheetLocked){ if(fromPop) try{ history.pushSt
   if($("#sheet").classList.contains("hide")) return;
   $("#sheet").classList.add("hide"); document.body.style.overflow="";
   if(!fromPop && history.state?.sheet){ S.popSkip=true; history.back(); } }
-addEventListener("popstate", ()=>{ if(S.popSkip){ S.popSkip=false; return; } if(!$("#sheet").classList.contains("hide")) closeSheet(true); });
+addEventListener("popstate", ()=>{ if(S.popSkip){ S.popSkip=false; return; } if(history.state?.sheet || history.state?.chat) return; if(!$("#sheet").classList.contains("hide")) closeSheet(true); });
 $("#shClose").onclick = ()=>closeSheet();
 $("#sheet").addEventListener("click", e => { if(e.target.id==="sheet") closeSheet(); });
 document.addEventListener("keydown", e => { if(e.key==="Escape") closeSheet(); });
