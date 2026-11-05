@@ -2042,3 +2042,10 @@ h3 .req{font-size:11.5px;font-weight:700;color:var(--muted);margin-left:6px;font
   .pk-edit{order:1;margin-left:auto}
   .pk-sel{order:2;flex-basis:100%;margin-left:46px;justify-content:flex-start}
 }
+
+/* 1.21.11: alt menü hiç saklanmaz; tabloda takım adı büyük, gerçek ad küçük */
+body.bars-hidden .nav,body.trial-on.bars-hidden .nav{transform:none;pointer-events:auto}
+body.bars-moving .nav{pointer-events:auto}
+body.bars-hidden .chat-fab{transform:none}
+.lb-row .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lb-row .nm-real{display:block;font-size:12px;font-weight:600;color:var(--board-muted);line-height:1.2;margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
