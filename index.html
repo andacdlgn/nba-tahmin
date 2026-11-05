@@ -18,7 +18,7 @@
 <link rel="preconnect" href="https://site.web.api.espn.com" crossorigin>
 <link rel="preconnect" href="https://raw.githubusercontent.com" crossorigin>
 <link rel="preconnect" href="https://a.espncdn.com">
-<link rel="modulepreload" href="app.js?v=1.21.2">
+<link rel="modulepreload" href="app.js?v=1.21.3">
 <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js" crossorigin>
 <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js" crossorigin>
 <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js" crossorigin>
@@ -33,13 +33,22 @@
 <script>
 // Açılış ekranı + sürüm kontrolü. Her güncellemede BUILD, version.json, app.js'deki VERSION ve
 // aşağıdaki ?v= numaraları birlikte artırılır (scripts/surum.py hepsini birden yapar).
-window.BUILD = "1.21.2";
+window.BUILD = "1.21.3";
 (function(){
   var t0 = Date.now(), MIN = 1000, MAX = 8000, ready = false, done = false;
   function hide(){ if(done) return; done = true; var s = document.getElementById("splash"); if(!s) return; s.classList.add("out"); setTimeout(function(){ s.remove(); }, 450); }
   function tryHide(){ if(ready && Date.now() - t0 >= MIN) hide(); }
   window.addEventListener("app-ready", function(){ ready = true; setTimeout(tryHide, Math.max(0, MIN - (Date.now() - t0))); });
-  setTimeout(function(){ ready = true; tryHide(); }, MAX);
+  // 12 sn içinde açılmazsa boş ekran yerine yeniden deneme seçeneği (önbelleği temizleyip yeniler)
+  setTimeout(function(){ if(ready) return; var s = document.getElementById("splash"), m = document.getElementById("spMsg"); if(!s || !m) return; s.removeAttribute("aria-hidden");
+    m.innerHTML = 'Bağlantı yavaş görünüyor.<br><button id="spRetry" type="button" style="margin-top:12px;padding:10px 18px;border-radius:12px;border:0;font:inherit;font-weight:700;cursor:pointer">Tekrar dene</button>';
+    document.getElementById("spRetry").onclick = function(){ var go = function(){ location.replace(location.pathname + location.search); };
+      try{ Promise.all([
+        ("caches" in window) ? caches.keys().then(function(ks){ return Promise.all(ks.map(function(k){ return caches.delete(k); })); }) : 0,
+        (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) ? navigator.serviceWorker.getRegistrations().then(function(rs){ return Promise.all(rs.map(function(r){ return r.unregister(); })); }) : 0
+      ]).then(go, go); }catch(e){ go(); } };
+  }, 12000);
+  setTimeout(function(){ if(!ready) return; tryHide(); }, MAX);
   // Sunucudaki sürüm, bu sayfanınkinden yeniyse önbelleği atlayıp yeni dosyaları çek ve bir kez yenile
   fetch("version.json?t=" + Date.now(), {cache: "no-store"}).then(function(r){ return r.json(); }).then(function(j){
     if(!j || !j.v || j.v === window.BUILD) return;
@@ -51,7 +60,7 @@ window.BUILD = "1.21.2";
   }).catch(function(){});
 })();
 </script>
-<link rel="stylesheet" href="style.css?v=1.21.2">
+<link rel="stylesheet" href="style.css?v=1.21.3">
 </head>
 <body>
 
@@ -232,6 +241,6 @@ window.BUILD = "1.21.2";
 
 <div class="toast hide" id="toast" role="status" aria-live="polite"></div>
 
-<script type="module" src="app.js?v=1.21.2"></script>
+<script type="module" src="app.js?v=1.21.3"></script>
 </body>
 </html>

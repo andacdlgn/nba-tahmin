@@ -45,10 +45,13 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.21.2";
+const VERSION = "1.21.3";
+if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
+  fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.21.3", d:"5 Kasım 2026", items:["Mobilde (özellikle Safari'de) geç ya da boş açılma düzeltmesi: yavaş veya erişilemeyen veri adresi siteyi artık kilitlemiyor, en fazla 3 sn bekleyip sitenin kendi kopyasına geçiyor.","Açılış takılırsa boş ekran yerine \"Tekrar dene\" düğmesi çıkıyor."]},
   {v:"1.21.2", d:"4 Kasım 2026", items:["Davet mesajında bu gecenin ilk kilit saati ve deneme haftası bilgisi yazıyor.","Mail adresi onaylanmamış olanlara daha açık bir hatırlatma: neden gerekli olduğu ve kodun nasıl girileceği."]},
   {v:"1.21.1", d:"4 Kasım 2026", items:["Profil → Ayarlar'ın en altında \"Profilimi sil\": hesabını ve bütün verini kalıcı olarak silebilirsin.","Giriş ekranında \"Giriş yapan\" kartındaki fotoğraf artık yuvarlak, basık görünmüyor."]},
   {v:"1.21.0", d:"4 Kasım 2026", items:["Üst çubukta İstekler düğmesi: sorun, istek, öneri ya da soru yaz; doğrudan lig yöneticisinin mailine gider, yönetici yanıtlayınca cevap senin mailine gelir."]},
@@ -228,7 +231,13 @@ const col = uid => { const c=S.players[uid]?.color; return PKEYS.includes(c) ? `
 // eski kayıtlarda küçük harfle başlayan adlar ekranda büyük harfle görünsün
 const pname = uid => { const n=S.players[uid]?.name; return n ? n.charAt(0).toLocaleUpperCase("tr")+n.slice(1) : "?"; };
 function toast(msg, ms=2600){ const t=$("#toast"); t.textContent=msg; t.classList.remove("hide"); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.add("hide"), ms); }
-async function getJSON(url){ const r = await fetch(url, {cache:"no-store"}); if(!r.ok) throw new Error(r.status); return r.json(); }
+// Her istek en fazla ms kadar bekler; takılan bağlantı (ör. mobil operatörde yavaş ya da engelli bir adres) siteyi kilitlemesin
+async function getJSON(url, ms=10000){
+  const ac = typeof AbortController==="function" ? new AbortController() : null, t = ac ? setTimeout(()=>ac.abort(), ms) : 0;
+  try{ const r = await fetch(url, {cache:"no-store", ...(ac?{signal:ac.signal}:{})}); if(!r.ok) throw new Error(r.status); return await r.json(); }
+  finally{ clearTimeout(t); }
+}
+const withTimeout = (p, ms) => Promise.race([p, new Promise(r=>setTimeout(()=>r("timeout"), ms))]);
 async function espn(path){
   let err;
   for(const b of ESPN_BASES){ try{ return await getJSON(b+path); }catch(e){ err=e; } }
@@ -3686,7 +3695,9 @@ async function loadArchive(){
   const base = (() => { const h=location.hostname; if(!h.endsWith(".github.io")) return "data/";
     const owner=h.split(".")[0], seg=location.pathname.split("/").filter(Boolean)[0];
     return `https://raw.githubusercontent.com/${owner}/${seg && !seg.includes(".")?seg:h}/main/data/`; })();
-  const get = async n => { try{ return await getJSON(base+n+"?t="+Date.now()); }catch(e){ return getJSON("data/"+n+"?t="+Date.now()).catch(()=>null); } };
+  // raw.githubusercontent.com bazı mobil operatörlerde yavaş ya da kapalı: 3 sn içinde gelmezse sitenin kendi kopyası kullanılır
+  const get = async n => { if(S.rawSlow && base!=="data/") return getJSON("data/"+n+"?t="+Date.now()).catch(()=>null);
+    try{ return await getJSON(base+n+"?t="+Date.now(), 3000); }catch(e){ if(base!=="data/") S.rawSlow=true; return getJSON("data/"+n+"?t="+Date.now()).catch(()=>null); } };
   const [g,p,s] = await Promise.all([get("games.json"), get("players.json"), get("scores.json")]);
   if(g) S.arch.games=g; if(p) S.pstats=p.p||{}; if(s) S.arch.scores={days:{},games:{},totals:{},weeks:{},...s};
   S.archRaw = S.arch.scores;
@@ -4805,7 +4816,9 @@ if("serviceWorker" in navigator && location.protocol==="https:") navigator.servi
   try{ ok = await initFirebase(); }catch(e){ console.error(e); }
   if(!ok){ $("#auth").classList.remove("hide"); $("#authForm").innerHTML=`<div class="note">Kurulum bekleniyor: config.json içine Firebase bilgileri girilince oyun açılacak.</div>`; return; }
   S.today = espnToday(); S.day = S.today;
-  await Promise.all([loadPlayers().catch(()=>{}), loadArchive().catch(()=>{})]);
+  // açılış en fazla 8 sn bekler; geç gelen veri ekran açıldıktan sonra yerine oturur
+  const boot = Promise.all([loadPlayers().catch(()=>{}), loadArchive().catch(()=>{})]);
+  if(await withTimeout(boot, 8000)==="timeout"){ console.warn("açılış verisi gecikti"); boot.then(()=>{ if(S.uid){ applyLeague?.(); render(); } else paintLgPick?.(); }); }
   { const last=lsGet("lastUser"); if(last && S.players[last]){ S.lgUser=last; $("#inName").value=pname(last); } }
   setAuthMode(Q.get("davet") ? "join" : "login"); paintAuthInvite(); renderAuthLive();
   onAuthStateChanged(S.auth, async user=>{
