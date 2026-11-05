@@ -17,7 +17,7 @@
 <link rel="preconnect" href="https://securetoken.googleapis.com" crossorigin>
 <link rel="preconnect" href="https://site.web.api.espn.com" crossorigin>
 <link rel="preconnect" href="https://a.espncdn.com">
-<link rel="modulepreload" href="app.js?v=1.21.12">
+<link rel="modulepreload" href="app.js?v=1.21.13">
 <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js" crossorigin>
 <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js" crossorigin>
 <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js" crossorigin>
@@ -32,7 +32,7 @@
 <script>
 // Açılış ekranı + sürüm kontrolü. Her güncellemede BUILD, version.json, app.js'deki VERSION ve
 // aşağıdaki ?v= numaraları birlikte artırılır (scripts/surum.py hepsini birden yapar).
-window.BUILD = "1.21.12";
+window.BUILD = "1.21.13";
 (function(){
   var t0 = Date.now(), MIN = 1000, MAX = 8000, ready = false, done = false;
   function hide(){ if(done) return; done = true; var s = document.getElementById("splash"); if(!s) return; s.classList.add("out"); setTimeout(function(){ s.remove(); }, 450); }
@@ -59,7 +59,7 @@ window.BUILD = "1.21.12";
   }).catch(function(){});
 })();
 </script>
-<link rel="stylesheet" href="style.css?v=1.21.12">
+<link rel="stylesheet" href="style.css?v=1.21.13">
 </head>
 <body>
 
@@ -77,11 +77,11 @@ window.BUILD = "1.21.12";
 
 <div class="topbar">
   <div class="wrap">
-    <div class="brand cond">NBA Tahmin</div>
+    <div class="brand cond"><img src="icons/icon-192.png" alt="" class="brand-logo" width="28" height="28"><span class="brand-t">NBA Tahmin</span></div>
     <div class="mini" id="mini" aria-hidden="true"></div>
     <div class="tb-right">
-      <button class="rules-btn" id="rulesBtn" type="button">Kurallar</button>
-      <button class="rules-btn" id="scoreBtn" type="button">Puanlama</button>
+      <button class="rules-btn ico-btn" id="rulesBtn" type="button" aria-label="Kurallar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M4 20.5A2.5 2.5 0 0 0 6.5 23H20v-5"/><path d="M9 8h7M9 11.5h5"/></svg><span>Kurallar</span></button>
+      <button class="rules-btn ico-btn" id="scoreBtn" type="button" aria-label="Puanlama"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2.5" width="14" height="19" rx="2.5"/><path d="M8.5 6.5h7"/><path d="M8.5 11h.01M12 11h.01M15.5 11h.01M8.5 14.5h.01M12 14.5h.01M15.5 14.5h.01M8.5 18h.01M12 18h3.5"/></svg><span>Puanlama</span></button>
       <button class="rules-btn req-btn" id="reqBtn" type="button" aria-label="İstekler"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H8l-4 4z"/><path d="M8 9h8M8 12.5h5"/></svg><span>İstekler</span></button>
       <button class="rules-btn inv-btn hide" id="invBtn" type="button" aria-label="Davet et"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.6 3.2-5.5 6.5-5.5s5.9 1.9 6.5 5.5"/><path d="M19 8v6M16 11h6"/></svg><span>Davet et</span></button>
       <button class="icon-btn hide srch" id="srch" type="button" aria-label="Ara"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg></button>
@@ -240,6 +240,6 @@ window.BUILD = "1.21.12";
 
 <div class="toast hide" id="toast" role="status" aria-live="polite"></div>
 
-<script type="module" src="app.js?v=1.21.12"></script>
+<script type="module" src="app.js?v=1.21.13"></script>
 </body>
 </html>

@@ -2051,3 +2051,27 @@ body.bars-hidden .chat-fab{transform:none}
 .lb-row .nm-real{display:block;font-size:12px;font-weight:600;color:var(--board-muted);line-height:1.2;margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .fo-ri b.fo-tops span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .fo-ri b.fo-tops{white-space:normal}
+
+/* 1.21.13: üst çubuk — logo, eşit dağılmış ikon düğmeleri, telefonda kısa deneme şeridi */
+.brand{display:flex;align-items:center;gap:8px}
+.brand-logo{width:28px;height:28px;border-radius:8px;flex:none;display:block}
+.ico-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.ico-btn svg{width:18px;height:18px;flex:none}
+.ts-s{display:none}
+@media (min-width:561px){ .topbar .tb-right .ico-btn svg{display:none} }
+@media (max-width:560px){
+  .topbar .wrap{gap:10px;padding-left:12px;padding-right:12px}
+  .topbar .brand-t{display:none}
+  .topbar .brand,.topbar.scrolled .brand,.topbar:has(#invBtn:not(.hide)) .brand{display:flex}
+  .topbar .mini,.topbar .mini.show{display:none}
+  .tb-right{flex:1;justify-content:space-between;gap:0;max-width:340px;margin-left:auto}
+  .tb-right .rules-btn,.tb-right .icon-btn{width:38px;height:38px;padding:0;display:inline-grid;place-items:center;border-radius:12px;font-size:0}
+  .tb-right .rules-btn span{display:none}
+  .topbar .tb-right .rules-btn svg,.topbar .tb-right .icon-btn svg{width:19px;height:19px;display:block}
+  .tb-right .hide{display:none}
+  #me{overflow:hidden;border-radius:50%}
+  .ts-t{display:none}
+  .ts-s{display:inline;min-width:0;overflow:hidden;text-overflow:ellipsis}
+  .trial-strip{justify-content:flex-start}
+}
+@media (max-width:360px){ .tb-right .rules-btn,.tb-right .icon-btn{width:34px;height:34px} .brand-logo{width:24px;height:24px} }

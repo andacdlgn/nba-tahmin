@@ -45,7 +45,7 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.21.12";
+const VERSION = "1.21.13";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
@@ -2725,7 +2725,7 @@ function renderBanners(){
   const strip=$("#trialStrip");
   if(strip){ strip.classList.toggle("hide", !tr); document.body.classList.toggle("trial-on", !!tr);
     if(tr){ const left=Math.max(0, Math.round((parseYmd(shiftDay(tr.end,1))-parseYmd(espnToday()))/864e5));
-      strip.innerHTML=`<span class="ts-tag">🧪 DENEME HAFTASI</span><span class="ts-t">${dayNice(baseStart(),{day:"numeric",month:"long"})}–${dayNice(tr.end,{day:"numeric",month:"long"})} · puanlar ${dayNice(shiftDay(tr.end,1),{day:"numeric",month:"long"})} pazartesi sıfırlanacak${left?` · asıl lige ${left} gün`:""}</span>`; } }
+      strip.innerHTML=`<span class="ts-tag">🧪 DENEME HAFTASI</span><span class="ts-t">${dayNice(baseStart(),{day:"numeric",month:"long"})}–${dayNice(tr.end,{day:"numeric",month:"long"})} · puanlar ${dayNice(shiftDay(tr.end,1),{day:"numeric",month:"long"})} pazartesi sıfırlanacak${left?` · asıl lige ${left} gün`:""}</span><span class="ts-s">Puanlar ${dayNice(shiftDay(tr.end,1),{day:"numeric",month:"long"})} pazartesi sıfırlanır</span>`; } }
   const n=S.notice;
   if(n?.text && lsGet("noticeSeen")!==String(n.at)) html += `<div class="banner notice"><span class="bn-i">${ICON.megaphone}</span><span class="bn-t">${esc(n.text)}</span><button class="bn-x" data-bn="notice" aria-label="Kapat">✕</button></div>`;
   const later=+(lsGet("mailNudge")||0);
