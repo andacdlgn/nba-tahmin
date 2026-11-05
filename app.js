@@ -45,12 +45,13 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.21.13";
+const VERSION = "1.22.0";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.22.0", d:"5 Kasım 2026", items:["Özel mesajlar: sohbet baloncuğunda artık \"Lig sohbeti\" ve \"Özel mesajlar\" sekmeleri var. Ligdeki birine yalnızca ikinizin görebileceği mesaj gönderebilirsin; yönetici dahil kimse okuyamaz.","Bir oyuncunun profilinden \"Mesaj gönder\" ile doğrudan yazabilirsin. İstemediğin birini konuşmanın üstündeki \"Engelle\" ile engelleyebilirsin. Küfür filtresi özel mesajlarda da geçerli."]},
   {v:"1.21.9", d:"5 Kasım 2026", items:["Pencereler artık art arda açılmıyor: bir açılışta en fazla bir bilgilendirme penceresi çıkıyor, sen bir pencere açtıysan (ör. Kurallar) hiç çıkmıyor. Kapatınca arkasından yenisi açılmıyor.","Deneme haftası penceresi en üstteki şeride dokununca her zaman açılıyor."]},
   {v:"1.21.8", d:"5 Kasım 2026", items:["Avatarlara WNBA eklendi: 2026 sezonunun en skorer 15 oyuncusu (A'ja Wilson, Caitlin Clark, Paige Bueckers…)."]},
   {v:"1.21.7", d:"5 Kasım 2026", items:["Gerçek ad: Profil → Ayarlar'dan adını değiştirebilirsin; giriş adın da birlikte değişir, şifren aynı kalır. Kayıtlı oyunculara bir kez soruluyor."]},
@@ -2796,6 +2797,7 @@ function paintProf(){
       ${p.club?`<div class="pf-club">${ICON.shield}${esc(p.club)}</div>`:""}
       ${p.bio?`<div class="pf-bio">“${esc(p.bio)}”</div>`:""}
       ${(inv=>inv.length?`<div class="pf-inv">${ICON.link}Lige getirdiği: ${inv.map(x=>`<b style="color:${col(x)}">${esc(pname(x))}</b>`).join(", ")}</div>`:"")(invitedBy(u))}
+      ${!me && S.uid ? `<button class="btn sm dm-btn" data-dmto="${u}" type="button">✉️ Mesaj gönder</button>` : ""}
       ${!me && S.uid ? `<button class="btn sm rival-btn ${S.players[S.uid]?.rival===u?"on":""}" id="rivalBtn" type="button">${S.players[S.uid]?.rival===u?"✓ Rakibim":"Rakibim yap"}</button>` : ""}
       <small class="muted">${st.rank}. sırada · ${st.tot} puan${p.favTeam?` · <span data-tp="${p.favTeam}" class="linkish" style="font-size:13px">${esc(fav?.n||p.favTeam)}</span> taraftarı`:""} · Ligde ${daysIn}. günü</small></div></div>
     <div class="seg2 prof-tabs" style="grid-template-columns:repeat(${tabs.length},1fr)">${tabs.map(([k,l])=>`<button data-ptab="${k}" aria-pressed="${tab===k}">${l}</button>`).join("")}</div>
@@ -4302,18 +4304,18 @@ function startChat(){
   }, () => { S.chatErr=true; S.chatUnsub=null; if(S.chatOpen) paintChatList(); });
   if(!S.pinUnsub) S.pinUnsub = onSnapshot(doc(S.db,"chatpin","main"), d => { S.chatPin = d.exists() && d.data().id ? d.data() : null; paintPin(); }, () => {});
 }
-function stopChat(){ for(const k of ["chatUnsub","pinUnsub","typUnsub"]) if(S[k]){ S[k](); S[k]=null; } S.chat=[]; S.chatOld=[]; S.chatPin=null; chatBadge(); }
+function stopChat(){ stopDMs(); for(const k of ["chatUnsub","pinUnsub","typUnsub"]) if(S[k]){ S[k](); S[k]=null; } S.chat=[]; S.chatOld=[]; S.chatPin=null; chatBadge(); }
 function chatAll(){ const m=new Map(); for(const x of [...S.chatOld, ...S.chat]) m.set(x.id, x); return [...m.values()].sort((a,b)=>chatTs(a)-chatTs(b)); }
 function chatBadge(){
   const fab=$("#chatFab"); if(!fab) return;
   fab.classList.toggle("hide", !S.uid);
   const seen=chatSeen(), fresh=S.chatOpen ? [] : S.chat.filter(m=>m.uid!==S.uid && chatTs(m)>seen);
   const men=fresh.filter(m=>(m.mn||[]).includes(S.uid)||m.rp?.uid===S.uid).length, muted=chatMuted();
-  const n = muted ? men : fresh.length, b=$("#chatN");
+  const dn=dmUnreadN(), n = (muted ? men : fresh.length) + dn, b=$("#chatN");
   b.textContent = men ? `@${muted?"":" "+(n>99?"99+":n)}`.trim() : (n>99 ? "99+" : n);
   b.classList.toggle("hide", !n); b.classList.toggle("ment", !!men);
   fab.classList.toggle("muted", muted);
-  fab.setAttribute("aria-label", n ? `Lig sohbeti, ${n} yeni mesaj${men?", seni anan var":""}` : "Lig sohbeti");
+  fab.setAttribute("aria-label", n ? `Sohbet, ${n} yeni mesaj${dn?`, ${dn} özel mesaj`:""}${men?", seni anan var":""}` : "Sohbet"); paintChTabs();
 }
 const chatDK = d => d.toLocaleDateString("en-CA",{timeZone:TZ});
 const chatDay = ms => { const d=new Date(ms), k=chatDK(d), t=chatDK(new Date()), y=chatDK(new Date(Date.now()-864e5));
@@ -4358,7 +4360,7 @@ function chatMsgHTML(m, prev){
     </div></div>`;
 }
 function paintChatList(keep){
-  const box=$("#chList"); if(!box) return;
+  const box=$("#chList"); if(!box || S.chMode!=="lig") return;
   const atEnd = box.scrollHeight-box.scrollTop-box.clientHeight < 80, oldH=box.scrollHeight, oldTop=box.scrollTop;
   const ms=chatAll(); let html=S.chatMore?`<button class="btn ch-more" id="chMore" type="button">Daha eski mesajlar</button>`:"", day="";
   if(S.chatErr) html+=`<p class="ch-empty">Sohbet şu an açılamadı. Biraz sonra tekrar dene.</p>`;
@@ -4390,6 +4392,7 @@ function paintTyping(){
   el.textContent = !who.length ? "" : who.length===1 ? `${who[0]} yazıyor…` : who.length===2 ? `${who[0]} ve ${who[1]} yazıyor…` : `${who.length} kişi yazıyor…`;
 }
 function noteTyping(){
+  if(S.chMode!=="lig") return;
   const now=Date.now(); if(!$("#chIn").value.trim()) return clearTyping();
   if(now-(S.typSent||0) < 4000) return; S.typSent=now;
   setDoc(doc(S.db,"typing",S.uid), {at:serverTimestamp()}).catch(()=>{});
@@ -4406,7 +4409,7 @@ function cancelCtx(){ if(S.chatEdit){ $("#chIn").value=""; chatCount(); } S.chat
 /* @ önerileri */
 function paintMent(){
   const inp=$("#chIn"), el=$("#chMent"), before=inp.value.slice(0, inp.selectionStart ?? inp.value.length);
-  const m=before.match(/(^|\s)@([^\s@]{0,20})$/);
+  const m=S.chMode==="lig" && before.match(/(^|\s)@([^\s@]{0,20})$/);
   if(!m){ el.classList.add("hide"); S.mentList=[]; return; }
   const q=m[2].toLocaleLowerCase("tr");
   S.mentList=S.order.filter(u=>u!==S.uid && pname(u).toLocaleLowerCase("tr").startsWith(q)).slice(0,6);
@@ -4421,12 +4424,12 @@ function pickMent(u){
 function openChat(){
   S.chatOpen=true; if(!S.chatUnsub) startChat(); startTyping(); const el=$("#chat"); el.classList.remove("hide"); document.body.style.overflow="hidden";
   try{ history.pushState({chat:1}, ""); }catch(e){}
-  paintMute(); paintCtx(); paintChatList(); $("#chList").scrollTop=$("#chList").scrollHeight; chatBadge();
+  paintMute(); S.dmPainted=false; setChMode(dmUnreadN() ? "dms" : "lig"); chatBadge();
   if(matchMedia("(min-width:700px)").matches) $("#chIn").focus();
 }
 function closeChat(fromPop){
   if(!S.chatOpen) return; S.chatOpen=false; S.chatPick=null; $("#chat").classList.add("hide"); document.body.style.overflow="";
-  stopTyping(); $("#chMent").classList.add("hide");
+  stopTyping(); $("#chMent").classList.add("hide"); if(S.dmMsgUnsub){ S.dmMsgUnsub(); S.dmMsgUnsub=null; } S.chMode="lig"; S.dmWith=null; $(".ch-foot").classList.remove("hide");
   const ms=S.chat; if(ms.length) setChatSeen(Math.max(chatSeen(), ...ms.map(chatTs)));
   chatBadge(); if(!fromPop && history.state?.chat){ S.popSkip=true; history.back(); }
 }
@@ -4434,6 +4437,7 @@ addEventListener("popstate", ()=>{ if(S.chatOpen && !history.state?.chat) closeC
 document.addEventListener("keydown", e => { if(e.key==="Escape" && S.chatOpen){ if(S.chatReply||S.chatEdit) return cancelCtx(); closeChat(); } });
 addEventListener("pagehide", ()=>clearTyping());
 async function sendChat(){
+  if(S.chMode==="dm") return sendDM();
   const inp=$("#chIn"), msg=$("#chMsg"), t=inp.value.replace(/\s+$/,"").replace(/^\s+/,"");
   if(!t) return;
   if(t.length>CHAT_MAX){ msg.textContent=`Mesaj en fazla ${CHAT_MAX} karakter olabilir.`; return; }
@@ -4468,6 +4472,7 @@ function chatGoto(id){
   el.scrollIntoView({block:"center", behavior:"smooth"}); el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash");
 }
 $("#chatFab").onclick=()=>openChat();
+document.addEventListener("click", e=>{ const b=e.target.closest("[data-dmto]"); if(b){ S.dmPainted=false; openDM(b.dataset.dmto); } });
 $("#chClose").onclick=()=>closeChat();
 $("#chSend").onclick=()=>sendChat();
 $("#chMute").onclick=()=>{ lsSet("chatMute", chatMuted()?"0":"1"); paintMute(); chatBadge(); toast(chatMuted()?"Sohbet sessizde: baloncukta yalnızca seni anan mesajlar sayılır.":"Sohbet bildirimleri açık."); };
@@ -4486,6 +4491,14 @@ $("#chPin").addEventListener("click", async e => {
   const g=e.target.closest("[data-goto]"); if(g) chatGoto(g.dataset.goto);
 });
 $("#chList").addEventListener("click", async e => {
+  if(S.chMode!=="lig"){
+    const c=e.target.closest("[data-cht]"); if(c) return setChMode(c.dataset.cht);
+    if(e.target.closest("#dmNew")) return setChMode("pick");
+    const du=e.target.closest("[data-dmu]"); if(du){ S.dmPainted=false; return openDM(du.dataset.dmu); }
+    const dd=e.target.closest("[data-dmdel]"); if(dd){ if(dd.dataset.sure!=="1"){ dd.dataset.sure="1"; dd.textContent="Emin misin?"; setTimeout(()=>{ if(dd.isConnected){ dd.dataset.sure=""; dd.textContent="Sil"; } }, 3000); return; }
+      try{ await deleteDoc(doc(S.db,"dm",dmId(S.dmWith),"m",dd.dataset.dmdel)); }catch(x){ toast("Silinemedi."); } return; }
+    return;
+  }
   if(e.target.closest("#chMore")){
     if(!S.chatLastDoc) return; const qd=await getDocs(query(collection(S.db,"chat"), orderBy("at","desc"), startAfter(S.chatLastDoc), limit(100))).catch(()=>null); if(!qd) return;
     S.chatOld.push(...qd.docs.map(d=>({id:d.id, ...d.data()}))); if(qd.docs.length<100) S.chatMore=false; else S.chatLastDoc=qd.docs[qd.docs.length-1];
@@ -4516,6 +4529,119 @@ $("#chList").addEventListener("click", async e => {
     try{ await deleteDoc(doc(S.db,"chat",id)); S.chatOld=S.chatOld.filter(x=>x.id!==id); if(S.chatPin?.id===id && S.isAdmin) setDoc(doc(S.db,"chatpin","main"), {id:""}).catch(()=>{}); paintChatList("stay"); }catch(x){ toast("Silinemedi."); }
   }
 });
+
+/* ====================================================== özel mesajlar */
+// dm/{a_b} (a<b): {u:[a,b], at: son hareket, last:{uid,t}, rd:{uid: okuma saati}, bl:{uid:true} engelleyen}
+// dm/{a_b}/m/{id}: {uid, t (≤500), at}. Yalnızca iki kişi okur; yönetici dahil başkası göremez.
+S.chMode="lig"; S.dms=[]; S.dmMsgs=[]; S.dmWith=null;
+const dmId = u => [S.uid,u].sort().join("_");
+const dmTs = v => v?.toMillis ? v.toMillis() : (v ? Date.now() : 0);
+const dmOther = d => (d.u||[]).find(x=>x!==S.uid);
+const dmUnread = d => d.last && d.last.uid!==S.uid && dmTs(d.at) > dmTs(d.rd?.[S.uid]);
+function startDMs(){
+  if(S.dmUnsub || !S.uid) return;
+  S.dmUnsub = onSnapshot(query(collection(S.db,"dm"), where("u","array-contains",S.uid)), snap => {
+    S.dms = snap.docs.map(d=>({id:d.id, ...d.data({serverTimestamps:"estimate"})})).filter(d=>S.players[dmOther(d)]).sort((a,b)=>dmTs(b.at)-dmTs(a.at));
+    chatBadge(); paintChTabs();
+    if(S.chatOpen && S.chMode==="dms") paintDMs();
+    if(S.chatOpen && S.chMode==="dm"){ if(!S.dmMsgUnsub && S.dms.some(d=>d.id===dmId(S.dmWith))) watchThread(); else paintThreadHead(); markDMRead(); }
+  }, () => {});
+}
+function stopDMs(){ for(const k of ["dmUnsub","dmMsgUnsub"]) if(S[k]){ S[k](); S[k]=null; } S.dms=[]; S.dmMsgs=[]; }
+function dmUnreadN(){ return (S.dms||[]).filter(dmUnread).length; }
+function paintChTabs(){
+  const el=$("#chTabs"); if(!el) return; const n=dmUnreadN();
+  if(S.chMode==="dm"){ const u=S.dmWith, d=S.dms.find(x=>x.id===dmId(u)), iBl=!!d?.bl?.[S.uid];
+    el.innerHTML=`<button class="ch-back" data-cht="dms" type="button" aria-label="Özel mesajlara dön">‹</button>${avatar(u,"sm")}<b class="ch-dmn" style="color:${col(u)}">${esc(pname(u))}</b><span class="ch-lock">🔒 yalnızca ikiniz</span>${d?`<button class="ch-act" id="dmBlock" type="button">${iBl?"Engeli kaldır":"Engelle"}</button>`:""}`; return; }
+  el.innerHTML=`<button class="ch-tab ${S.chMode==="lig"?"on":""}" data-cht="lig" type="button">Lig sohbeti</button><button class="ch-tab ${S.chMode!=="lig"?"on":""}" data-cht="dms" type="button">Özel mesajlar${n?`<i class="ch-tn">${n}</i>`:""}</button>`;
+}
+function setChMode(m){
+  S.chMode=m; if(m!=="dm"){ if(S.dmMsgUnsub){ S.dmMsgUnsub(); S.dmMsgUnsub=null; } S.dmWith=null; S.dmMsgs=[]; }
+  const lig=m==="lig";
+  $("#chPin").classList.toggle("hide", !lig || !S.chatPin);
+  $("#chTyping").classList.toggle("hide", !lig);
+  $(".ch-foot").classList.toggle("hide", m==="dms" || m==="pick");
+  $("#chMent").classList.add("hide"); S.chatReply=null; S.chatEdit=null; paintCtx();
+  $("#chIn").placeholder = m==="dm" ? `${pname(S.dmWith)} adlı kişiye yaz…` : "Mesaj yaz…";
+  $("#chMsg").textContent="";
+  paintChTabs();
+  if(lig){ paintChatList(); $("#chList").scrollTop=$("#chList").scrollHeight; } else if(m==="dms") paintDMs(); else if(m==="pick") paintDMPick(); else paintThread();
+}
+function paintDMs(){
+  const box=$("#chList");
+  box.innerHTML=`<button class="btn ch-new" id="dmNew" type="button">＋ Yeni mesaj</button>`
+    + (S.dms.length ? S.dms.map(d=>{ const u=dmOther(d), un=dmUnread(d), bl=d.bl&&Object.keys(d.bl).length;
+        return `<button class="ch-conv ${un?"un":""}" data-dmu="${u}" type="button">${avatar(u)}<span class="ch-ci"><b style="color:${col(u)}">${esc(pname(u))}</b><small>${bl?"🚫 engellendi":d.last?`${d.last.uid===S.uid?"Sen: ":""}${esc(d.last.t)}`:""}</small></span><span class="ch-cm"><small>${d.at?chatDayShort(dmTs(d.at)):""}</small>${un?`<i class="ch-dot"></i>`:""}</span></button>`; }).join("")
+      : `<p class="ch-empty">Henüz özel mesajın yok.<br>Ligdeki birine yalnızca onun görebileceği bir mesaj gönder.</p>`);
+  box.scrollTop=0;
+}
+const chatDayShort = ms => { const d=chatDay(ms); return d==="Bugün" ? timeTR(new Date(ms)) : d==="Dün" ? "Dün" : new Date(ms).toLocaleDateString(LOC,{timeZone:TZ, day:"numeric", month:"short"}); };
+function paintDMPick(){
+  const ppl=S.order.filter(u=>u!==S.uid && S.players[u]).sort((a,b)=>pname(a).localeCompare(pname(b),"tr"));
+  $("#chList").innerHTML=`<button class="ch-back-row" data-cht="dms" type="button">‹ Geri</button><p class="ch-hint">Kime yazmak istiyorsun?</p>`
+    + ppl.map(u=>`<button class="ch-conv" data-dmu="${u}" type="button">${avatar(u)}<span class="ch-ci"><b style="color:${col(u)}">${esc(S.players[u]?.club||pname(u))}</b><small>${esc(pname(u))}</small></span></button>`).join("");
+  paintChTabs();
+}
+function openDM(u){
+  if(!S.players[u] || u===S.uid) return;
+  if(!S.chatOpen) openChat();
+  S.dmWith=u; setChMode("dm");
+  if(S.dms.some(d=>d.id===dmId(u))) watchThread();
+  markDMRead();
+}
+function watchThread(){
+  if(S.dmMsgUnsub){ S.dmMsgUnsub(); S.dmMsgUnsub=null; }
+  const u=S.dmWith; if(!u) return;
+  S.dmMsgUnsub = onSnapshot(query(collection(S.db,"dm",dmId(u),"m"), orderBy("at","desc"), limit(150)), snap => {
+    if(S.dmWith!==u) return;
+    S.dmMsgs = snap.docs.map(d=>({id:d.id, ...d.data({serverTimestamps:"estimate"})})).reverse();
+    paintThread(); markDMRead();
+  }, () => { S.dmMsgs=[]; paintThread(); });
+}
+function paintThreadHead(){ paintChTabs(); }
+function paintThread(){
+  const box=$("#chList"); if(!box || S.chMode!=="dm") return;
+  const atEnd = box.scrollHeight-box.scrollTop-box.clientHeight < 80;
+  const d=S.dms.find(x=>x.id===dmId(S.dmWith)), bl=d?.bl||{};
+  let html="", day="";
+  if(!S.dmMsgs.length) html+=`<p class="ch-empty">Bu konuşmayı yalnızca sen ve ${esc(pname(S.dmWith))} görebilirsiniz.<br>İlk mesajı yaz.</p>`;
+  S.dmMsgs.forEach((m,i)=>{ const dd=chatDay(chatTs(m)); if(dd!==day){ day=dd; html+=`<div class="ch-day"><span>${dd}</span></div>`; }
+    const prev=S.dmMsgs[i-1], mine=m.uid===S.uid, same=prev && prev.uid===m.uid && chatTs(m)-chatTs(prev)<5*60e3 && chatDay(chatTs(prev))===dd;
+    html+=`<div class="ch-msg ${mine?"me":""} ${same?"cont":""}" data-id="${m.id}"><span class="ch-av">${same||mine?"":avatar(m.uid)}</span><div class="ch-b"><div class="ch-t">${chatRich(m.t)}</div><div class="ch-meta"><span class="ch-tm">${timeTR(new Date(chatTs(m)))}</span>${mine?`<button class="ch-act" data-dmdel="${m.id}" type="button">Sil</button>`:""}</div></div></div>`; });
+  if(bl[S.uid]) html+=`<p class="ch-block">Bu kişiyi engelledin. Engeli kaldırana kadar ikiniz de mesaj gönderemezsiniz.</p>`;
+  else if(Object.keys(bl).length) html+=`<p class="ch-block">Bu konuşmaya artık mesaj gönderilemiyor.</p>`;
+  box.innerHTML=html;
+  $(".ch-foot").classList.toggle("hide", Object.keys(bl).length>0);
+  if(atEnd || !S.dmPainted) box.scrollTop=box.scrollHeight; S.dmPainted=true;
+}
+function markDMRead(){
+  const d=S.dms.find(x=>x.id===dmId(S.dmWith)); if(!d || !S.chatOpen || document.hidden) return;
+  if(dmUnread(d) || !d.rd?.[S.uid]) updateDoc(doc(S.db,"dm",d.id), {[`rd.${S.uid}`]: serverTimestamp()}).catch(()=>{});
+}
+async function sendDM(){
+  const inp=$("#chIn"), msg=$("#chMsg"), t=inp.value.trim(), u=S.dmWith;
+  if(!t || !u) return;
+  if(t.length>CHAT_MAX){ msg.textContent=`Mesaj en fazla ${CHAT_MAX} karakter olabilir.`; return; }
+  if(chatProblem(t)){ msg.textContent="Bu mesajda küfür ya da hakaret var, gönderilmedi."; return; }
+  const btn=$("#chSend"); btn.disabled=true; msg.textContent="";
+  const id=dmId(u), had=S.dms.find(x=>x.id===id), last={uid:S.uid, t:t.replace(/\s+/g," ").slice(0,80)};
+  try{
+    inp.value=""; chatCount();
+    const b=writeBatch(S.db), ref=doc(S.db,"dm",id);
+    if(had) b.update(ref, {at:serverTimestamp(), last, [`rd.${S.uid}`]:serverTimestamp()});
+    else b.set(ref, {u:[S.uid,u].sort(), at:serverTimestamp(), last, rd:{[S.uid]:serverTimestamp()}, bl:{}});
+    b.set(doc(collection(S.db,"dm",id,"m")), {uid:S.uid, t, at:serverTimestamp()});
+    await b.commit();
+    if(!S.dmMsgUnsub) watchThread();
+  }catch(e){ inp.value=inp.value||t; chatCount(); msg.textContent = e?.code==="permission-denied" ? "Gönderilemedi. Bu konuşmada engel olabilir ya da sayfayı yenilemen gerekebilir." : "Gönderilemedi, bağlantını kontrol edip tekrar dene."; }
+  btn.disabled=false; inp.focus();
+}
+$("#chTabs").addEventListener("click", async e => {
+  const t=e.target.closest("[data-cht]"); if(t) return setChMode(t.dataset.cht);
+  if(e.target.closest("#dmBlock")){ const d=S.dms.find(x=>x.id===dmId(S.dmWith)); if(!d) return; const on=!d.bl?.[S.uid];
+    try{ await updateDoc(doc(S.db,"dm",d.id), {[`bl.${S.uid}`]: on ? true : deleteField()}); toast(on?"Engellendi. Artık birbirinize mesaj gönderemezsiniz.":"Engel kaldırıldı."); }catch(x){ toast("Kaydedilemedi."); } }
+});
+document.addEventListener("visibilitychange", ()=>{ if(!document.hidden && S.chatOpen && S.chMode==="dm") markDMRead(); });
 
 // Şifre sıfırlama isteğinin sonucunu bekle (GitHub görevi birkaç dakikada bir çalışır)
 const RESET_MSG = {
@@ -4909,7 +5035,7 @@ if("serviceWorker" in navigator){ navigator.serviceWorker.getRegistrations?.().t
       }
     }
     $("#auth").classList.add("hide"); $("#app").classList.remove("hide");
-    $("#me").classList.remove("hide"); $("#srch").classList.remove("hide"); $("#invBtn").classList.remove("hide"); later(()=>{ startChat(); chatBadge(); }); paintMe(); applyTheme();
+    $("#me").classList.remove("hide"); $("#srch").classList.remove("hide"); $("#invBtn").classList.remove("hide"); later(()=>{ startChat(); startDMs(); chatBadge(); }); paintMe(); applyTheme();
     S.statFor=S.uid;
     $("#foot").innerHTML=`Kazanan +1 (sürprizde +2 / +3) · Fark ±3 +1 · En skorer +1 · Banko 2 kat / -1 · Günün oyuncusu +3 · Gecenin sorusu +1 · Haftada 4 gece +2<br><button class="linkish ver" id="pgFoot" type="button">📖 Puanlama rehberi</button><br>Veriler ESPN'den alınır. Maç varken 30 saniyede bir yenilenir.<br><button class="linkish ver" id="verBtn" type="button">Sürüm ${VERSION} · Yenilikler</button> · <button class="linkish ver" id="repBtn" type="button">Sorun bildir</button> · <button class="linkish ver" id="langBtn" type="button">${LANG==="en"?"Türkçe":"English"}</button>`;
     $("#verBtn").onclick=()=>openNews(true); $("#repBtn").onclick=()=>openReport(); $("#langBtn").onclick=()=>setLang(LANG==="en"?"tr":"en");

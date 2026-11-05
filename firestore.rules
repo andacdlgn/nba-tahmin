@@ -371,6 +371,54 @@ service cloud.firestore {
           && (!('mn' in request.resource.data) || (request.resource.data.mn is list && request.resource.data.mn.size() <= 10))));
       allow delete: if (signedIn() && resource.data.uid == request.auth.uid) || isAdmin();
     }
+    // Özel mesajlar: dm/{a_b} (a<b) yalnızca iki kişi okur ve yazar; yönetici dahil başkası göremez.
+    // {u:[a,b], at, last:{uid,t}, rd:{uid: okuma saati}, bl:{uid:true}} · mesajlar dm/{a_b}/m/{id} = {uid, t, at}
+    function dmPath(pid) { return /databases/$(database)/documents/dm/$(pid); }
+    function dmLastOk(d) { return d.last is map && d.last.keys().hasOnly(['uid', 't']) && d.last.uid == request.auth.uid
+      && str(d.last.t, 80) && cleanChat(d.last.t); }
+    match /dm/{pid} {
+      allow read: if signedIn() && request.auth.uid in resource.data.u;
+      allow create: if isPlayer()
+        && request.resource.data.keys().hasOnly(['u', 'at', 'last', 'rd', 'bl'])
+        && request.resource.data.u is list && request.resource.data.u.size() == 2
+        && request.auth.uid in request.resource.data.u
+        && request.resource.data.u[0] < request.resource.data.u[1]
+        && pid == request.resource.data.u[0] + '_' + request.resource.data.u[1]
+        && exists(/databases/$(database)/documents/players/$(request.resource.data.u[0]))
+        && exists(/databases/$(database)/documents/players/$(request.resource.data.u[1]))
+        && request.resource.data.at == request.time
+        && dmLastOk(request.resource.data)
+        && request.resource.data.rd is map && request.resource.data.rd.keys().hasOnly([request.auth.uid])
+        && request.resource.data.bl == {};
+      allow update: if isPlayer() && request.auth.uid in resource.data.u
+        && request.resource.data.u == resource.data.u
+        && (
+          // yeni mesaj: son hareket, özet ve kendi okuma saati (engel varsa olmaz)
+          (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['at', 'last', 'rd'])
+            && request.resource.data.at == request.time && dmLastOk(request.resource.data)
+            && request.resource.data.rd.diff(resource.data.rd).affectedKeys().hasOnly([request.auth.uid])
+            && resource.data.bl.size() == 0)
+          // okundu
+          || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rd'])
+            && request.resource.data.rd.diff(resource.data.rd).affectedKeys().hasOnly([request.auth.uid]))
+          // engelle / engeli kaldır: herkes yalnızca kendi kaydını
+          || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['bl'])
+            && request.resource.data.bl.diff(resource.data.bl).affectedKeys().hasOnly([request.auth.uid])
+            && (!(request.auth.uid in request.resource.data.bl) || request.resource.data.bl[request.auth.uid] == true))
+        );
+      allow delete: if false;
+      match /m/{mid} {
+        allow read: if signedIn() && request.auth.uid in get(dmPath(pid)).data.u;
+        allow create: if isPlayer()
+          && request.auth.uid in getAfter(dmPath(pid)).data.u
+          && getAfter(dmPath(pid)).data.bl.size() == 0
+          && request.resource.data.keys().hasOnly(['uid', 't', 'at'])
+          && request.resource.data.uid == request.auth.uid
+          && str(request.resource.data.t, 500) && cleanChat(request.resource.data.t)
+          && request.resource.data.at == request.time;
+        allow delete: if signedIn() && resource.data.uid == request.auth.uid;
+      }
+    }
     // ad değiştirme: ad giriş hesabına bağlı olduğu için arka plan görevi ikisini birlikte değiştirir
     match /renameReq/{uid} {
       allow read: if false;

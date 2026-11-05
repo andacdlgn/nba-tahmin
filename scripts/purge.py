@@ -33,6 +33,14 @@ def delete_users(db, victims, wipe=False):
     for coll in BY_ID + ["deleteReq"]:
         removed[coll] = _delete_all([db.collection(coll).document(v) for v in victims
                                      if db.collection(coll).document(v).get().exists])
+    # özel mesajlar: oyunculardan birinin silindiği konuşmalar mesajlarıyla birlikte gider
+    n = 0
+    for d in db.collection("dm").stream():
+        if set((d.to_dict() or {}).get("u", [])) & set(victims):
+            n += _delete_all([m.reference for m in d.reference.collection("m").stream()])
+            d.reference.delete()
+            n += 1
+    removed["dm"] = n
     if wipe:
         for coll in WIPE:
             removed[coll] = _delete_all([d.reference for d in db.collection(coll).stream()])
