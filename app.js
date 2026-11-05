@@ -45,12 +45,13 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.21.6";
+const VERSION = "1.21.7";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.21.7", d:"5 Kasım 2026", items:["Gerçek ad: Profil → Ayarlar'dan adını değiştirebilirsin; giriş adın da birlikte değişir, şifren aynı kalır. Kayıtlı oyunculara bir kez soruluyor."]},
   {v:"1.21.6", d:"5 Kasım 2026", items:["Kayıtta ilk adım artık \"Gerçek adın\" diye soruyor; takma ad yerine takım adı kullanılıyor. Adın ilk harfi kendiliğinden büyüyor."]},
   {v:"1.21.5", d:"5 Kasım 2026", items:["Gecenin sorusu cevaplanınca Evet/Hayır düğmeleri gizleniyor, \"Değiştir\" ile yeniden açılıyor.","Görsel düzeltmeler: Günün oyuncusu ve skorer fotoğrafları kaymıyor, alt menüde simgeler ve yazılar aynı hizada.","Bağlantı yavaşken oturumun kendiliğinden kapanması engellendi."]},
   {v:"1.21.4", d:"5 Kasım 2026", items:["Mobil açılış düzeltmesi: hızlandırma için eklenen telefon önbelleği (servis çalışanı) kaldırıldı; eski ve yeni dosyaların karışıp bazı bölümlerin yüklenmemesine yol açıyordu.","Maç ve puan verisi önce sitenin kendi sunucusundan geliyor (telefonda ek bağlantı yok).","Sakatlıklar ve kadrolar artık açılıştan hemen sonra yükleniyor; dokunma sırasında ekranın donabildiği bir durum düzeltildi."]},
@@ -4190,6 +4191,39 @@ function paintAuthInvite(){
   if(r && S.players[r]){ el.classList.remove("hide"); el.innerHTML=`${avatar(r,"lg")}<span><b>${esc(pname(r))}</b> seni NBA Tahmin ligine davet etti.<small>Aşağıdan birkaç adımda katılabilirsin.</small></span>`; }
   else if(S.jw.inv){ el.classList.remove("hide"); el.innerHTML=`<span class="av lg">🏀</span><span><b>NBA Tahmin ligine davet edildin.</b><small>Aşağıdan birkaç adımda katılabilirsin.</small></span>`; }
 }
+// Gerçek ad: ad ve giriş adı arka plan görevinde birlikte değişir (Firebase hesabı adla açılıyor)
+async function renameMe(v, msgEl){
+  const say=t=>{ if(msgEl) msgEl.textContent=t; };
+  if(v && v[0]!==v[0].toLocaleUpperCase("tr")) v=v[0].toLocaleUpperCase("tr")+v.slice(1);
+  if(v===pname(S.uid)) return say("Adın zaten bu."), false;
+  const p = nameProblem(v) || (S.order.some(u=>u!==S.uid && slug(pname(u))===slug(v)) ? "Bu ad alınmış. Soyadının baş harfini ekleyebilirsin (ör. Ali K.)." : null);
+  if(p) return say(p), false;
+  try{ await deleteDoc(doc(S.db,"renameRes",S.uid)).catch(()=>{}); await setDoc(doc(S.db,"renameReq",S.uid), {name:v, at:serverTimestamp()}); }
+  catch(e){ return say("İstek gönderilemedi, tekrar dene."), false; }
+  say("Adın değiştiriliyor… (yarım dakika kadar sürebilir)");
+  const t0=Date.now();
+  while(Date.now()-t0 < 3*60e3){
+    await new Promise(r=>setTimeout(r,3000));
+    const r=await getDoc(doc(S.db,"renameRes",S.uid)).then(x=>x.data()).catch(()=>null);
+    if(r?.state==="ok"){ await loadPlayers().catch(()=>{}); paintMe(); render(); say(""); toast(`Adın artık "${v}". Girişte bu adı yazacaksın.`, 5000); return true; }
+    if(r?.state==="error"){ say(r.msg||"Ad değiştirilemedi."); return false; }
+  }
+  say("İstek sırada; biraz sonra sayfayı yenileyip kontrol et."); return false;
+}
+// Eski oyunculara bir kez: ligde görünen ad artık gerçek ad
+function maybeRealName(){
+  if(!S.uid || S.onboard || S.isAdmin || lsGet("realName1")) return;
+  if(!$("#sheet").classList.contains("hide")) return setTimeout(maybeRealName, 5000);
+  lsSet("realName1","1");
+  openSheet(`<h3 id="shTitle">Ligde gerçek adlar</h3><p>Herkes birbirini tanısın diye ligde artık <b>gerçek adını</b> kullanıyoruz; takma ad için <b>takım adın</b> var.</p>
+    <p class="muted">Şu an ligde adın: <b>${esc(pname(S.uid))}</b>. Gerçek adın değilse şimdi düzelt; girişte de yeni adı yazacaksın, şifren aynı kalır.</p>
+    <label class="fld"><span>Gerçek adın</span><input id="rnName" maxlength="40" autocapitalize="words" value="${esc(pname(S.uid))}"></label>
+    <p class="err" id="rnErr"></p>
+    <button class="btn-primary" id="rnSave" type="button">Kaydet</button>
+    <button class="linkish ob-skip" id="rnOk" type="button">Bu zaten gerçek adım</button>`);
+  $("#rnOk").onclick=()=>closeSheet();
+  $("#rnSave").onclick=async()=>{ const v=$("#rnName").value.trim(); if(v===pname(S.uid)) return closeSheet(); $("#rnSave").disabled=true; const ok=await renameMe(v, $("#rnErr")); $("#rnSave").disabled=false; if(ok) closeSheet(); };
+}
 // Davet mesajı: bu gecenin ilk kilidi (geçmediyse) ve deneme haftası bilgisiyle
 function inviteNote(){
   const D=S.days[S.today], first=D?.games?.length ? D.games[0].nightLock : null, out=[];
@@ -4545,6 +4579,9 @@ function paintProfile(){
       <div class="seg2"><button data-ap="1" aria-pressed="${!!me.autoPick}">Açık</button><button data-ap="0" aria-pressed="${!me.autoPick}">Kapalı</button></div></div>
     <div class="pf-sec"><h4>Arkadaşını davet et</h4><small class="muted">Linkinle katılan herkes profilinde "Lige getirdiği" olarak görünür.${myInv.length?` Şimdiye kadar ${myInv.length} kişi getirdin: ${myInv.map(x=>esc(pname(x))).join(", ")}.`:""}</small>
       <button class="btn" id="pfInvite" type="button" style="margin-top:8px">${ICON.link}Davet linkimi paylaş</button><small class="muted" id="pfInvMsg"></small></div>
+    <div class="pf-sec"><h4>Gerçek adın</h4><small class="muted">Sıralamada en üstte görünen ad; giriş yaparken de bunu yazarsın. Takma ad için aşağıdaki takım adını kullan.</small>
+      <div class="adm-row" style="margin-top:6px"><input id="pfName" class="adm-in" maxlength="40" autocapitalize="words" value="${esc(me.name||"")}"><button class="btn" id="pfNameSave" type="button">Değiştir</button></div>
+      <small class="err" id="pfNameErr"></small></div>
     <div class="pf-sec"><h4>Takım adın</h4><small class="muted">Ligdeki takma adın: sıralamada ve profilinde gerçek adının altında görünür (ör. Kyle Korver Sevenler Derneği). En fazla 40 karakter; küfür, argo ve hakaret yazılamaz.</small>
       <div class="adm-row" style="margin-top:6px"><input id="pfClub" class="adm-in" maxlength="40" placeholder="ör. Kyle Korver Sevenler Derneği" value="${esc(me.club||"")}"><button class="btn" id="pfClubSave" type="button">Kaydet</button></div>
       <small class="err" id="pfClubErr"></small></div>
@@ -4596,6 +4633,7 @@ function paintProfile(){
   $("#histBtn").onclick = () => openHistory();
   $("#pfInvite").onclick = () => shareInvite($("#pfInvMsg"));
   $("#pfClub").oninput = () => { const v=$("#pfClub").value.trim().replace(/\s+/g," "); $("#pfClubErr").textContent = v ? (clubProblem(v)||"") : ""; };
+  $("#pfNameSave").onclick = () => renameMe($("#pfName").value.trim(), $("#pfNameErr"));
   $("#pfClubSave").onclick = async () => {
     const v=$("#pfClub").value.trim().replace(/\s+/g," "); const p=clubProblem(v);
     if(p) return $("#pfClubErr").textContent=p;
@@ -4859,7 +4897,7 @@ if("serviceWorker" in navigator){ navigator.serviceWorker.getRegistrations?.().t
     route(); showDay(); Promise.resolve(refresh()).catch(()=>{}).finally(()=>dispatchEvent(new Event("app-ready")));
     if(S.onboard){ if(S.joinP) await S.joinP.catch(()=>{}); await loadPlayers().catch(()=>{}); allPlayers().catch(()=>{}).finally(()=>openOnboard(4)); }
     else checkRecovery();
-    loadLT(); setTimeout(installBanner, 6000); maybeNews(); maybeCeremony(); later(markSeen, 3000); setTimeout(()=>later(maybeLeaguePop,0), 3000); setTimeout(()=>later(maybeScoringGuide,0), 4500); setTimeout(()=>later(maybeAskAuto, 0), 9000);
+    loadLT(); setTimeout(installBanner, 6000); maybeNews(); maybeCeremony(); later(markSeen, 3000); setTimeout(()=>later(maybeLeaguePop,0), 3000); setTimeout(()=>later(maybeScoringGuide,0), 4500); setTimeout(()=>later(maybeAskAuto, 0), 9000); setTimeout(()=>later(maybeRealName, 0), 6000);
     later(()=>{ getDoc(doc(S.db,"config","admin")).then(()=>{ S.isAdmin=true; maybeArchiveTrial(); }).catch(()=>{ S.isAdmin=false; });
       getDoc(doc(S.db,"config","secret")).then(r=>{ S.invite=r.data()?.invite||""; }).catch(()=>{});
       allPlayers().catch(()=>{}); }, 2000);

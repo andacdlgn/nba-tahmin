@@ -41,6 +41,62 @@ def slug(s: str) -> str:
     return re.sub(r"[^a-z0-9]", "", s)
 
 
+NAME_BAD = re.compile(r"(orospu|orosbu|siktir|sikerim|sikeyim|sikik|yarrak|dalyarak|am[iı]nak|amc[iı]k|ibne|pezevenk|kahpe|kaltak|yav[sş]ak|[sş]erefsiz|fuck|shit|bitch|cunt|nigg|faggot|whore|asshole)")
+
+
+def name_ok(n: str) -> bool:
+    """firestore.rules validName ile aynı: büyük harfle başlar, harf/rakam/boşluk/. ' - içerir, en fazla 40 karakter, küfür yok."""
+    if not n or len(n) > 40 or not n[0].isupper() or not n[0].isalpha():
+        return False
+    if any(not (c.isalpha() or c.isdigit() or c in " .'-") for c in n):
+        return False
+    return not NAME_BAD.search(n.replace("I", "ı").replace("İ", "i").lower())
+
+
+def run_rename(db):
+    """renameReq/{uid} = {name}: oyuncunun görünen adını ve giriş adını (Firebase hesabının e-postası) birlikte değiştirir.
+    Sonuç renameRes/{uid} = {state: ok|error, msg, name}."""
+    reqs = list(db.collection("renameReq").stream())
+    if not reqs:
+        return
+    players = {d.id: (d.to_dict() or {}) for d in db.collection("players").stream()}
+    for r in reqs:
+        uid, new = r.id, str((r.to_dict() or {}).get("name") or "").strip()
+        res = db.collection("renameRes").document(uid)
+
+        def finish(state, msg=""):
+            res.set({"state": state, "msg": msg, "name": new, "at": firestore.SERVER_TIMESTAMP})
+            r.reference.delete()
+
+        if uid not in players:
+            r.reference.delete()
+            continue
+        if not name_ok(new) or not slug(new):
+            finish("error", "Bu ad uygun değil: büyük harfle başlamalı; yalnızca harf, rakam, boşluk ve . - ' olabilir.")
+            continue
+        s = slug(new)
+        if any(slug(p.get("name", "")) == s for u, p in players.items() if u != uid):
+            finish("error", "Bu ad alınmış. Soyadının baş harfini ekleyebilirsin (ör. Ali K.).")
+            continue
+        email = f"{s}@{CONFIG['authEmailDomain']}"
+        try:
+            other = auth.get_user_by_email(email)
+            if other.uid != uid:
+                finish("error", "Bu ad alınmış. Soyadının baş harfini ekleyebilirsin (ör. Ali K.).")
+                continue
+        except auth.UserNotFoundError:
+            pass
+        try:
+            auth.update_user(uid, email=email)
+            db.collection("players").document(uid).update({"name": new})
+            players[uid]["name"] = new
+            finish("ok")
+            print("ad değişti:", uid[:5])
+        except Exception as e:
+            finish("error", "Ad değiştirilemedi, biraz sonra tekrar dene.")
+            print("ad değiştirme hatası:", type(e).__name__)
+
+
 def answer_hash(salt: str, team: str, player_id: str) -> str:
     return hashlib.sha256(f"{salt}{team}:{player_id}".encode("utf-8")).hexdigest()
 
@@ -85,6 +141,12 @@ def main():
         db.collection("resetStatus").document(r.id).set({"state": state, "at": firestore.SERVER_TIMESTAMP})
         r.reference.delete()
         print(r.id[:6], state)
+
+    # oyuncunun ad değiştirme isteği (varsa)
+    try:
+        run_rename(db)
+    except Exception as e:
+        print("ad değiştirme görevi hatası:", type(e).__name__)
 
     # yönetim panelindeki "Herkesi sil" isteği (varsa)
     try:
