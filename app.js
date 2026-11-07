@@ -4,7 +4,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, connectAuthEmulator }
   from "https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, collection, query, where, writeBatch, serverTimestamp, Timestamp, arrayUnion, connectFirestoreEmulator, onSnapshot, orderBy, limit, startAfter, deleteField }
+import { getFirestore, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, collection, query, where, writeBatch, serverTimestamp, increment, Timestamp, arrayUnion, connectFirestoreEmulator, onSnapshot, orderBy, limit, startAfter, deleteField }
   from "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js";
 
 const $ = s => document.querySelector(s);
@@ -45,12 +45,13 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.29.1";
+const VERSION = "1.30.0";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.30.0", d:"7 Kasım 2026", items:["Anket: \"Lig pazartesi başlasın mı?\" Açılışta bir kez sorulur; oylar anonim, sonuçlar pazar 22:00'ye kadar Bu Gece ekranında görünür."]},
   {v:"1.29.1", d:"7 Kasım 2026", items:["Maç önü karşılaştırma çubukları sadeleşti: her takımın çubuğu ortadan kendi tarafına, ikisi aynı ölçekte; deplasman mavi, ev sahibi kırmızı, iyi olan koyu."]},
   {v:"1.29.0", d:"7 Kasım 2026", items:["Maç önü: iki takım yan yana çubuklarla (sayı, yediği sayı, averaj, son 5 maç, isabet yüzdeleri, ribaund, asist, top çalma, blok, top kaybı) ve ligdeki sıraları.","Maç önü: yorgunluk etiketleri (arka arkaya maç, dinlenme günü, deplasman serisi, yarın da maçı var).","Maç önü: aralarındaki maçlarda henüz karşılaşmadılarsa bu yazıyor; her takımın en skorer 6 oyuncusu tabloyla.","Takım sayfası ve Takımım: bütün sezon fikstürü (oynanan, kalan, skorlar), sıradaki maça kendiliğinden kayar."]},
   {v:"1.28.7", d:"7 Kasım 2026", items:["Maç önü: son 5 maçta rakip ve skor görünüyor; sakat oyuncuların sezon ortalaması (sayı, ribaund, asist) yazıyor."]},
@@ -975,7 +976,7 @@ function renderStatus(){
   const mine = D.games.filter(g=>D.picks[g.id]?.[S.uid]).length;
   const daily = D.daily[S.uid]||{};
   const parts = [];
-  if(!D.games.length){ $("#dayStatus").innerHTML = EMPTY_NIGHT; return; }
+  if(!D.games.length){ $("#dayStatus").innerHTML = pollHTML() + EMPTY_NIGHT; return; }
   const pct = Math.round(mine/D.games.length*100);
   parts.push(`<span><b>${mine}/${D.games.length}</b> maçı tahmin ettin</span><span class="prog"><i style="width:${pct}%"></i></span>`);
   const todo=[];
@@ -995,7 +996,7 @@ function renderStatus(){
   const anyPick = D.games.some(g=>Object.keys(D.picks[g.id]||{}).length);
   if(allFinal && anyPick) parts.push(`<button class="btn" id="sumBtn">Gece özeti</button>`);
   if(open.length) parts.push(`<button class="btn quick-btn" id="quickBtn" type="button">${ICON.bolt}Hızlı tahmin</button><button class="btn quick-btn" id="swipeBtn" type="button">${ICON.cards}Tek tek tahmin</button>`);
-  $("#dayStatus").innerHTML = (todo.length ? `<div class="todo"><span class="td-h">Bu gece eksiklerin</span>${todo.join("")}</div>` : "") + `<div class="status">${parts.join("")}</div>`;
+  $("#dayStatus").innerHTML = pollHTML() + (todo.length ? `<div class="todo"><span class="td-h">Bu gece eksiklerin</span>${todo.join("")}</div>` : "") + `<div class="status">${parts.join("")}</div>`;
   $$("#dayStatus [data-td]").forEach(b=>b.onclick=()=>{
     const k=b.dataset.td, go=el=>{ if(!el) return; el.scrollIntoView({behavior:"smooth",block:"center"}); el.classList.remove("td-flash"); void el.offsetWidth; el.classList.add("td-flash"); };
     if(k==="dp") return openPlayerPicker({mode:"day"});
@@ -2055,6 +2056,43 @@ function invitePopDue(){
   const h=+new Date().toLocaleString("en-GB",{timeZone:"Europe/Istanbul",hour:"2-digit",hour12:false});
   return h>=7 && h<13 && Date.now()-last > 46*36e5 && joined && Date.now()-joined > 864e5;
 }
+/* 1.30.0: anket — lig pazartesi başlasın mı? Oylar anonim: herkes yalnızca kendi oyunu okuyabilir, ekranda sadece toplamlar görünür.
+   polls/{id} = {yes, no} sayaç · polls/{id}/votes/{uid} = {v, at} (tek oy, değiştirilemez). Pazar 22:00'de (TR) kapanır ve tamamen kalkar. */
+const POLL = {id:"ligbasla1", end:Date.UTC(2026,10,8,19,0), q:"Lig pazartesi başlasın mı?", o:{yes:"Evet, başlayalım", no:"Hayır, biraz daha kalabalıklaşsın"}};
+const pollOn = () => Date.now() < POLL.end && !!S.uid && !!S.players[S.uid];
+function watchPoll(){
+  if(!pollOn() || S.pollUn) return;
+  S.pollUn = onSnapshot(doc(S.db,"polls",POLL.id), d=>{ S.poll = d.exists() ? d.data() : null; S.pollLoaded=true; paintPoll(); }, ()=>{});
+  getDoc(doc(S.db,"polls",POLL.id,"votes",S.uid)).then(d=>{ if(d.exists()){ S.myVote=d.data().v; lsSet("poll_"+POLL.id, S.myVote); } paintPoll(); }).catch(()=>{});
+  setTimeout(()=>{ try{ S.pollUn?.(); }catch(e){} S.pollUn=null; paintPoll(); }, Math.max(0, POLL.end-Date.now())+1000);
+}
+function pollBody(){
+  const mine = S.myVote || lsGet("poll_"+POLL.id), y=S.poll?.yes||0, n=S.poll?.no||0, t=y+n;
+  const row=(k,c)=>{ const pc=t?Math.round(c/t*100):0; return `<div class="pl-r ${mine===k?"me":""}"><div class="pl-l"><b>${esc(POLL.o[k])}</b><span>${c} oy · %${pc}</span></div><div class="pl-b"><i style="width:${pc}%"></i></div></div>`; };
+  return mine ? `${row("yes",y)}${row("no",n)}<small class="muted">Oyun: ${esc(POLL.o[mine])} · Toplam ${t} oy · Kimin ne oyladığı görünmez · Pazar 22:00'de kapanır</small>`
+    : `<div class="pl-btns"><button class="btn-primary" data-poll="yes" type="button">${esc(POLL.o.yes)}</button><button class="btn" data-poll="no" type="button">${esc(POLL.o.no)}</button></div><small class="muted">Anonim: kimin ne oyladığı görünmez, sadece toplamlar. Oy verince sonuçları görürsün. Pazar 22:00'de kapanır.</small>`;
+}
+function pollHTML(){ if(!pollOn()) return ""; watchPoll(); return `<div class="poll" id="pollBox"><div class="pl-h">📊 Anket · ${esc(POLL.q)}</div>${pollBody()}</div>`; }
+function paintPoll(){
+  const b=$("#pollBox"); if(b){ if(!pollOn()) b.remove(); else b.outerHTML=pollHTML(); }
+  const sh=$("#pollSheet"); if(sh) sh.innerHTML=pollBody();
+}
+async function votePoll(v){
+  if(!pollOn() || S.myVote || S.pollBusy) return; S.pollBusy=true;
+  const pr=doc(S.db,"polls",POLL.id);
+  try{
+    if(!(await getDoc(pr)).exists()) await setDoc(pr,{yes:0,no:0}).catch(()=>{});
+    const b=writeBatch(S.db); b.set(doc(S.db,"polls",POLL.id,"votes",S.uid),{v, at:serverTimestamp()}); b.update(pr,{[v]:increment(1)}); await b.commit();
+    S.myVote=v; lsSet("poll_"+POLL.id, v); toast("Oyun kaydedildi, teşekkürler");
+  }catch(e){
+    const d=await getDoc(doc(S.db,"polls",POLL.id,"votes",S.uid)).catch(()=>null);
+    if(d?.exists()){ S.myVote=d.data().v; lsSet("poll_"+POLL.id, S.myVote); toast("Bu ankette zaten oy vermişsin"); } else toast("Oy kaydedilemedi, biraz sonra tekrar dene");
+  }
+  S.pollBusy=false; paintPoll();
+}
+document.addEventListener("click", e=>{ const b=e.target.closest("[data-poll]"); if(b){ e.stopPropagation(); votePoll(b.dataset.poll); } });
+function maybePoll(){ autoPop(0.5, ()=>pollOn() && !S.myVote && !lsGet("poll_"+POLL.id), ()=>{ watchPoll();
+  openSheet(`<h3 id="shTitle">📊 ${esc(POLL.q)}</h3><p class="muted" style="margin-top:-4px">Ligin puanlı olarak pazartesi mi başlamasını istersin, yoksa biraz daha kişi katılsın mı bekleyelim? Oylar anonim, kimin ne seçtiği görünmez. Sonuçlar Bu Gece ekranında pazar akşamına kadar görünür.</p><div class="poll" id="pollSheet">${pollBody()}</div>`); }); }
 function maybeInvitePop(){ autoPop(8, invitePopDue, showInvitePop); }
 function showInvitePop(){
   lsSet("invPopAt", String(Date.now()));
@@ -5487,7 +5525,7 @@ if("serviceWorker" in navigator){ navigator.serviceWorker.getRegistrations?.().t
     else checkRecovery();
     loadLT(); setTimeout(installBanner, 6000); later(markSeen, 3000);
     // bilgilendirme pencereleri sıraya girer; açılıştan ~3 sn sonra en önemlisi (varsa) bir tane açılır
-    setTimeout(()=>{ maybeNews(); maybeCeremony(); markVisit(); maybeLeaguePop(); maybeWeekPop(); maybeSelfPlay(); maybeScoringGuide(); maybeInvitePop(); maybeInstallPop(); maybeAskAuto(); maybeRealName(); }, 600);
+    setTimeout(()=>{ maybeNews(); maybeCeremony(); markVisit(); maybePoll(); maybeLeaguePop(); maybeWeekPop(); maybeSelfPlay(); maybeScoringGuide(); maybeInvitePop(); maybeInstallPop(); maybeAskAuto(); maybeRealName(); }, 600);
     later(()=>{ getDoc(doc(S.db,"config","admin")).then(()=>{ S.isAdmin=true; maybeArchiveTrial(); }).catch(()=>{ S.isAdmin=false; });
       getDoc(doc(S.db,"config","secret")).then(r=>{ S.invite=r.data()?.invite||""; }).catch(()=>{});
       allPlayers().catch(()=>{}); }, 2000);

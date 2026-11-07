@@ -469,5 +469,28 @@ service cloud.firestore {
         && request.resource.data.at == request.time;
       allow delete: if signedIn() && resource.data.uid == request.auth.uid;
     }
+    // Anket (1.30.0): polls/{id} = {yes, no} sayaç; polls/{id}/votes/{uid} = {v, at}. Oy anonim: herkes yalnızca kendi oyunu okur.
+    // Sayaç yalnızca aynı yazımda oy belgesi oluşturulurken ve önceden oy yoksa 1 artabilir; oy değiştirilemez, silinemez.
+    function pollPath(pid) { return /databases/$(database)/documents/polls/$(pid); }
+    match /polls/{pid} {
+      allow read: if signedIn();
+      allow create: if isPlayer() && request.resource.data.keys().hasOnly(['yes', 'no'])
+        && request.resource.data.yes == 0 && request.resource.data.no == 0;
+      allow update: if isPlayer()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['yes', 'no'])
+        && !exists(/databases/$(database)/documents/polls/$(pid)/votes/$(request.auth.uid))
+        && existsAfter(/databases/$(database)/documents/polls/$(pid)/votes/$(request.auth.uid))
+        && ((request.resource.data.yes == resource.data.yes + 1 && request.resource.data.no == resource.data.no
+             && getAfter(/databases/$(database)/documents/polls/$(pid)/votes/$(request.auth.uid)).data.v == 'yes')
+          || (request.resource.data.no == resource.data.no + 1 && request.resource.data.yes == resource.data.yes
+             && getAfter(/databases/$(database)/documents/polls/$(pid)/votes/$(request.auth.uid)).data.v == 'no'));
+      match /votes/{uid} {
+        allow read: if signedIn() && request.auth.uid == uid;
+        allow create: if isPlayer() && request.auth.uid == uid
+          && request.resource.data.keys().hasOnly(['v', 'at'])
+          && request.resource.data.v in ['yes', 'no'] && request.resource.data.at == request.time
+          && exists(pollPath(pid));
+      }
+    }
   }
 }

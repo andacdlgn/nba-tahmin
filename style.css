@@ -2312,3 +2312,14 @@ body.bars-hidden .chat-fab{transform:none}
 .cb-b .l i{background:var(--p0)}.cb-b .r i{background:var(--p1)}
 .cb-b i.lo{opacity:.35}
 .cb-dot{display:inline-block;width:9px;height:9px;border-radius:50%}
+
+/* 1.30.0: anket */
+.poll{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:12px 14px;margin:0 0 12px;display:flex;flex-direction:column;gap:8px;box-shadow:inset 3px 0 0 var(--amber)}
+#pollSheet{box-shadow:none;border:0;padding:0;background:none}
+.pl-h{font-weight:800;font-size:15px}
+.pl-btns{display:flex;flex-direction:column;gap:8px}.pl-btns button{width:100%;padding:12px;font-size:15px}
+.pl-r{display:flex;flex-direction:column;gap:4px}
+.pl-l{display:flex;justify-content:space-between;gap:8px;font-size:14px}.pl-l span{color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
+.pl-r.me .pl-l b::after{content:" ✓";color:var(--amber)}
+.pl-b{height:9px;border-radius:6px;background:var(--panel-2);overflow:hidden}.pl-b i{display:block;height:100%;background:var(--amber);border-radius:6px}
+.poll small{font-size:12px}
