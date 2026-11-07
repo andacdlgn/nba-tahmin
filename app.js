@@ -45,12 +45,13 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.22.3";
+const VERSION = "1.23.0";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.23.0", d:"7 Kasım 2026", items:["🎯 Nokta atışı: asıl ligden (9 Kasım) itibaren maçın farkını tam bilen +1 ek puan alır, fark puanı +2 olur. NBA Kupası ve playoff'ta bu da katlanır. \"40+\" tam sayılmaz.","Maç kartlarında nokta atışları 🎯 ile işaretlenir; yeni rozet: 5 nokta atışında \"Nokta atışı\". Aylık Fark ustası ödülünde nokta atışı 2 sayılır."]},
   {v:"1.22.0", d:"5 Kasım 2026", items:["Özel mesajlar: sohbet baloncuğunda artık \"Lig sohbeti\" ve \"Özel mesajlar\" sekmeleri var. Ligdeki birine yalnızca ikinizin görebileceği mesaj gönderebilirsin; yönetici dahil kimse okuyamaz.","Bir oyuncunun profilinden \"Mesaj gönder\" ile doğrudan yazabilirsin. İstemediğin birini konuşmanın üstündeki \"Engelle\" ile engelleyebilirsin. Küfür filtresi özel mesajlarda da geçerli."]},
   {v:"1.21.9", d:"5 Kasım 2026", items:["Pencereler artık art arda açılmıyor: bir açılışta en fazla bir bilgilendirme penceresi çıkıyor, sen bir pencere açtıysan (ör. Kurallar) hiç çıkmıyor. Kapatınca arkasından yenisi açılmıyor.","Deneme haftası penceresi en üstteki şeride dokununca her zaman açılıyor."]},
   {v:"1.21.8", d:"5 Kasım 2026", items:["Avatarlara WNBA eklendi: 2026 sezonunun en skorer 15 oyuncusu (A'ja Wilson, Caitlin Clark, Paige Bueckers…)."]},
@@ -193,6 +194,9 @@ const marginsFor = g => isRules2(g) ? MARGINS2 : MARGINS;
 const bucketOf = (g, m) => isRules2(g) ? bucket2(m) : bucket(m);
 // tahmindeki barem hangi düzendeyse onunla karşılaştır (yeni kurala geçişte eski seçimler bozulmasın)
 const MARGIN_TOL = 3, MARGIN_MAX = 40;
+// 1.23.0: asıl ligden (9 Kasım 2026) itibaren farkı tam bilen +1 ek puan alır (fark puanı 2). "40+" tam sayılmaz.
+const EXACT_FROM = "20261109";
+const marginExact = (label, m, day) => (day||"") >= EXACT_FROM && /^\d+$/.test(String(label)) && +label < MARGIN_MAX && +label === m;
 const marginHit = (label, m) => /^\d+$/.test(String(label)) ? (+label>=MARGIN_MAX ? m>=MARGIN_MAX-MARGIN_TOL : Math.abs(+label-m)<=MARGIN_TOL) : MARGINS2.includes(label) ? bucket2(m)===label : bucket(m)===label;
 const dpValue = day => day>=RULES2_FROM ? 3 : 2;
 // Sürpriz kademesi (4 Kasım 2026'dan itibaren): ESPN'in maç önü şansı %20 ve altı +3, %33 ve altı +2, üstü +1.
@@ -458,7 +462,7 @@ function scorePick(g, pick, conf){
   const winner = homeLead>0 ? g.home.abbr : homeLead<0 ? g.away.abbr : null;
   const won = winner && pick.winner===winner;
   r.tier = tierOf(g, pick.winner);
-  if(won){ r.w = (conf?2:1)*r.tier; if(marginHit(pick.margin, Math.abs(homeLead))) r.m=1; }
+  if(won){ r.w = (conf?2:1)*r.tier; if(marginHit(pick.margin, Math.abs(homeLead))) r.m = marginExact(pick.margin, Math.abs(homeLead), g.day || gameDayOf(g)) ? 2 : 1; }
   else if(conf && winner) r.w = -1;
   const tops = g.state==="post" ? topsOf(g) : liveTops(g);
   if(tops && tops.some(t=>t.id===pick.scorerId)) r.s=1;
@@ -547,8 +551,9 @@ async function loadPlayers(){
 const pickRef = (gid, uid) => doc(S.db, "picks", `${gid}_${uid}`);
 const dailyRef = (day, uid) => doc(S.db, "daily", `${day}_${uid}`);
 const progressRef = (day, uid) => doc(S.db, "progress", `${day}_${uid}`);
-async function readPick(gid, uid){ try{ const s=await getDoc(pickRef(gid,uid)); return s.exists()?s.data():null; }catch(e){ return null; } }
-async function readDaily(day, uid){ try{ const s=await getDoc(dailyRef(day,uid)); return s.exists()?s.data():null; }catch(e){ return null; } }
+// okunamazsa (bağlantı ya da kota) undefined döner: eldeki değer silinmez, "tahmin yok" gibi görünmez
+async function readPick(gid, uid){ try{ const s=await getDoc(pickRef(gid,uid)); return s.exists()?s.data():null; }catch(e){ return undefined; } }
+async function readDaily(day, uid){ try{ const s=await getDoc(dailyRef(day,uid)); return s.exists()?s.data():null; }catch(e){ return undefined; } }
 
 S.loadingDay = {};
 function loadDay(day, opts={}){
@@ -562,21 +567,31 @@ async function loadDayNow(day, {force=false}={}){
   let raw=null;
   if(S.preSB?.day===day){ raw=await S.preSB.p; S.preSB=null; }   // açılışta önceden istenmiş liste
   const games = parseGames(raw || await espn(`/scoreboard?dates=${day}&limit=50`));
-  const D = { games, picks: old?.picks||{}, daily: old?.daily||{}, progress: old?.progress||{}, at:Date.now() };
+  // Firestore okuma kotası: maç skorları (ESPN) her yenilemede gelir, tahminler en fazla 3 dakikada bir okunur.
+  // Kilitlenmiş tahminler değişmediği için bir kez okunduktan sonra yeniden okunmaz.
+  const fsFresh = !!old?.fsAt && Date.now()-old.fsAt < 3*60e3;
+  const D = { games, picks: old?.picks||{}, daily: old?.daily||{}, progress: old?.progress||{}, at:Date.now(), fsAt: fsFresh ? old.fsAt : Date.now(), dailyLocked: old?.dailyLocked||{}, chk: old?.chk||{} };
   const firstStart = games.length ? Math.min(...games.map(g=>g.start.getTime())) : Infinity;
+  const nightLocked = Date.now() >= (games[0]?.nightLock?.getTime() ?? firstStart);
   const jobs=[];
   for(const g of games){
     D.picks[g.id] = D.picks[g.id]||{};
     for(const uid of S.order){
       if(uid!==S.uid && !started(g)) continue;
-      if(D.picks[g.id][uid] && started(g) && uid!==S.uid && D.picks[g.id][uid]._locked) continue;
-      jobs.push(readPick(g.id, uid).then(p => { if(p){ p._locked = started(g); D.picks[g.id][uid]=p; } else delete D.picks[g.id][uid]; }));
+      const have = D.picks[g.id][uid], ck = g.id+"_"+uid;
+      if((have && started(g) && have._locked) || D.chk[ck]===2) continue;   // kilitli: bir kez okunması yeter
+      if(fsFresh && (have || D.chk[ck])) continue;                          // 3 dakika dolmadı
+      jobs.push(readPick(g.id, uid).then(p => { if(p===undefined) return;
+        D.chk[ck] = started(g) ? 2 : 1;
+        if(p){ p._locked = started(g); D.picks[g.id][uid]=p; } else delete D.picks[g.id][uid]; }));
     }
   }
   for(const uid of S.order){
-    jobs.push(getDoc(progressRef(day, uid)).then(s => { D.progress[uid] = new Set(s.exists() ? s.data().gids||[] : []); }).catch(()=>{}));
-    if(uid!==S.uid && Date.now()<(games[0]?.nightLock?.getTime() ?? firstStart)) continue;
-    jobs.push(readDaily(day, uid).then(d => { if(d) D.daily[uid]=d; else delete D.daily[uid]; }));
+    // kimin kaç maçı doldurduğu yalnızca bütün maçlar başlamadan önce anlamlı
+    if(!fsFresh && !games.every(started)) jobs.push(getDoc(progressRef(day, uid)).then(s => { D.progress[uid] = new Set(s.exists() ? s.data().gids||[] : []); }).catch(()=>{}));
+    if(uid!==S.uid && !nightLocked) continue;
+    if(D.dailyLocked[uid] || (fsFresh && (uid in D.daily || uid===S.uid))) continue;
+    jobs.push(readDaily(day, uid).then(d => { if(d===undefined) return; if(d) D.daily[uid]=d; else delete D.daily[uid]; if(nightLocked) D.dailyLocked[uid]=1; }));
   }
   // kilitlenmiş maçlara bırakılan emoji ve yorumlar
   D.talk = old?.talk || {};
@@ -723,7 +738,7 @@ const awardPts = u => Object.values(S.arch.scores.awards||{}).reduce((t,a)=>t+(a
 function awardsHTML(){
   const A=Object.entries(S.arch.scores.awards||{}).sort((a,b)=>b[0].localeCompare(a[0]));
   if(!A.length){ // henüz açıklanan ay yok: ödülleri ve ne zaman açıklanacağını göster
-    const L=[["👑","Ayın tahmincisi","Ayın en çok puan toplayanı",1],["★","Banko ustası","En yüksek banko isabeti (en az 4 banko)",2],["🎯","Sürpriz avcısı","ESPN'in favorisinin karşısına geçip en çok bilen",2],["🔥","Skorer ustası","En skoreri en çok bilen",2],["📏","Fark ustası","Farkı en çok tutturan",2]];
+    const L=[["👑","Ayın tahmincisi","Ayın en çok puan toplayanı",1],["★","Banko ustası","En yüksek banko isabeti (en az 4 banko)",2],["🎯","Sürpriz avcısı","ESPN'in favorisinin karşısına geçip en çok bilen",2],["🔥","Skorer ustası","En skoreri en çok bilen",2],["📏","Fark ustası","Farkı en çok tutturan (nokta atışı 2 sayılır)",2]];
     return `<div class="sec-title"><h2>Lig ödülleri</h2><span class="aside">her ay sonu, puana eklenir</span></div><div class="aw-m"><div class="aw-mh"><b>Ekim-Kasım ödülleri</b><span class="muted">1 Aralık'ta açıklanır</span></div>
       ${L.map(([i,t,d,p])=>`<div class="aw-r"><span class="aw-i">${i}</span><span class="aw-t"><b>${t}</b><small>${d}</small></span><span class="aw-w"><span class="muted">—</span></span><span class="aw-p">+${p}</span></div>`).join("")}</div>`;
   }
@@ -963,7 +978,7 @@ function pickCell(g, pick, uid, conf){
   const small = post ? "puan" : live ? (state==="winning"?"tutuyor":state==="losing"?"tutmuyor":"şu an") : "";
   return `<div class="prow ${state} ${!S.seen.has(g.id) && uid!==S.uid ? "reveal":""}" style="--pc:${col(uid)}">
     <span class="who">${esc(pname(uid))}${conf?' <span class="star" title="Günün bankosu">★</span>':""}</span>
-    <span class="pk">${chip(esc(team.abbr||team.name), cW, "Kazanan")}${chip(pick.margin, cM, "Fark")}${chip(esc(pick.scorerName), cS, "En skorer", faceImg(pick.scorerId,"rc-face"))}</span>
+    <span class="pk">${chip(esc(team.abbr||team.name), cW, "Kazanan")}${chip(pick.margin+(r.m===2?" 🎯":""), cM, r.m===2?"Fark · nokta atışı":"Fark")}${chip(esc(pick.scorerName), cS, "En skorer", faceImg(pick.scorerId,"rc-face"))}</span>
     <span class="pts tnum">${(post||live)?(r.pts>0?"+":"")+r.pts:""}<small>${small}</small></span>
   </div>`;
 }
@@ -1028,7 +1043,7 @@ function bestPickCard(D){
   const ch=(t,ok)=>`<span class="rc ${ok?"ok":"no"}"><i>${ok?"✓":"✗"}</i>${t}</span>`;
   return `<div class="best" style="--pc:${col(u)}"><div class="best-l"><span class="best-k">Gecenin tahmini</span>${avatar(u)}</div>
     <div class="best-m"><b style="color:${col(u)}">${esc(pname(u))}</b><span class="best-g"><img src="${g.away.logo}" alt="">${esc(g.away.abbr)} ${g.away.score}–${g.home.score} ${esc(g.home.abbr)}<img src="${g.home.logo}" alt=""></span>
-      <span class="pk">${ch(esc(team.abbr),r.w>0)}${ch(p.margin,r.m>0)}${ch(esc(p.scorerName),r.s>0)}${D.daily[u]?.confGame===g.id?'<span class="rc ok"><i>★</i>banko</span>':""}</span></div>
+      <span class="pk">${ch(esc(team.abbr),r.w>0)}${ch(p.margin+(r.m===2?" 🎯":""),r.m>0)}${ch(esc(p.scorerName),r.s>0)}${D.daily[u]?.confGame===g.id?'<span class="rc ok"><i>★</i>banko</span>':""}</span></div>
     <div class="best-p">+${r.pts}<small>puan</small></div></div>`;
 }
 // Kilide kalan süre halkası (6 saatten itibaren boşalır)
@@ -1821,6 +1836,7 @@ function openScoringGuide(){
 <p>Her maç için üç şey seçersin. Her biri ayrı puan getirir.</p>
 <div class="pg-t"><span>Kazananı bilirsen</span><b>+1</b><span>Farkı bilirsen (kazananı da bildiysen)</span><b>+1</b><span>Maçın en skorerini bilirsen</span><b>+1</b></div>
 <p><b>Fark:</b> Kaydırıcıyla iki takım arasındaki sayı farkını seçersin. Gerçek farka <b>3 sayı ya da daha yakınsan</b> tuttu sayılır. Örnek: 9 dedin, maç 6 ile 12 arasında bir farkla bittiyse +1. "40+" seçersen 37 ve üstü farklar tutar.</p>
+<p><b>🎯 Nokta atışı:</b> Farkı <b>tam</b> bilirsen (9 dedin, maç tam 9 farkla bitti) +1 ek puan alırsın; fark puanın +2 olur. NBA Kupası ve playoff maçlarında bu da katlanır (+4). "40+" seçimi tam sayılmaz. Asıl ligle (9 Kasım) başlar.</p>
 <p><b>En skorer:</b> Maçta en çok sayı atan oyuncu. Eşitlik olursa eşit atanlardan birini seçen herkes bilmiş sayılır. Sakat ya da oynamayacak oyuncular listede işaretlidir.</p>
 
 <h4>2. Sürpriz kademesi</h4>
@@ -1845,7 +1861,7 @@ function openScoringGuide(){
 
 <h4>7. Aylık lig ödülleri</h4>
 <div class="pg-t"><span>Ayın tahmincisi (ayın en çok puanı)</span><b>+1</b><span>Banko ustası, Sürpriz avcısı, Skorer ustası, Fark ustası</span><b>+2'şer</b></div>
-<p>Ay bitince hesaplanır, eşitlikte ödülü paylaşan herkes puanı alır.</p>
+<p>Ay bitince hesaplanır, eşitlikte ödülü paylaşan herkes puanı alır. Fark ustasında nokta atışı (tam fark) 2 sayılır.</p>
 
 <h4>8. Uzun vade</h4>
 <div class="pg-t"><span>Haftanın oyuncusu (Doğu ve Batı ayrı)</span><b>+2</b><span>Ayın oyuncusu / ayın çaylağı / ayın savunmacısı</span><b>+4 / +3 / +3</b><span>Konferans sıralaması (Doğu ve Batı'nın ilk 6'sı, her takım için)</span><b>tam yer +2 / bir sıra şaşma +1</b><span>NBA Kupası şampiyonu / finalistler / kupa MVP'si</span><b>+8 / +3 / +6</b><span>Most Valuable Player</span><b>+12</b><span>Diğer sezon ödülleri (ROY, DPOY, MIP, 6MOY, COY)</span><b>+8'er</b><span>NBA Champion / Eastern ve Western Conference Champion</span><b>+10 / +5</b></div>
@@ -1922,9 +1938,10 @@ function openRules(){
   openSheet(`<div class="rules"><h3 id="shTitle">Kurallar</h3><button class="btn pg-open" id="pgOpen" type="button">📖 Puanlama rehberi: bütün puanlar örnekleriyle</button>
     <p>Her gece o gecenin bütün NBA maçları için üç tahmin yaparsın: <b>kazanan takım</b>, <b>fark</b> (iki takım arasındaki sayı farkı) ve <b>maçın en skoreri</b>. Bir maçın tahmini, üçü de seçilip kaydedilince geçerli olur.</p>
     <h4>Puanlar</h4>
-    <div class="pt"><span>Kazananı bilirsen</span><b>+1</b><span>Sürpriz kazananı bilirsen (ESPN şansı %33 ve altı / %20 ve altı)</span><b>+2 / +3</b><span>Kazananla birlikte farkı da bilirsen (±3 sayı)</span><b>+1</b><span>Maçın en skorerini bilirsen</span><b>+1</b><span>Günün oyuncusunu bilirsen</span><b>+3</b><span>Gecenin sorusunu bilirsen</span><b>+1</b></div>
+    <div class="pt"><span>Kazananı bilirsen</span><b>+1</b><span>Sürpriz kazananı bilirsen (ESPN şansı %33 ve altı / %20 ve altı)</span><b>+2 / +3</b><span>Kazananla birlikte farkı da bilirsen (±3 sayı)</span><b>+1</b><span>Farkı tam bilirsen (🎯 nokta atışı)</span><b>+2</b><span>Maçın en skorerini bilirsen</span><b>+1</b><span>Günün oyuncusunu bilirsen</span><b>+3</b><span>Gecenin sorusunu bilirsen</span><b>+1</b></div>
     <h4>Fark</h4>
     <p>Farkı kaydırıcıyla sayı olarak seçersin (1–40+). Gerçek farka <b>3 sayı ya da daha yakın</b> tahmin tutmuş sayılır: 9 dedin, maç 6 ile 12 arası bir farkla bittiyse +1. "40+" 37 ve üstü farkları kapsar. Uzatmaya giden maçlarda son skordaki fark geçerlidir. Fark puanını almak için kazananı da bilmen gerekir.</p>
+    <p><b>🎯 Nokta atışı:</b> Farkı tam bilirsen (9 dedin, maç tam 9 farkla bitti) <b>+1 ek puan</b>, yani fark puanın +2 olur. NBA Kupası ve playoff'ta bu da katlanır (+4). "40+" tam sayılmaz. Asıl ligle (9 Kasım) başlar.</p>
     <h4>Sürpriz kademesi</h4>
     <p>Her takım düğmesinde ESPN'in maç önü kazanma şansı yazar. Seçtiğin takımın şansı <b>%33 ve altındaysa kazanan puanı +2</b>, <b>%20 ve altındaysa +3</b>, üstündeyse +1 olur. Şans maç önündeki ESPN tahminidir, maç başladıktan sonra değişmez. Fark ve skorer puanları sürprizden etkilenmez.</p>
     <h4>Günün bankosu</h4>
@@ -1951,7 +1968,7 @@ function openRules(){
     <h4>Uzun vade</h4>
     <p>Haftanın oyuncusu, ayın ödülleri, konferans sıralaması, NBA Kupası ve sezon ödülleri için önceden tahmin yaparsın. Puanlar ve kilit tarihleri Uzun Vade sekmesinde ve Puanlama rehberinde yazar. Doğru tahminler ana sıralamaya eklenir.</p>
     <h4>Aylık lig ödülleri</h4>
-    <p>Her ay sonunda <b>Ayın tahmincisi +1</b>; <b>Banko ustası, Sürpriz avcısı, Skorer ustası ve Fark ustası +2</b>'şer puan alır. Eşitlikte ödülü paylaşanların hepsi puanı alır.</p>
+    <p>Her ay sonunda <b>Ayın tahmincisi +1</b>; <b>Banko ustası, Sürpriz avcısı, Skorer ustası ve Fark ustası +2</b>'şer puan alır. Fark ustasında tam bilinen fark (nokta atışı) 2 sayılır. Eşitlikte ödülü paylaşanların hepsi puanı alır.</p>
     <h4>Deneme haftası</h4>
     <p>Lig deneme haftasıyla başlarsa o hafta her şey gerçeği gibi sayılır, ama haftanın sonunda puanlar, rozetler ve istatistikler sıfırlanır; hesabın, profilin ve ayarların kalır. Deneme haftasının tablosu "Geçmiş ligler"de saklanır. Deneme süresince sayfanın en üstünde çizgili bir "Deneme haftası" şeridi görünür.</p>
     <h4>Yeni oyuncu</h4>
@@ -2030,7 +2047,7 @@ function renderAyrisma(){
     const cls = g.state==="post" ? (diff>0?"won":"lost") : g.state==="in" && diff>0 ? "leading" : "";
     const who = ps.map(([u,p])=>{
       const cf=D.daily[u]?.confGame===g.id, r = g.state!=="pre" ? scorePick(g,p,cf) : null;
-      return `<div class="fo-p" data-hsu="${u}" title="${esc(pname(u))} · tahmin geçmişi">${avatar(u,"sm")}<span class="fo-pi"><b style="color:${col(u)}">${esc(pname(u))}${cf?' <span class="star">★</span>':""}</b><small>${p.margin} · ${faceImg(p.scorerId,"fo-face")}${esc(p.scorerName)}</small></span>${r&&(g.state==="post"||g.state==="in")?`<span class="pt-badge ${r.pts>0?"pos":r.pts<0?"neg":"zero"}">${r.pts>0?"+":""}${r.pts}</span>`:""}</div>`;
+      return `<div class="fo-p" data-hsu="${u}" title="${esc(pname(u))} · tahmin geçmişi">${avatar(u,"sm")}<span class="fo-pi"><b style="color:${col(u)}">${esc(pname(u))}${cf?' <span class="star">★</span>':""}</b><small>${p.margin}${r?.m===2?' <span title="Nokta atışı: fark tam bilindi">🎯</span>':""} · ${faceImg(p.scorerId,"fo-face")}${esc(p.scorerName)}</small></span>${r&&(g.state==="post"||g.state==="in")?`<span class="pt-badge ${r.pts>0?"pos":r.pts<0?"neg":"zero"}">${r.pts>0?"+":""}${r.pts}</span>`:""}</div>`;
     }).join("") || `<small class="muted fo-none">kimse seçmedi</small>`;
     return `<div class="fo-side ${cls}" style="--tc:${tcol(t.abbr)}"><div class="fo-tm"><img src="${t.logo||LOGO_SMALL(t.abbr)}" alt=""><span><b>${esc(t.abbr)}</b><small>${esc(t.name)}</small></span>${g.state!=="pre"?`<span class="fo-sc">${t.score??""}</span>`:""}</div>${who}
       ${cls==="won"?(ps.length && ps.length*2<picks.length?'<span class="fo-flag minor">Azınlıkta kaldı, haklı çıktı</span>':'<span class="fo-flag">Haklı çıktı</span>'):cls==="leading"?'<span class="fo-flag lead">Şu an önde</span>':""}</div>`;
@@ -2224,6 +2241,7 @@ const BADGES = [
   {id:"banko", ico:"⭐", name:"Banko kralı", desc:"Üst üste 5 bankoyu tuttur"},
   {id:"skorer", ico:"🎯", name:"Skorer avcısı", desc:"10 kez maçın en skorerini bil"},
   {id:"fark", ico:"📏", name:"Fark ustası", desc:"Bir gecede 3 maçın farkını bil"},
+  {id:"nokta", ico:"🎯", name:"Nokta atışı", desc:"5 maçın farkını tam bil"},
   {id:"gece", ico:"🌙", name:"Gece kralı", desc:"Üst üste 3 gece kazan"},
   {id:"hafta", ico:"🏆", name:"Haftanın şampiyonu", desc:"Bir haftayı kazan"},
   {id:"ay", ico:"📅", name:"Ayın şampiyonu", desc:"Bir ayı kazan"},
@@ -2241,6 +2259,7 @@ function badgesOf(u){
     if(a.filter(x=>x.r.m>0).length>=3){ got.fark++; mark("fark",d); } }
   got.kusursuz=0; let sk=0; for(const x of recs){ if(x.r.w>0 && x.r.m>0 && x.r.s>0){ got.kusursuz++; mark("kusursuz",x.day); } if(x.r.s>0){ sk++; if(sk%10===0) mark("skorer",x.day); } }
   got.skorer = Math.floor(sk/10);
+  let nk=0; for(const x of recs){ if(x.r.m===2){ nk++; if(nk%5===0) mark("nokta",x.day); } } got.nokta=Math.floor(nk/5);
   let run=0; got.banko=0; for(const x of recs.filter(x=>x.r.c)){ if(x.r.w>0){ run++; if(run===5){ got.banko++; run=0; mark("banko",x.day); } } else run=0; }
   let nr=0; got.gece=0; for(const n of nightsOf()){ if(n.w.st==="w" && n.w.u===u){ nr++; if(nr===3){ got.gece++; nr=0; mark("gece",n.d); } } else nr=0; }
   const curWk=weekKey(S.today); got.hafta=0;
@@ -2250,7 +2269,7 @@ function badgesOf(u){
   const dayRows=Object.entries(S.arch.scores.days||{}).sort().map(([d,r])=>[d,r[u]]).filter(x=>x[1]);
   let dpc=0, qc=0; for(const [d,x] of dayRows){ if(x.dp>0){ dpc++; if(dpc%3===0) mark("oyuncu",d); } if(x.qp>0){ qc++; if(qc%5===0) mark("bilge",d); } }
   got.oyuncu = Math.floor(dpc/3); got.bilge = Math.floor(qc/5);
-  const prog = {skorer:`${sk%10}/10`, banko:`${run}/5`, gece:`${nr}/3`, oyuncu:`${dpc%3}/3`, bilge:`${qc%5}/5`};
+  const prog = {nokta:`${nk%5}/5`, skorer:`${sk%10}/10`, banko:`${run}/5`, gece:`${nr}/3`, oyuncu:`${dpc%3}/3`, bilge:`${qc%5}/5`};
   return BADGES.map(b=>({...b, n:got[b.id]||0, prog:prog[b.id]||"", first:first[b.id]||null}));
 }
 const badgeHTML = (list, compact=false) => `<div class="badges ${compact?"compact":""}">${list.map(b=>`<div class="bdg ${b.n?"on":""}" title="${esc(b.desc)}"><span class="bi">${b.ico}</span><span class="bt"><b>${esc(b.name)}${b.n>1?` <small>×${b.n}</small>`:""}</b>${compact?"":`<small>${b.n?esc(b.desc):esc(b.desc)+(b.prog?` · ${b.prog}`:"")}</small>`}</span></div>`).join("")}</div>`;
@@ -2275,7 +2294,7 @@ function seasonAwards(){
     {ico:"🌙", t:"Gecelerin hâkimi", d:"En çok gece kazanan", r:by(u=>nights.filter(n=>n.w.st==="w"&&n.w.u===u).length), f:v=>`${v} gece`},
     {ico:"🔥", t:"En uzun seri", d:"Üst üste kazanılan gece", r:by(streak), f:v=>`${v} gece`},
     {ico:"🎯", t:"Skorer avcısı", d:"En çok en skorer bilen", r:by(u=>recs[u].filter(x=>x.r.s>0).length), f:v=>`${v} kez`},
-    {ico:"📏", t:"Fark ustası", d:"En çok fark bilen", r:by(u=>recs[u].filter(x=>x.r.m>0).length), f:v=>`${v} kez`},
+    {ico:"📏", t:"Fark ustası", d:"En çok fark bilen (nokta atışı 2 sayılır)", r:by(u=>recs[u].reduce((t,x)=>t+(x.r.m||0),0)), f:v=>`${v} puan`},
     {ico:"⭐", t:"Banko kralı", d:"Bankodan en çok net puan", r:by(u=>recs[u].filter(x=>x.r.c).reduce((s,x)=>s+(x.r.w>0?2:-1),0)), f:v=>`${v>0?"+":""}${v} puan`},
     {ico:"🌟", t:"Keskin göz", d:"Günün oyuncusunu en çok bilen", r:by(u=>Object.values(days).filter(r=>r[u]?.dp>0).length), f:v=>`${v} kez`},
     {ico:"🦉", t:"Bilge", d:"Gecenin sorusunu en çok bilen", r:by(u=>Object.values(days).filter(r=>r[u]?.qp>0).length), f:v=>`${v} kez`},
@@ -2909,7 +2928,7 @@ function openHistory(u=S.uid, flt="all", team=""){
   const rows=Object.entries(byDay).map(([d,list])=>`<div class="hs-n"><div class="hs-nh"><b>${dayNice(d,{day:"numeric",month:"long",weekday:"short"})}</b><span>${nInfo[d]?`${nInfo[d].pts} puan · gece ${nInfo[d].rank}.${nInfo[d].of?`/${nInfo[d].of}`:""}`:""}</span></div>
     ${list.map(x=>{ const g=S.arch.games[x.gid]||{}, fav=g.fav, upset=fav && x.r.pick.w && x.r.pick.w!==fav && x.r.w>0, df=Math.abs((x.home?.score??0)-(x.away?.score??0));
       return `<div class="hs"><div class="hs-h"><span class="hs-m"><img src="${LOGO_SMALL(x.away.abbr)}" alt="">${esc(x.away.abbr)} <b>${x.away.score??""}–${x.home.score??""}</b> ${esc(x.home.abbr)}<img src="${LOGO_SMALL(x.home.abbr)}" alt="">${g.cup?`<span class="cup-mini">${ICON.cup}</span>`:""}</span><span class="hs-p ${x.r.pts>0?"pos":x.r.pts<0?"neg":""}">${x.r.pts>0?"+":""}${x.r.pts}</span></div>
-        <div class="pk">${ch(x.r.pick.w||"–",x.r.w>0)}${ch(x.r.pick.m||"–",x.r.m>0)}${ch(x.r.pick.s||"–",x.r.s>0)}${x.r.c?'<span class="rc"><i>★</i>banko</span>':""}</div>
+        <div class="pk">${ch(x.r.pick.w||"–",x.r.w>0)}${ch((x.r.pick.m||"–")+(x.r.m===2?" 🎯":""),x.r.m>0)}${ch(x.r.pick.s||"–",x.r.s>0)}${x.r.c?'<span class="rc"><i>★</i>banko</span>':""}</div>
         <small class="hs-x">Sonuç: ${esc(x.winner||"")} ${df} farkla (${bucketOf(g,df)})${g.top?.length?` · en skorer ${esc(g.top.map(t=>t.name).join(", "))} ${g.top[0].pts}`:""}${fav?` · ESPN favorisi ${esc(fav)}`:""}${upset?' · <b class="hs-up">favorinin tersine bildi</b>':""}</small></div>`; }).join("")}</div>`).join("");
   openSheet(`<div class="hs-top">${avatar(u,"sm")}<h3 id="shTitle" style="margin:0">${me?"Tahmin geçmişin":`${esc(pname(u))} · tahmin geçmişi`}</h3></div><p class="muted">${n} biten maç${leagueStart()>(S.cfg?.seasonStart||"")?" (bu lig)":""}.</p>
     ${sum}${n?`${me?`<button class="btn" id="csvBtn" type="button">${ICON.download}Excel için indir (CSV)</button>`:""}<div class="hs-list">${rows||emptyBox("filter", "Bu filtrede maç yok.")}</div>`:`<div class="note">${me?"Tahmin yaptığın":"Tahmin yaptığı"} maçlar bittikçe burada listelenecek.</div>`}`);
@@ -5037,7 +5056,7 @@ if("serviceWorker" in navigator){ navigator.serviceWorker.getRegistrations?.().t
     $("#auth").classList.add("hide"); $("#app").classList.remove("hide");
     $("#me").classList.remove("hide"); $("#srch").classList.remove("hide"); $("#invBtn").classList.remove("hide"); later(()=>{ startChat(); startDMs(); chatBadge(); }); paintMe(); applyTheme();
     S.statFor=S.uid;
-    $("#foot").innerHTML=`Kazanan +1 (sürprizde +2 / +3) · Fark ±3 +1 · En skorer +1 · Banko 2 kat / -1 · Günün oyuncusu +3 · Gecenin sorusu +1 · Haftada 4 gece +2<br><button class="linkish ver" id="pgFoot" type="button">📖 Puanlama rehberi</button><br>Veriler ESPN'den alınır. Maç varken 30 saniyede bir yenilenir.<br><button class="linkish ver" id="verBtn" type="button">Sürüm ${VERSION} · Yenilikler</button> · <button class="linkish ver" id="repBtn" type="button">Sorun bildir</button> · <button class="linkish ver" id="langBtn" type="button">${LANG==="en"?"Türkçe":"English"}</button>`;
+    $("#foot").innerHTML=`Kazanan +1 (sürprizde +2 / +3) · Fark ±3 +1 (tam fark +2) · En skorer +1 · Banko 2 kat / -1 · Günün oyuncusu +3 · Gecenin sorusu +1 · Haftada 4 gece +2<br><button class="linkish ver" id="pgFoot" type="button">📖 Puanlama rehberi</button><br>Veriler ESPN'den alınır. Maç varken 30 saniyede bir yenilenir.<br><button class="linkish ver" id="verBtn" type="button">Sürüm ${VERSION} · Yenilikler</button> · <button class="linkish ver" id="repBtn" type="button">Sorun bildir</button> · <button class="linkish ver" id="langBtn" type="button">${LANG==="en"?"Türkçe":"English"}</button>`;
     $("#verBtn").onclick=()=>openNews(true); $("#repBtn").onclick=()=>openReport(); $("#langBtn").onclick=()=>setLang(LANG==="en"?"tr":"en");
     route(); showDay(); Promise.resolve(refresh()).catch(()=>{}).finally(()=>dispatchEvent(new Event("app-ready")));
     if(S.onboard){ if(S.joinP) await S.joinP.catch(()=>{}); await loadPlayers().catch(()=>{}); allPlayers().catch(()=>{}).finally(()=>openOnboard(4)); }

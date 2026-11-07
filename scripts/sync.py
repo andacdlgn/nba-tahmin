@@ -397,7 +397,7 @@ def league_awards(sc, games, players, today, league_start):
                 if g.get("fav") and r["pick"].get("w") and r["pick"]["w"] != g["fav"] and r.get("w", 0) > 0:
                     st[u]["sur"] += 1
                 st[u]["sc"] += r.get("s", 0) > 0
-                st[u]["mg"] += r.get("m", 0) > 0
+                st[u]["mg"] += r.get("m", 0)   # nokta atışı 2 sayılır
 
         def best(key, minv=1, cond=lambda x: True):
             vals = {u: key(x) for u, x in st.items() if cond(x)}
@@ -416,7 +416,7 @@ def league_awards(sc, games, players, today, league_start):
         w, v = best(lambda x: x["sc"])
         lst.append({"k": "skorer", "i": "🔥", "t": "Skorer ustası", "d": "En skoreri en çok bilen", "u": w, "v": f"{v} maç", "pts": 2})
         w, v = best(lambda x: x["mg"])
-        lst.append({"k": "fark", "i": "📏", "t": "Fark ustası", "d": "Farkı en çok tutturan", "u": w, "v": f"{v} maç", "pts": 2})
+        lst.append({"k": "fark", "i": "📏", "t": "Fark ustası", "d": "Farkı en çok tutturan (nokta atışı 2 sayılır)", "u": w, "v": f"{v} puan", "pts": 2})
         title = f"{AY[m - 1]} ödülleri"   # lig Kasım'da başladığı için Ekim'in son günleri Kasım'a sayılır
         out[mk] = {"title": title, "list": lst}
     return out
@@ -481,7 +481,9 @@ def score_game(g, pick, conf, top_ids):
         else:
             hit = (margin_bucket2(g["margin"]) == lab) if lab in MARGINS2_LABELS else (lab == g["bucket"])
         if hit:
-            r["m"] = 1
+            # 1.23.0: asıl ligden itibaren farkı tam bilen +1 ek (fark puanı 2); "40+" tam sayılmaz
+            exact = g.get("day", "") >= EXACT_FROM and lab.isdigit() and int(lab) < MARGIN_MAX and int(lab) == g["margin"]
+            r["m"] = 2 if exact else 1
     elif conf:
         r["w"] = -1
     if pick.get("scorerId") in top_ids:
@@ -492,6 +494,7 @@ def score_game(g, pick, conf, top_ids):
 
 LOCK = timedelta(0)  # 3 Kasım 2026 öncesi: gecenin bütün tahminleri ilk maç başlayınca kilitlenir
 GAP_FROM, PERGAME_FROM = "20261103", "20261104"
+EXACT_FROM = "20261109"   # tam fark (nokta atışı) ödülü asıl ligle başlar
 CUP2X_FROM = "20261104"   # 3 Kasım: kilit 10 dk önce; 4 Kasım: her maç kendi saatinde
 
 
@@ -688,6 +691,8 @@ def save_injuries():
             st = "Cezalı" if i.get("status") == "Suspension" else "Oynamıyor" if inj_out(i) else "Belirsiz"
             out[pid] = {"s": st, "y": det.get("type", ""), "c": i.get("shortComment", ""),
                         "r": det.get("returnDate", ""), "t": a.get("team", {}).get("abbreviation", "")}
+    if len(out) < 10 and len(load("injuries.json", {})) >= 30:
+        raise RuntimeError(f"sakatlık listesi şüpheli derecede kısa ({len(out)}); eski liste korunuyor")
     return save("injuries.json", out)
 
 
