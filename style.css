@@ -2260,3 +2260,15 @@ body.bars-hidden .chat-fab{transform:none}
 .st tr.wk-p2 td{background:color-mix(in srgb,#b8c4d0 9%,var(--panel))}
 .st tr.wk-p3 td{background:color-mix(in srgb,#cd7f32 9%,var(--panel))}
 .st tr.wk-p1 td.st-rk,.st tr.wk-p2 td.st-rk,.st tr.wk-p3 td.st-rk{font-size:18px}
+
+/* 1.28.7: maç önü son 5 maç skorları ve sakatların istatistikleri */
+.l5x{display:flex;flex-direction:column;gap:4px;margin:4px 0 6px}
+.l5r{display:grid;grid-template-columns:26px 1fr auto auto;align-items:center;gap:8px;padding:6px 8px;border-radius:10px;background:var(--panel-2);font-size:13.5px}
+.l5r .l5b{width:24px;height:24px;border-radius:7px;display:grid;place-items:center;font-weight:800;font-size:12px}
+.l5r.W .l5b{background:color-mix(in srgb,#22c55e 22%,transparent);color:#16a34a}
+.l5r.L .l5b{background:color-mix(in srgb,#ef4444 22%,transparent);color:#dc2626}
+.l5o{display:flex;align-items:center;gap:5px;color:var(--muted)}.l5o img{flex:none}
+.l5s{font-variant-numeric:tabular-nums}
+.l5r small{color:var(--muted);font-size:11.5px;min-width:42px;text-align:right}
+.injr{padding:6px 0;border-bottom:1px solid var(--line)}.injr:last-child{border-bottom:0}
+.inj-st{font-size:13px;margin-top:2px}

@@ -45,12 +45,13 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.28.6";
+const VERSION = "1.28.7";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.28.7", d:"7 Kasım 2026", items:["Maç önü: son 5 maçta rakip ve skor görünüyor; sakat oyuncuların sezon ortalaması (sayı, ribaund, asist) yazıyor."]},
   {v:"1.28.6", d:"7 Kasım 2026", items:["Haftalık puan durumu sezon tablosuyla aynı: Hafta toplamı, Galip, Fark, Maçın skoreri, Günün oyuncusu, Gecenin sorusu ve ödül sütunu.","Haftalık ödül öne çıktı: tablonun üstünde +10 / +7 / +5 şeridi ve kalan süre, ilk 3 madalyayla; sezon tablosunda ve ana tabloda da bu haftanın ödül sırası görünüyor."]},
   {v:"1.28.5", d:"7 Kasım 2026", items:["Tek seferlik rozetler artık Bronz/Gümüş gibi kademe taşımıyor: hepsi \"Özel rozet\" (+3). Kademeler yalnızca seviyeli rozetlerde."]},
   {v:"1.28.3", d:"7 Kasım 2026", items:["Sıralama sayfası sadeleşti: Rekorlar ve Gece gece bölümleri kalktı, sezon grafiği oynatmasız, düz hâliyle duruyor."]},
@@ -1817,9 +1818,11 @@ async function openInfo(g){
     const reb = ld.find(x=>/rebounds/i.test(x.name))?.leaders?.[0];
     const ast = ld.find(x=>/assists/i.test(x.name))?.leaders?.[0];
     return `<div class="box"><h4 style="margin:0 0 8px;display:flex;gap:8px;align-items:center"><img src="${t.logo}" alt="" width="26" height="26">${esc(t.name)} <small class="muted">${t.rec}</small><button class="linkish" data-tp="${t.abbr}" style="margin-left:auto;font-size:13px">Takım sayfası ›</button></h4>
-      <div class="row-lbl">Son 5 maç</div><div class="l5">${l5.map(e=>`<span class="${e.gameResult}" title="${esc(e.atVs||"")} ${esc(e.opponent?.abbreviation||"")} ${esc(e.score||"")}">${e.gameResult==="W"?"G":"M"}</span>`).join("")||'<span class="muted">–</span>'}</div>
+      <div class="row-lbl">Son 5 maç</div>${l5.length?`<div class="l5x">${l5.map(e=>{ const op=e.opponent?.abbreviation||""; const sc=String(e.score||"").replace(/\s/g,""); const w=e.gameResult==="W";
+        return `<div class="l5r ${w?"W":"L"}"><span class="l5b">${w?"G":"M"}</span><span class="l5o">${e.atVs==="@"?"@":"vs"} ${op?`<img src="${LOGO_SMALL(op)}" alt="" width="16" height="16">`:""}${esc(op)}</span><b class="l5s">${esc(sc)}</b>${e.gameDate?`<small>${new Date(e.gameDate).toLocaleDateString(LOC,{day:"numeric",month:"short",timeZone:TZ})}</small>`:""}</div>`; }).join("")}</div>`:'<div class="muted">–</div>'}
       <div class="row-lbl">Öne çıkan oyuncular (maç başına ortalama)</div><div style="font-size:14px">${[pts&&`${esc(pts.athlete.displayName)} ${pts.displayValue} sayı`,reb&&`${esc(reb.athlete.displayName)} ${reb.displayValue} ribaund`,ast&&`${esc(ast.athlete.displayName)} ${ast.displayValue} asist`].filter(Boolean).join("<br>")||"–"}</div>
-      <div class="row-lbl">Sakatlar</div><div style="font-size:14px">${inj.length?inj.map(i=>`${esc(i.n)} <span class="inj ${i.o?"":"q"}">${i.s}</span>${i.c?`<small class="inj-c">${esc(i.c)}</small>`:""}`).join(""):'<span class="muted">Sakat oyuncu yok</span>'}</div></div>`;
+      <div class="row-lbl">Sakatlar</div><div style="font-size:14px">${inj.length?inj.map(i=>{ const st=S.pstats?.[i.id]; const f=v=>(v/st.gp).toFixed(1);
+        return `<div class="injr"><div>${esc(i.n)} <span class="inj ${i.o?"":"q"}">${i.s}</span></div><div class="inj-st">${st?.gp?`<b>${f(st.pts)}</b> sayı · <b>${f(st.reb)}</b> rib. · <b>${f(st.ast)}</b> ast. <span class="muted">(${st.gp} maç)</span>`:`<span class="muted">Bu sezon henüz oynamadı</span>`}</div>${i.c?`<small class="inj-c">${esc(i.c)}</small>`:""}</div>`; }).join(""):'<span class="muted">Sakat oyuncu yok</span>'}</div></div>`;
   };
   const pr = s.predictor; let pred="";
   if(pr?.homeTeam?.gameProjection){
