@@ -45,12 +45,13 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.28.2";
+const VERSION = "1.28.3";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.28.3", d:"7 Kasım 2026", items:["Sıralama sayfası sadeleşti: Rekorlar ve Gece gece bölümleri kalktı, sezon grafiği oynatmasız, düz hâliyle duruyor."]},
   {v:"1.28.2", d:"7 Kasım 2026", items:["Puan durumu sütunları: Toplam, Galip, Fark, Maçın skoreri, Günün oyuncusu, Gecenin sorusu, Uzun vade, Bonus ve ödüller. Gece ve hafta birincilik sayıları tablodan çıktı.","Sıralama sayfası sadeleşti: sıralama grafiği, gece takvimi ve eski \"Bu hafta\" kutusu kalktı; sezon yarışı sezon grafiğiyle birleşti (▶ Oynat ile gece gece ilerler)."]},
   {v:"1.28.1", d:"7 Kasım 2026", items:["Puan durumu: her puan kategorisi kendi sütununda (Kazanan, Fark, Skorer, Günün oyuncusu, Gecenin sorusu, Uzun vade, Ödül); sütunların toplamı puana eşit. Telefonda tablo yana kaydırılır, oyuncu adı sabit kalır."]},
   {v:"1.28.0", d:"7 Kasım 2026", items:["Rozetler: seviyeler en fazla 3 (Bronz, Gümüş, Altın), Efsane kaldırıldı. Çeşitlilik artık farklı rozetlerle: 120 ayrı rozet ailesi, toplam 190 rozet.","Yeni: 30 takımın her biri için takım uzmanlığı (takım logolu), 25 yıldız için oyuncu uzmanlığı (oyuncu fotoğraflı), haftalık birincilik / ikincilik / üçüncülük, podyum müdavimi ve her aylık ödül için ayrı rozet."]},
@@ -2330,7 +2331,7 @@ function seasonChart(upto, bare){
   const svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Sezon boyunca toplam puan">${g}${lines}${labels}
     <text x="${L}" y="${H-6}" class="gt">${dl(days[0])}</text><text x="${W-R}" y="${H-6}" class="gt" text-anchor="end">${dl(days[n-1])}</text></svg>`;
   if(bare) return svg;
-  return `<div class="sec-title"><h2>Sezon grafiği</h2><button class="btn sm" id="chartPlay" type="button">▶ Oynat</button></div>
+  return `<div class="sec-title"><h2>Sezon grafiği</h2><span class="aside">gece gece toplam puan</span></div>
     <div class="box chart"><div id="chartSvg">${svg}</div>
     <div class="chart-leg">${ranked.map(u=>`<span class="pn"><i style="background:${col(u)}"></i>${esc(pname(u))}</span>`).join("")}</div></div>`;
 }
@@ -2681,33 +2682,6 @@ function renderPuan(){
       <span class="mo-w">👑 <b>${esc(w?.name||"?")}</b><small>${w?.pts??0} puan</small></span><span class="mo-s">${(h.rows||[]).slice(1).map(r=>`${esc(r.name)} ${r.pts}`).join(" · ")}</span></div>`; }).join("")}</div>`;
   html += seasonChart();
 
-  // rekorlar
-  let bestNight=null, streak={}, maxStreak={};
-  S.order.forEach(u=>{streak[u]=0; maxStreak[u]=0;});
-  for(const {d,pts} of [...dayRows].reverse()){
-    if(S.order.some(u=>pts[u] && !pts[u].final)) continue; // süren gece rekora sayılmaz
-    for(const u of S.order){ const p=pts[u]?.pts; if(p!=null && (!bestNight||p>bestNight.p)) bestNight={u,p,d}; }
-    const vals=S.order.map(u=>pts[u]?.pts??-99); const best=Math.max(...vals); const w=S.order.filter(u=>(pts[u]?.pts??-99)===best);
-    for(const u of S.order){ if(w.length===1 && w[0]===u){ streak[u]++; maxStreak[u]=Math.max(maxStreak[u],streak[u]); } else streak[u]=0; }
-  }
-  if(bestNight){
-    const ms = S.order.map(u=>[u,maxStreak[u]]).sort((a,b)=>b[1]-a[1])[0];
-    html += `<div class="sec-title"><h2>Rekorlar</h2></div><div class="cards2">
-      <div class="kpi"><b>${bestNight.p}</b><small>En iyi gece: <span style="color:${col(bestNight.u)};font-weight:700">${esc(pname(bestNight.u))}</span>, ${dayNice(bestNight.d,{day:"numeric",month:"short"})}</small></div>
-      <div class="kpi"><b>${ms[1]}</b><small>Üst üste kazanılan gece: <span style="color:${col(ms[0])};font-weight:700">${esc(pname(ms[0]))}</span></small></div>
-      ${S.order.map(u=>`<div class="kpi"><b>${streak[u]}</b><small>Şu anki seri: <span style="color:${col(u)};font-weight:700">${esc(pname(u))}</span></small></div>`).join("")}</div>`;
-  }
-
-  // gün gün
-  html += `<div class="sec-title"><h2>Gece gece</h2><span class="aside">dokun, o geceye git</span></div><div class="daylist">` +
-    (dayRows.length ? dayRows.map(({d,pts})=>{
-      const vals=S.order.map(u=>pts[u]?.pts??null); const best=Math.max(...vals.filter(v=>v!=null));
-      const w=S.order.filter(u=>pts[u]?.pts===best);
-      const prov = S.order.some(u=>pts[u] && !pts[u].final);
-      return `<button class="dayrow" data-day="${d}"><span class="d">${dayNice(d,{day:"numeric",month:"short",weekday:"short"})}</span>
-        <span class="sc">${S.order.map(u=>`<span style="color:${col(u)}">${esc(pname(u))} ${pts[u]?.pts??0}</span>`).join("")}</span>
-        <span class="w">${prov?"sürüyor":w.length===1?esc(pname(w[0])):"berabere"}</span></button>`;
-    }).join("") : `${emptyBox("chart", "İlk gece bitince puan tablosu burada dolmaya başlayacak.")}`) + `</div>`;
   $("#puan").innerHTML = html;
 }
 $("#puan").addEventListener("click", e => { const pv=e.target.closest("[data-pv]"); if(pv){ S.pv=pv.dataset.pv; return renderPuan(); } if(e.target.closest("#chartPlay")) return playChart(); if(e.target.closest("#raceBtn")){ if(playRace.t){ clearInterval(playRace.t); playRace.t=null; e.target.textContent="▶ Oynat"; } else playRace(); return; } if(e.target.closest("#awardsBtn")) return openAwards(); if(e.target.closest("#archBtn")) return openArchive(); const ar=e.target.closest("[data-arch]"); if(ar) return openArchive(+ar.dataset.arch); const aw=e.target.closest("[data-awshow]"); if(aw) return openCeremony(aw.dataset.awshow); const b=e.target.closest("[data-day]"); if(!b) return; S.day=b.dataset.day; location.hash="#tahmin"; showDay(); });
