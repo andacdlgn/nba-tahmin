@@ -11,6 +11,9 @@ service cloud.firestore {
     function signedIn() { return request.auth != null; }
     function isPlayer() { return signedIn() && exists(/databases/$(database)/documents/players/$(request.auth.uid)); }
     function str(v, maxLen) { return v is string && v.size() > 0 && v.size() <= maxLen; }
+    // Güvenlik (1.30.1): takım kısaltması (ESPN: GS, NY, UTAH...) ve ESPN oyuncu/maç numarası yalnızca bu biçimde kabul edilir
+    function teamAbbr(v) { return v is string && v.matches('^[A-Z]{2,4}$'); }
+    function numId(v) { return v is string && v.matches('^[0-9]{1,12}$'); }
     // Tahminler kilit saatinde (start'tan 10 dk önce) kapanır ve o an herkese açılır. Site "start" alanına
     // maçın kendi saatini (günlük seçimlerde gecenin ilk maçını) yazar; puanlama betiği bunu ESPN'den ayrıca doğrular.
     function lockAt(t) { return t - duration.value(10, 'm'); }
@@ -30,7 +33,7 @@ service cloud.firestore {
     function profileOk(d) {
       return (!('color' in d) || d.color in ['p0', 'p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8', 'p9'])
         && (!('emoji' in d) || d.emoji in ['', '🏀', '🔥', '🐐', '👑', '🦅', '🐺', '🦁', '🐻', '🐍', '🦈', '⚡', '🌪️', '🎯', '💎', '🚀', '🧊', '☄️', '🌙', '⭐', '🍀', '🎲', '🛡️', '🥷', '🤖'])
-        && (!('favTeam' in d) || (d.favTeam is string && d.favTeam.size() <= 5))
+        && (!('favTeam' in d) || (d.favTeam is string && d.favTeam.matches('^([A-Z]{2,4})?$')))
         && (!('theme' in d) || d.theme in ['default', 'team'])
         // av: avatar görseli. '' ya da 't:LAL' (takım logosu) ya da 'p:1234567' (oyuncu fotoğrafı)
         && (!('av' in d) || (d.av is string && d.av.matches('^(t:[A-Z]{2,4}|p:[0-9]{3,10}|w:[0-9]{3,10})?$')))
@@ -52,6 +55,20 @@ service cloud.firestore {
         : k == 'k_2027' ? timestamp.date(2026, 12, 1) + duration.value(17, 'h')
         : timestamp.date(2027, 1, 15) + duration.value(17, 'h');
     }
+    // Güvenlik (1.30.1): sezon ödülü değişikliği. Kilitten sonra yalnızca TEK yeni kategori eklenebilir; önceki
+    // değişiklikler ve diğer kategoriler değişmez. Yeni kayıt {from: eski seçim, to: yeni oyuncu, toName}.
+    function ltSwapEntry(e, from) {
+      return e is map && e.keys().hasOnly(['from', 'to', 'toName']) && e.from == from && numId(e.to) && str(e.toName, 60);
+    }
+    function ltSwapOne(nw, df, picks, c) {
+      return df.addedKeys().hasOnly([c]) && ltSwapEntry(nw[c], picks[c]);
+    }
+    function ltSwapOk(nw, old, picks) {
+      let df = nw.diff(old);
+      return nw is map && df.addedKeys().size() == 1 && df.changedKeys().size() == 0 && df.removedKeys().size() == 0
+        && (ltSwapOne(nw, df, picks, 'mvp') || ltSwapOne(nw, df, picks, 'roy') || ltSwapOne(nw, df, picks, 'dpoy')
+            || ltSwapOne(nw, df, picks, 'mip') || ltSwapOne(nw, df, picks, 'smoy'));
+    }
     match /lt/{id} {
       allow read: if resource == null
         || (signedIn() && resource.data.uid == request.auth.uid)
@@ -68,7 +85,7 @@ service cloud.firestore {
               && request.time < timestamp.date(2027, 3, 1)
               && request.resource.data.picks == resource.data.picks
               && request.resource.data.get('names', {}) == resource.data.get('names', {})
-              && request.resource.data.swaps.size() == resource.data.get('swaps', {}).size() + 1));
+              && ltSwapOk(request.resource.data.swaps, resource.data.get('swaps', {}), resource.data.picks)));
     }
     // Uzun vade sonuçları: herkes okur, yönetici yazar.
     match /ltResults/{k} {
@@ -79,8 +96,13 @@ service cloud.firestore {
     // reports/{id}: oyuncuların "sorun bildir" mesajları. Oyuncu yazar, yönetici okur ve siler.
     match /reports/{id} {
       allow read, delete: if isAdmin();
-      allow create: if isPlayer() && id.size() >= 10 && id.size() <= 40
+      allow create: if isPlayer() && id.matches('^[0-9a-f]{10,40}$')
         && request.resource.data.keys().hasOnly(['uid', 'kind', 'text', 'v', 'tab', 'ua', 'w', 'at'])
+        // Güvenlik (1.30.1): ek alanların türü ve boyu sınırlı
+        && (!('v' in request.resource.data) || (request.resource.data.v is string && request.resource.data.v.size() <= 20))
+        && (!('tab' in request.resource.data) || (request.resource.data.tab is string && request.resource.data.tab.size() <= 20))
+        && (!('ua' in request.resource.data) || (request.resource.data.ua is string && request.resource.data.ua.size() <= 200))
+        && (!('w' in request.resource.data) || request.resource.data.w is number)
         && (!('kind' in request.resource.data) || request.resource.data.kind in ['sorun', 'istek', 'soru', 'diger'])
         && request.resource.data.uid == request.auth.uid
         && str(request.resource.data.text, 1000)
@@ -137,6 +159,11 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['color', 'emoji', 'favTeam', 'theme', 'av', 'bio', 'club', 'rival', 'autoPick', 'seen', 'vd'])
         // autoPick: yedek tahmin tercihi; seen: son giriş (yalnızca sunucu saati); vd: siteye girilen günler (rozetler için, en fazla 1000)
         && (!('vd' in request.resource.data) || (request.resource.data.vd is list && request.resource.data.vd.size() <= 1000))
+        // Güvenlik (1.30.1): vd'ye her seferinde en fazla bir gün eklenir ve o da 8 haneli tarih olur (YYYYMMDD)
+        && (!('vd' in request.resource.data.diff(resource.data).affectedKeys())
+            || (request.resource.data.vd.toSet().difference(resource.data.get('vd', []).toSet()).size() <= 1
+                && request.resource.data.vd.size() <= resource.data.get('vd', []).size() + 1
+                && (request.resource.data.vd.size() == 0 || request.resource.data.vd[request.resource.data.vd.size() - 1].matches('^[0-9]{8}$'))))
         && (!('autoPick' in request.resource.data) || request.resource.data.autoPick is bool)
         && (!('seen' in request.resource.data.diff(resource.data).affectedKeys()) || request.resource.data.seen == request.time)
         && (!('name' in request.resource.data.diff(resource.data).affectedKeys()) || validName(request.resource.data.name))
@@ -160,13 +187,13 @@ service cloud.firestore {
         return d.keys().hasOnly(['uid', 'gameId', 'day', 'start', 'winner', 'margin', 'scorerId', 'scorerName', 'updatedAt'])
           && d.uid == request.auth.uid
           && pid == d.gameId + '_' + request.auth.uid
-          && str(d.gameId, 20) && str(d.day, 8)
+          && numId(d.gameId) && str(d.day, 8)
           && d.start is timestamp
-          && str(d.winner, 6)
+          && teamAbbr(d.winner)
           // fark: eski baremler, 1.7.0 baremleri ya da 1.13.0'dan itibaren sayı (1-40; 40 = 40 ve üstü)
           && (d.margin in ['1-5', '6-10', '11-15', '16+', '1-3', '4-7', '8-12', '13-19', '20+']
               || (d.margin is string && d.margin.matches('^([1-9]|[1-3][0-9]|40)$')))
-          && str(d.scorerId, 20) && str(d.scorerName, 60)
+          && numId(d.scorerId) && str(d.scorerName, 60)
           && d.updatedAt == request.time
           && request.time < lockAt(d.start);
       }
@@ -195,7 +222,7 @@ service cloud.firestore {
         let d = request.resource.data;
         return !('confGame' in d) || (
           (old != null && 'confGame' in old && d.confGame == old.confGame && d.confAt == old.confAt && d.confStart == old.confStart)
-          || (str(d.confGame, 20) && d.confStart is timestamp && request.time < lockAt(d.confStart)
+          || (numId(d.confGame) && d.confStart is timestamp && request.time < lockAt(d.confStart)
               && d.confAt == request.time
               && (old == null || !('confStart' in old) || request.time < lockAt(old.confStart)))
         );
@@ -204,7 +231,7 @@ service cloud.firestore {
         let d = request.resource.data;
         return !('dayPlayerId' in d) || (
           (old != null && 'dayPlayerId' in old && d.dayPlayerId == old.dayPlayerId && d.dayAt == old.dayAt)
-          || (str(d.dayPlayerId, 20) && str(d.dayPlayerName, 60)
+          || (numId(d.dayPlayerId) && str(d.dayPlayerName, 60)
               && d.dayAt == request.time && request.time < lockAt(d.firstStart))
         );
       }
@@ -325,7 +352,7 @@ service cloud.firestore {
         return d.keys().hasOnly(['uid', 'key', 'winner', 'games', 'start', 'updatedAt'])
           && d.uid == request.auth.uid
           && sid == d.key + '_' + request.auth.uid
-          && str(d.key, 40) && str(d.winner, 6)
+          && str(d.key, 40) && teamAbbr(d.winner)
           && d.games in [4, 5, 6, 7]
           && d.start is timestamp
           && d.updatedAt == request.time
@@ -457,7 +484,7 @@ service cloud.firestore {
 
     // talk/{maçId}_{uid}: maç kartına emoji tepki ve kısa yorum (laf atma). Herkes görür, sahibi yazar.
     match /talk/{tid} {
-      allow read: if signedIn();
+      allow read: if isPlayer();
       allow create, update: if isPlayer()
         && request.resource.data.keys().hasOnly(['uid', 'gid', 'day', 'e', 't', 'at'])
         && request.resource.data.uid == request.auth.uid
@@ -473,8 +500,8 @@ service cloud.firestore {
     // Sayaç yalnızca aynı yazımda oy belgesi oluşturulurken ve önceden oy yoksa 1 artabilir; oy değiştirilemez, silinemez.
     function pollPath(pid) { return /databases/$(database)/documents/polls/$(pid); }
     match /polls/{pid} {
-      allow read: if signedIn();
-      allow create: if isPlayer() && request.resource.data.keys().hasOnly(['yes', 'no'])
+      allow read: if isPlayer();
+      allow create: if isPlayer() && pid in ['ligbasla1'] && request.resource.data.keys().hasOnly(['yes', 'no'])
         && request.resource.data.yes == 0 && request.resource.data.no == 0;
       allow update: if isPlayer()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['yes', 'no'])

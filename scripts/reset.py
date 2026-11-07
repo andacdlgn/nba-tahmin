@@ -199,8 +199,9 @@ def send_code(db, d, now):
     except auth.UserNotFoundError:
         return "nouser", {}
     uid = user.uid
+    # Güvenlik (1.30.1): kod yolu kendi kilidine bakar; güvenlik sorusunu yanlış deneyen biri mail yolunu kilitleyemez
     lock = (db.collection("resetLocks").document(uid).get().to_dict() or {})
-    if lock.get("until") and lock["until"] > now:
+    if lock.get("cuntil") and lock["cuntil"] > now:
         return "locked", {}
     c = db.collection("contacts").document(uid).get().to_dict() or {}
     email = (c.get("email") or "").strip()
@@ -208,6 +209,11 @@ def send_code(db, d, now):
         return "nomail", {}
     old = db.collection("resetCode").document(uid).get().to_dict() or {}
     if old.get("sentAt") and now - old["sentAt"] < timedelta(minutes=2):
+        return "wait", {}
+    # Güvenlik (1.30.1): başkası adına sürekli kod maili attırılamasın; bir oyuncuya günde en fazla 3 kod
+    today = now.strftime("%Y%m%d")
+    sent_today = int(old.get("n", 0)) if old.get("day") == today else 0
+    if sent_today >= 3:
         return "wait", {}
     mail = Mailer("--dry" in sys.argv)
     if not mail.ok():
@@ -226,7 +232,8 @@ def send_code(db, d, now):
         return "error", {}
     mail.close()
     db.collection("resetCode").document(uid).set({"salt": salt, "h": hashlib.sha256((salt + code).encode()).hexdigest(),
-                                                  "exp": now + timedelta(hours=3), "sentAt": now})
+                                                  "exp": now + timedelta(hours=3), "sentAt": now,
+                                                  "day": today, "n": sent_today + 1})
     return "sent", {"m": mask(email)}
 
 
@@ -240,9 +247,12 @@ def handle(db, d, now):
         return "nouser"
     uid = user.uid
 
+    # Güvenlik (1.30.1): güvenlik sorusu ve mail kodu ayrı sayılır ve ayrı kilitlenir. Böylece adını bilen biri
+    # 3 yanlış soru cevabıyla sahibinin mail koduyla sıfırlamasını engelleyemez.
     lock_ref = db.collection("resetLocks").document(uid)
     lock = (lock_ref.get().to_dict() or {})
-    until = lock.get("until")
+    fk, uk = ("cfails", "cuntil") if code else ("fails", "until")
+    until = lock.get(uk)
     if until and until > now:
         return "locked"
 
@@ -270,11 +280,13 @@ def handle(db, d, now):
             return "ok"
         wrong = "wrong"
 
-    fails = int(lock.get("fails", 0)) + 1
+    fails = int(lock.get(fk, 0)) + 1
     if fails >= MAX_FAILS:
-        lock_ref.set({"fails": 0, "until": now + LOCK})
+        lock_ref.set({fk: 0, uk: now + LOCK}, merge=True)
+        if code:   # kod tahmin edilmeye çalışılıyor: o kodu geçersiz yap, yenisi istenmeli
+            db.collection("resetCode").document(uid).delete()
         return "locked"
-    lock_ref.set({"fails": fails, "until": None})
+    lock_ref.set({fk: fails, uk: None}, merge=True)
     return wrong
 
 

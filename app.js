@@ -13,8 +13,8 @@ const TZ = "Europe/Istanbul";
 const UI_EN = (()=>{ try{ return localStorage.getItem("lang")==="en"; }catch(e){ return false; } })();
 const LOC = UI_EN ? "en-US" : "tr-TR";
 const Q = new URLSearchParams(location.search);
-const ESPN_BASES = Q.get("espn") ? [Q.get("espn")] :
-  ["https://site.web.api.espn.com/apis/site/v2/sports/basketball/nba", "https://site.api.espn.com/apis/site/v2/sports/basketball/nba"];
+// 1.30.1 güvenlik: veri kaynağı adresten (?espn=) değiştirilemez; yalnızca ESPN'in iki sunucusu
+const ESPN_BASES = ["https://site.web.api.espn.com/apis/site/v2/sports/basketball/nba", "https://site.api.espn.com/apis/site/v2/sports/basketball/nba"];
 // Fark baremleri: MARGINS 3 Kasım 2026'ya kadar, MARGINS2 4 Kasım'dan itibaren.
 // RULES2_FROM: yeni kurallar (5 barem, günün oyuncusu +3, yanan banko katlanmaz, yeni soru havuzu)
 const MARGINS = ["1-5", "6-10", "11-15", "16+"];
@@ -45,12 +45,13 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.30.0";
+const VERSION = "1.30.1";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.30.1", d:"8 Kasım 2026", items:["Güvenlik iyileştirmeleri: site yalnızca kendi adreslerinden kod ve veri yükler, tahmin alanları daha sıkı denetlenir, şifre sıfırlama kötüye kullanıma karşı sınırlandı."]},
   {v:"1.30.0", d:"7 Kasım 2026", items:["Anket: \"Lig pazartesi başlasın mı?\" Açılışta bir kez sorulur; oylar anonim, sonuçlar pazar 22:00'ye kadar Bu Gece ekranında görünür."]},
   {v:"1.29.1", d:"7 Kasım 2026", items:["Maç önü karşılaştırma çubukları sadeleşti: her takımın çubuğu ortadan kendi tarafına, ikisi aynı ölçekte; deplasman mavi, ev sahibi kırmızı, iyi olan koyu."]},
   {v:"1.29.0", d:"7 Kasım 2026", items:["Maç önü: iki takım yan yana çubuklarla (sayı, yediği sayı, averaj, son 5 maç, isabet yüzdeleri, ribaund, asist, top çalma, blok, top kaybı) ve ligdeki sıraları.","Maç önü: yorgunluk etiketleri (arka arkaya maç, dinlenme günü, deplasman serisi, yarın da maçı var).","Maç önü: aralarındaki maçlarda henüz karşılaşmadılarsa bu yazıyor; her takımın en skorer 6 oyuncusu tabloyla.","Takım sayfası ve Takımım: bütün sezon fikstürü (oynanan, kalan, skorlar), sıradaki maça kendiliğinden kayar."]},
@@ -183,8 +184,10 @@ function maybeNews(){
   if(seen===VERSION) return;
   autoPop(5, ()=>lsGet("newsSeen")!==VERSION, ()=>{ lsSet("newsSeen", VERSION); openNews(); });
 }
-const LOGO_SMALL = a => `logos/${String(a).toLowerCase()}.png`;
-const LOGO_FULL  = a => `https://a.espncdn.com/i/teamlogos/nba/500/${String(a).toLowerCase()}.png`;
+// 1.30.1 güvenlik: kullanıcıdan gelen takım kısaltması / oyuncu numarası adrese girmeden temizlenir
+const safeId = v => String(v??"").replace(/[^0-9A-Za-z_-]/g,"");
+const LOGO_SMALL = a => `logos/${safeId(a).toLowerCase()}.png`;
+const LOGO_FULL  = a => `https://a.espncdn.com/i/teamlogos/nba/500/${safeId(a).toLowerCase()}.png`;
 document.addEventListener("error", e => {
   const img = e.target;
   if(!(img instanceof HTMLImageElement)) return;
@@ -400,7 +403,7 @@ function parseGames(raw){
       return { key:`${ev.season?.year||""}${abbrs.join("-")}`, wins, need:Math.floor((+c.series.totalCompetitions||7)/2)+1, done:!!c.series.completed, summary:c.series.summary||"" };
     })() : null;
     const cupNote = (c.notes||[]).map(n=>n.headline||"").find(h=>/NBA Cup/i.test(h)) || "";
-    return { id:ev.id, start:new Date(ev.date), state:ty.state, series:sr, cup:!!cupNote, cupStage:cupNote.replace(/^.*NBA Cup\s*-?\s*/i,""), detail:ty.shortDetail||"", typeName:ty.name||"",
+    return { id:safeId(ev.id), start:new Date(ev.date), state:ty.state, series:sr, cup:!!cupNote, cupStage:cupNote.replace(/^.*NBA Cup\s*-?\s*/i,""), detail:ty.shortDetail||"", typeName:ty.name||"",
              period:st.period||0, clock:st.displayClock||"", home:side("home"), away:side("away"),
              seasonType:ev.season?.type ?? 2 };
   }).sort((a,b) => a.start-b.start);
@@ -732,9 +735,9 @@ function pairCols(a, h){
 const initials = n => String(n||"?").trim().split(/\s+/).slice(0,2).map(w=>w[0]).join("").toLocaleUpperCase("tr");
 // Avatar olarak seçilebilen 50 oyuncu (CBS Sports 2026-27 ilk 50 sıralaması) ve 30 takım logosu
 const STARS = [["5104157","Victor Wembanyama"],["4278073","Shai Gilgeous-Alexander"],["3112335","Nikola Jokic"],["3945274","Luka Doncic"],["4594268","Anthony Edwards"],["3032977","Giannis Antetokounmpo"],["3934672","Jalen Brunson"],["4432166","Cade Cunningham"],["4065648","Jayson Tatum"],["3975","Stephen Curry"],["6450","Kawhi Leonard"],["4396993","Tyrese Haliburton"],["4431678","Tyrese Maxey"],["3908809","Donovan Mitchell"],["3202","Kevin Durant"],["3136195","Karl-Anthony Towns"],["3917376","Jaylen Brown"],["4433134","Scottie Barnes"],["1966","LeBron James"],["4593803","Jalen Williams"],["3149673","Pascal Siakam"],["4432158","Evan Mobley"],["4066261","Bam Adebayo"],["3934719","OG Anunoby"],["5041939","Cooper Flagg"],["3136193","Devin Booker"],["4683021","Deni Avdija"],["4433255","Chet Holmgren"],["3936299","Jamal Murray"],["4701230","Jalen Johnson"],["4066457","Austin Reaves"],["4684740","Amen Thompson"],["3078576","Derrick White"],["4433621","Jalen Duren"],["4871144","Alperen Sengun"],["4277961","Jaren Jackson Jr."],["3059318","Joel Embiid"],["5037871","Dylan Harper"],["6583","Anthony Davis"],["4845367","Stephon Castle"],["4432816","LaMelo Ball"],["4066336","Lauri Markkanen"],["6442","Kyrie Irving"],["4566434","Franz Wagner"],["4432573","Paolo Banchero"],["3032976","Rudy Gobert"],["3992","James Harden"],["5061575","Kon Knueppel"],["4431671","Jaden McDaniels"],["4397688","Trey Murphy III"]];
-const FACE = id => `https://a.espncdn.com/combiner/i?img=/i/headshots/nba/players/full/${id}.png&w=96&h=70&scale=crop&cquality=70`;
+const FACE = id => `https://a.espncdn.com/combiner/i?img=/i/headshots/nba/players/full/${safeId(id)}.png&w=96&h=70&scale=crop&cquality=70`;
 const faceImg = (id, cls="face") => id ? `<img class="${cls}" src="${FACE(id)}" alt="" loading="lazy">` : "";
-const HEADSHOT = id => `https://a.espncdn.com/combiner/i?img=/i/headshots/nba/players/full/${id}.png&w=160&h=117&scale=crop&cquality=70`;
+const HEADSHOT = id => `https://a.espncdn.com/combiner/i?img=/i/headshots/nba/players/full/${safeId(id)}.png&w=160&h=117&scale=crop&cquality=70`;
 // Avatar yalnızca basketbolcu olabilir ("p:id"); eski takım logosu ve emoji avatarları gösterilmez, baş harfler görünür
 // WNBA: 2026 normal sezonunun en çok sayı ortalaması tutturan 15 oyuncusu (ESPN istatistikleri, ESPN oyuncu numarasıyla)
 const WSTARS = [["3149391","A'ja Wilson"],["3142191","Kelsey Mitchell"],["4433403","Caitlin Clark"],["2998938","Kahleah Copper"],["4433730","Paige Bueckers"],
@@ -2090,6 +2093,8 @@ async function votePoll(v){
   }
   S.pollBusy=false; paintPoll();
 }
+// 1.30.1: satır içi onclick yerine (tarayıcı koruması satır içi kodu engeller)
+document.addEventListener("click", e=>{ if(e.target.closest("[data-shclose]")) $("#shClose")?.click(); else if(e.target.closest("[data-reload]")) location.reload(); });
 document.addEventListener("click", e=>{ const b=e.target.closest("[data-poll]"); if(b){ e.stopPropagation(); votePoll(b.dataset.poll); } });
 function maybePoll(){ autoPop(0.5, ()=>pollOn() && !S.myVote && !lsGet("poll_"+POLL.id), ()=>{ watchPoll();
   openSheet(`<h3 id="shTitle">📊 ${esc(POLL.q)}</h3><p class="muted" style="margin-top:-4px">Ligin puanlı olarak pazartesi mi başlamasını istersin, yoksa biraz daha kişi katılsın mı bekleyelim? Oylar anonim, kimin ne seçtiği görünmez. Sonuçlar Bu Gece ekranında pazar akşamına kadar görünür.</p><div class="poll" id="pollSheet">${pollBody()}</div>`); }); }
@@ -3223,7 +3228,7 @@ function paintProf(){
       ${(inv=>inv.length?`<div class="pf-inv">${ICON.link}Lige getirdiği: ${inv.map(x=>`<b style="color:${col(x)}">${esc(pname(x))}</b>`).join(", ")}</div>`:"")(invitedBy(u))}
       ${!me && S.uid ? `<button class="btn sm dm-btn" data-dmto="${u}" type="button">✉️ Mesaj gönder</button>` : ""}
       ${!me && S.uid ? `<button class="btn sm rival-btn ${S.players[S.uid]?.rival===u?"on":""}" id="rivalBtn" type="button">${S.players[S.uid]?.rival===u?"✓ Rakibim":"Rakibim yap"}</button>` : ""}
-      <small class="muted">${st.rank}. sırada · ${st.tot} puan${p.favTeam?` · <span data-tp="${p.favTeam}" class="linkish" style="font-size:13px">${esc(fav?.n||p.favTeam)}</span> taraftarı`:""} · Ligde ${daysIn}. günü</small></div></div>
+      <small class="muted">${st.rank}. sırada · ${st.tot} puan${p.favTeam?` · <span data-tp="${safeId(p.favTeam)}" class="linkish" style="font-size:13px">${esc(fav?.n||p.favTeam)}</span> taraftarı`:""} · Ligde ${daysIn}. günü</small></div></div>
     <div class="seg2 prof-tabs" style="grid-template-columns:repeat(${tabs.length},1fr)">${tabs.map(([k,l])=>`<button data-ptab="${k}" aria-pressed="${tab===k}">${l}</button>`).join("")}</div>
     <div class="prof-body">${body}</div>`;
   box.querySelector("[data-hsu]")?.addEventListener("click", ()=>openHistory(u));
@@ -3753,7 +3758,7 @@ $("#nba")?.addEventListener("click", e=>{
   const c=e.target.closest("[data-ncat]"); if(c){ S.nba.cat=c.dataset.ncat; return renderNBA(); }
   const t=e.target.closest("[data-ntonight]");
   if(t){ const D=S.days[S.today];
-    if(!S.nba.tonight && !D?.games.length){ openSheet(`<h3 id="shTitle">Bu gece maç yok</h3><p>Bu gece NBA'de maç oynanmıyor, o yüzden "Bu gece oynayanlar" listesi boş olurdu. Liste bütün oyuncuları göstermeye devam ediyor.</p><button class="btn-primary" type="button" onclick="document.getElementById('shClose').click()">Tamam</button>`); return; }
+    if(!S.nba.tonight && !D?.games.length){ openSheet(`<h3 id="shTitle">Bu gece maç yok</h3><p>Bu gece NBA'de maç oynanmıyor, o yüzden "Bu gece oynayanlar" listesi boş olurdu. Liste bütün oyuncuları göstermeye devam ediyor.</p><button class="btn-primary" type="button" data-shclose>Tamam</button>`); return; }
     S.nba.tonight=!S.nba.tonight; return renderNBA(); }
   const pc=e.target.closest("[data-pconf]"); if(pc){ S.nba.conf=pc.dataset.pconf; return renderNBA(); }
   const pr=e.target.closest("[data-prook]"); if(pr){ S.nba.rookie=!S.nba.rookie; return renderNBA(); }
@@ -5507,7 +5512,7 @@ if("serviceWorker" in navigator){ navigator.serviceWorker.getRegistrations?.().t
       if(!S.players[S.uid]){
         // Oturum yalnızca hesabın gerçekten olmadığı SUNUCUDAN doğrulanınca kapatılır; bağlantı hatasında oturum korunur
         let exists=null; for(let i=0;i<3 && exists===null;i++){ exists = await getDoc(doc(S.db,"players",S.uid)).then(r=>r.exists()).catch(()=>null); if(exists===null) await new Promise(r=>setTimeout(r,1500)); }
-        if(exists===null){ $("#auth").classList.remove("hide"); $("#authErr").innerHTML=`Bağlantı yavaş, bilgilerin alınamadı. <button class="linkish" type="button" onclick="location.reload()">Tekrar dene</button>`; dispatchEvent(new Event("app-ready")); return; }
+        if(exists===null){ $("#auth").classList.remove("hide"); $("#authErr").innerHTML=`Bağlantı yavaş, bilgilerin alınamadı. <button class="linkish" type="button" data-reload>Tekrar dene</button>`; dispatchEvent(new Event("app-ready")); return; }
         if(exists){ await loadPlayers().catch(()=>{}); if(!S.players[S.uid]){ location.reload(); return; } }
         else {
           const ban = await getDoc(doc(S.db,"banned",S.uid)).then(r=>r.exists()).catch(()=>false);

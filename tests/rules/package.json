@@ -1,0 +1,8 @@
+{
+  "name": "nba-tahmin-rules-test",
+  "private": true,
+  "type": "module",
+  "description": "Firestore kurallarını yayınlamadan önce emülatörde dener. Kullanım: npm install && npm test (Java gerekir)",
+  "scripts": { "test": "firebase emulators:exec --only firestore --project demo-tahmin \"node rules.test.mjs\"" },
+  "devDependencies": { "firebase-tools": "14.27.0", "@firebase/rules-unit-testing": "4.0.1", "firebase": "11.10.0" }
+}
