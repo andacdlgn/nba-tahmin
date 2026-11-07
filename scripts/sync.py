@@ -302,9 +302,11 @@ def fs_list(coll):
     if not url:
         return {}
     try:
-        d = get(url, tries=2)
-    except urllib.error.HTTPError:
-        return {}
+        d = get(url, tries=3)
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            return {}
+        raise   # geçici hata: boş liste sayılmasın (uzun vade puanları silinmiş gibi görünürdü)
     return {x["name"].rsplit("/", 1)[1]: {k: fs_value(v) for k, v in x.get("fields", {}).items()} for x in d.get("documents", [])}
 
 
@@ -443,13 +445,11 @@ def backup(players, today):
 
 
 def fs_players():
-    url = fs_url("players?pageSize=100")
+    """Oyuncu listesi. Firestore'a ulaşılamazsa HATA verir: boş liste dönerse bütün puanlar silinmiş gibi yazılırdı."""
+    url = fs_url("players?pageSize=300")
     if not url:
         return {}
-    try:
-        d = get(url, tries=2)
-    except urllib.error.HTTPError:
-        return {}
+    d = get(url, tries=4)
     out = {}
     for doc in d.get("documents", []):
         uid = doc["name"].rsplit("/", 1)[1]
@@ -787,6 +787,11 @@ def main(full=False):
             league_start = max(league_start, nxt)
     players = fs_players()
     old = load("scores.json", {})
+    # güvenlik: oyuncu listesi boş ya da öncekinin yarısından azsa (Firestore geçici hatası) hiçbir şey yazılmaz
+    old_n = len(old.get("players") or {})
+    if not players or (old_n >= 4 and len(players) < old_n / 2):
+        print(f"Oyuncu listesi şüpheli ({len(players)} / önceki {old_n}); puanlar bu sefer yazılmadı.", file=sys.stderr)
+        return 1
     sc = {"players": players, "games": old.get("games", {}), "days": old.get("days", {})}
     # oyunda olmayan (silinmiş/test) oyuncuların kayıtlarını at
     for bucket_ in ("games", "days"):
@@ -920,9 +925,10 @@ def main(full=False):
     # uzun vade puanları: toplama ve sonucun açıklandığı haftaya eklenir
     try:
         lt, lt_days = lt_scores(players, league_start)
-    except Exception as e:
-        print("Uzun vade puanları alınamadı:", e)
-        lt, lt_days = {}, {}
+    except Exception as e:   # alınamazsa önceki sonuçlar korunur
+        print("Uzun vade puanları alınamadı, önceki değerler kullanılıyor:", e)
+        lt = {u: v.get("rounds", {}) for u, v in (old.get("lt") or {}).items() if u in players}
+        lt_days = old.get("ltDays") or {}
     sc["lt"] = {uid: {"total": sum(r.values()), "rounds": r} for uid, r in lt.items()}
     sc["ltDays"] = lt_days
     for uid, rounds in lt.items():
