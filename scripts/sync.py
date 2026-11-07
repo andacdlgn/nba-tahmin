@@ -877,7 +877,11 @@ def main(full=False):
                 total += r["pts"]
             night_done = nights.get(day, {}).get("done") and nights[day]["n"] == len(dgames)
             auto = 0
-            if n == 0 and not q and not dp_name and not conf_game and players[uid].get("autoPick") and day >= AUTO_FROM and night_done:
+            # lige sonradan katılan, katılmadan önceki gecelerde otomatik tahmin yapmış sayılır (açık olmasa da):
+            # aradaki farkı biraz kapatma şansı olsun
+            joined = players[uid].get("joined") or ""
+            late = bool(joined) and ts(joined) >= ts(first_start) - lock_gap(day)
+            if n == 0 and not q and not dp_name and not conf_game and (players[uid].get("autoPick") or late) and day >= AUTO_FROM and night_done:
                 auto = auto_points(dgames)
                 total += auto
             sc["days"][day][uid] = {"pts": total, "n": n + (1 if q else 0), "dp": dp, "dpName": dp_name, "conf": conf_game,

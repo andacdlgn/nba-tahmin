@@ -2100,3 +2100,19 @@ body.bars-hidden .chat-fab{transform:none}
 .ch-foot.hide{display:none}
 .ch-typing.hide{display:none}
 .dm-btn{margin-right:6px}
+
+/* 1.24.0: eksik listesi ve banko / günün oyuncusu hatırlatma penceresi */
+.todo{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 10px;padding:12px;border:1px solid color-mix(in srgb,var(--amber) 55%,transparent);background:color-mix(in srgb,var(--amber) 12%,var(--panel));border-radius:16px}
+.td-h{width:100%;font-weight:800;font-size:13px;letter-spacing:.02em;color:var(--amber);text-transform:uppercase}
+.td-i{border:1px solid color-mix(in srgb,var(--amber) 45%,transparent);background:var(--panel);color:var(--ink);border-radius:12px;padding:9px 12px;font-size:14px;cursor:pointer;text-align:left}
+.td-i b{color:var(--amber)}
+.td-i:hover{border-color:var(--amber)}
+.td-mail{width:100%;font-size:13px}
+.td-flash{animation:tdFlash 1.4s ease 1}
+@keyframes tdFlash{0%,100%{box-shadow:none}30%{box-shadow:0 0 0 3px var(--amber)}}
+.nudge-d h4{margin:16px 0 4px}
+.nd-g{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin-top:8px}
+.nd-b{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:10px 12px;height:auto;text-align:left}
+.nd-b small{color:var(--muted);font-weight:600}
+.nd-later{display:block;margin:16px auto 0}
+.nudge-d .lp-ico{font-size:40px;text-align:center}

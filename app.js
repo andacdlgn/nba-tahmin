@@ -45,12 +45,13 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.23.0";
+const VERSION = "1.24.0";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.24.0", d:"7 Kasım 2026", items:["Bu Gece sekmesinin üstünde \"Bu gece eksiklerin\" kutusu: eksik maç, banko, günün oyuncusu ve gecenin sorusu tek dokunuşla tamamlanır.","Bütün maçları doldurup banko ya da günün oyuncusunu unutursan bir pencere hatırlatır ve oradan hemen seçebilirsin.","Lige sonradan katılan, katılmadan önceki gecelerde otomatik tahmin yapmış sayılır."]},
   {v:"1.23.0", d:"7 Kasım 2026", items:["🎯 Nokta atışı: asıl ligden (9 Kasım) itibaren maçın farkını tam bilen +1 ek puan alır, fark puanı +2 olur. NBA Kupası ve playoff'ta bu da katlanır. \"40+\" tam sayılmaz.","Maç kartlarında nokta atışları 🎯 ile işaretlenir; yeni rozet: 5 nokta atışında \"Nokta atışı\". Aylık Fark ustası ödülünde nokta atışı 2 sayılır."]},
   {v:"1.22.0", d:"5 Kasım 2026", items:["Özel mesajlar: sohbet baloncuğunda artık \"Lig sohbeti\" ve \"Özel mesajlar\" sekmeleri var. Ligdeki birine yalnızca ikinizin görebileceği mesaj gönderebilirsin; yönetici dahil kimse okuyamaz.","Bir oyuncunun profilinden \"Mesaj gönder\" ile doğrudan yazabilirsin. İstemediğin birini konuşmanın üstündeki \"Engelle\" ile engelleyebilirsin. Küfür filtresi özel mesajlarda da geçerli."]},
   {v:"1.21.9", d:"5 Kasım 2026", items:["Pencereler artık art arda açılmıyor: bir açılışta en fazla bir bilgilendirme penceresi çıkıyor, sen bir pencere açtıysan (ör. Kurallar) hiç çıkmıyor. Kapatınca arkasından yenisi açılmıyor.","Deneme haftası penceresi en üstteki şeride dokununca her zaman açılıyor."]},
@@ -637,7 +638,36 @@ async function savePick(g, {quiet=false}={}){
     d.err = started(g) ? "Kilitlendi, kaydedilemedi." : "Kaydedilemedi, tekrar dene.";
   }
   d.saving = false; renderGames(); renderStatus();
-  if(!d.err){ setTimeout(()=>{ S.edit.delete(g.id); if(S.tab==="tahmin" && S.sub==="maclar") renderGames(); }, 1500); }
+  if(!d.err){ setTimeout(()=>{ S.edit.delete(g.id); if(S.tab==="tahmin" && S.sub==="maclar") renderGames(); }, 1500); S.nudgePending=true; setTimeout(nudgeDaily, 1700); }
+}
+// Banko seçme penceresi (kaydedilmiş kartlarda ★ düğmesi görünmediği için doğrudan buradan seçilir)
+function openBankoPicker(){
+  const D=S.days[S.day]; if(!D || Date.now()>=D.games[0].nightLock.getTime()) return toast("Banko gecenin ilk maçından 10 dk önce kilitlendi.");
+  const gl=D.games.filter(g=>!started(g));
+  openSheet(`<div class="nudge-d"><h3 id="shTitle">★ Günün bankosu</h3><p class="muted">Bankoda kazanan puanın 2 katı; bilemezsen -1. Bir maç seç:</p>
+    <div class="nd-g">${gl.map(g=>{ const p=D.picks[g.id]?.[S.uid]; return `<button class="btn nd-b" data-ndb="${g.id}" type="button"><b>${esc(g.away.abbr)} @ ${esc(g.home.abbr)}</b><small>${p?`seçimin: ${esc(p.winner)}`:"henüz tahmin yok"}</small></button>`; }).join("")}</div></div>`);
+  $$("[data-ndb]").forEach(b=>b.onclick=async()=>{ const g=D.games.find(x=>x.id===b.dataset.ndb); if(!g) return; closeSheet(); await saveDaily({confGame:g.id, confStart:g.nightBase}); });
+}
+// Bütün açık maçlar doldu ama banko ya da günün oyuncusu eksikse bir kez sor (en çok unutulan iki şey)
+S.nudged={};
+function nudgeDaily(){
+  const D=S.days[S.day]; if(!S.nudgePending || !D || S.day!==S.today || S.nudged[S.day]) return;
+  if(!$("#sheet").classList.contains("hide") || S.chatOpen) return;   // pencere açıksa kapanınca tekrar bakılır
+  S.nudgePending=false;
+  if(!D.games.length || Date.now()>=D.games[0].nightLock.getTime()) return;
+  const open=D.games.filter(g=>!started(g)); if(!open.length || open.some(g=>!D.picks[g.id]?.[S.uid])) return;
+  const daily=D.daily[S.uid]||{}, noB=!daily.confGame, noDp=!daily.dayPlayerId;
+  if(!noB && !noDp) return;
+  S.nudged[S.day]=true;
+  const gl=open.filter(g=>D.picks[g.id]?.[S.uid]);
+  openSheet(`<div class="nudge-d"><h3 id="shTitle">Neredeyse tamam 👌</h3>
+    <p>Bütün maçları doldurdun ama ${noB&&noDp?"<b>banko</b> ve <b>günün oyuncusu</b>":noB?"<b>banko</b>":"<b>günün oyuncusu</b>"} eksik. İkisi de gecenin ilk maçından 10 dakika önce kilitlenir.</p>
+    ${noB?`<h4>Banko</h4><p class="muted">Bankoda kazanan puanın 2 katı; bilemezsen -1. Bir maç seç:</p><div class="nd-g">${gl.map(g=>{ const p=D.picks[g.id][S.uid]; return `<button class="btn nd-b" data-ndb="${g.id}" type="button"><b>${esc(g.away.abbr)} @ ${esc(g.home.abbr)}</b><small>seçimin: ${esc(p.winner)}</small></button>`; }).join("")}</div>`:""}
+    ${noDp?`<h4>Günün oyuncusu</h4><p class="muted">Gecenin en çok sayı atanını bilirsen +3.</p><button class="btn primary" id="ndDp" type="button">Günün oyuncusunu seç</button>`:""}
+    <button class="linkish nd-later" id="ndLater" type="button">Sonra seçerim</button></div>`);
+  $$("[data-ndb]").forEach(b=>b.onclick=async()=>{ const g=D.games.find(x=>x.id===b.dataset.ndb); if(!g) return; closeSheet(); await saveDaily({confGame:g.id, confStart:g.nightBase}); if(noDp){ S.nudged[S.day]=false; S.nudgePending=true; setTimeout(nudgeDaily, 600); } });
+  if($("#ndDp")) $("#ndDp").onclick=()=>openPlayerPicker({mode:"day"});
+  $("#ndLater").onclick=()=>closeSheet();
 }
 async function saveDaily(patch){
   const D = S.days[S.day];
@@ -916,12 +946,15 @@ function renderStatus(){
   if(!D.games.length){ $("#dayStatus").innerHTML = EMPTY_NIGHT; return; }
   const pct = Math.round(mine/D.games.length*100);
   parts.push(`<span><b>${mine}/${D.games.length}</b> maçı tahmin ettin</span><span class="prog"><i style="width:${pct}%"></i></span>`);
+  const todo=[];
   if(open.length){
     const missing = open.filter(g=>!D.picks[g.id]?.[S.uid]).length;
-    if(missing) parts.push(`<span class="warn">${missing} maç eksik</span>`);
-    if(!daily.confGame) parts.push(`<span class="warn">Banko seçilmedi</span>`);
-    if(!daily.dayPlayerId && !D.games.some(started)) parts.push(`<span class="warn">Günün oyuncusu seçilmedi</span>`);
-    if(!daily.q && !D.games.some(started)) parts.push(`<span class="warn">Gecenin sorusu cevaplanmadı</span>`);
+    const nightOpen = Date.now() < D.games[0].nightLock.getTime();
+    if(missing) todo.push(`<button class="td-i" data-td="game" type="button"><b>${missing} maç</b> tahmin edilmedi</button>`);
+    if(!daily.confGame && nightOpen) todo.push(`<button class="td-i" data-td="banko" type="button"><b>Banko</b> seçilmedi</button>`);
+    if(!daily.dayPlayerId && nightOpen) todo.push(`<button class="td-i" data-td="dp" type="button"><b>Günün oyuncusu</b> seçilmedi</button>`);
+    if(!daily.q && nightOpen) todo.push(`<button class="td-i" data-td="q" type="button"><b>Gecenin sorusu</b> cevaplanmadı</button>`);
+    if(todo.length && S.contactLoaded && !S.contact?.verified) todo.push(`<button class="td-i td-mail" data-td="mail" type="button">📧 <b>Mailini onayla</b>, kilitten önce eksiklerin için hatırlatma gelsin</button>`);
     const inj = injuryAlerts(D);
     if(inj.length) parts.push(`<span class="bad">Oynamayacak: ${inj.map(esc).join(", ")}</span>`);
   }
@@ -930,7 +963,15 @@ function renderStatus(){
   const anyPick = D.games.some(g=>Object.keys(D.picks[g.id]||{}).length);
   if(allFinal && anyPick) parts.push(`<button class="btn" id="sumBtn">Gece özeti</button>`);
   if(open.length) parts.push(`<button class="btn quick-btn" id="quickBtn" type="button">${ICON.bolt}Hızlı tahmin</button><button class="btn quick-btn" id="swipeBtn" type="button">${ICON.cards}Tek tek tahmin</button>`);
-  $("#dayStatus").innerHTML = `<div class="status">${parts.join("")}</div>`;
+  $("#dayStatus").innerHTML = (todo.length ? `<div class="todo"><span class="td-h">Bu gece eksiklerin</span>${todo.join("")}</div>` : "") + `<div class="status">${parts.join("")}</div>`;
+  $$("#dayStatus [data-td]").forEach(b=>b.onclick=()=>{
+    const k=b.dataset.td, go=el=>{ if(!el) return; el.scrollIntoView({behavior:"smooth",block:"center"}); el.classList.remove("td-flash"); void el.offsetWidth; el.classList.add("td-flash"); };
+    if(k==="dp") return openPlayerPicker({mode:"day"});
+    if(k==="q") return go($(".qcard"));
+    if(k==="game") return go($(".game.missing") || $(".game:not(.picked)"));
+    if(k==="banko") return openBankoPicker();
+    if(k==="mail") return allPlayers().catch(()=>{}).finally(()=>openOnboard(5));
+  });
   renderPickBar(D);
   $("#sumBtn")?.addEventListener("click", nightSummary);
   $("#quickBtn")?.addEventListener("click", openQuick);
@@ -1789,7 +1830,8 @@ function openSheet(html){ S.sheetCount=(S.sheetCount||0)+1; if($("#sheet").class
 function closeSheet(fromPop){ if(S.sheetLocked){ if(fromPop) try{ history.pushState({sheet:1}, ""); }catch(e){} return; }
   if($("#sheet").classList.contains("hide")) return;
   $("#sheet").classList.add("hide"); document.body.style.overflow="";
-  if(!fromPop && history.state?.sheet){ S.popSkip=true; history.back(); } }
+  if(!fromPop && history.state?.sheet){ S.popSkip=true; history.back(); }
+  if(S.nudgePending) setTimeout(nudgeDaily, 500); }
 addEventListener("popstate", ()=>{ if(S.popSkip){ S.popSkip=false; return; } if(history.state?.sheet || history.state?.chat) return; if(!$("#sheet").classList.contains("hide")) closeSheet(true); });
 $("#shClose").onclick = ()=>closeSheet();
 $("#sheet").addEventListener("click", e => { if(e.target.id==="sheet") closeSheet(); });
@@ -1892,6 +1934,23 @@ function runAutoPop(){
 function leaguePopDue(){ const t=S.league?.trial; if(!S.uid || !t?.end) return false; const go=shiftDay(t.end,1);
   return (trialActive() && !lsGet("trialPop_"+t.end)) || ((t.done || espnToday()>t.end) && !lsGet("leagueGo_"+go) && espnToday()<=shiftDay(go,13)); }
 function maybeLeaguePop(){ autoPop(2, leaguePopDue, showLeaguePop); }
+// Şimdiye kadar hiç kendisi tahmin yapmamış (hep otomatik tahminle geçmiş) oyuncuya bir kerelik davet
+function selfPlayDue(){
+  if(!S.uid || lsGet("selfPlayPop1")) return false;
+  const rows=Object.values(S.arch.scores?.days||{}).map(r=>r[S.uid]).filter(Boolean);
+  return rows.length>=1 && rows.every(r=>!r.n) && !Object.values(S.days).some(D=>D.games.some(g=>D.picks[g.id]?.[S.uid]));
+}
+function maybeSelfPlay(){ autoPop(2.5, selfPlayDue, showSelfPlay); }
+function showSelfPlay(){
+  lsSet("selfPlayPop1","1");
+  const tr=trialOf(), start=tr ? shiftDay(tr.end,1) : null;
+  openSheet(`<div class="nudge-d"><div class="lp-ico">🏀</div><h3 id="shTitle">Kendi tahminini yap</h3>
+    <p>Şimdiye kadar gecelerin <b>otomatik tahminle</b> geçti: ESPN'in favorisi senin yerine seçildi ve doğru çıkan her 2 kazanan için yalnızca 1 puan aldın.</p>
+    <p>Kendin tahmin edersen bir maçtan <b>4 puana kadar</b> alabilirsin (kazanan, fark, en skorer), üstüne banko, günün oyuncusu ve gecenin sorusu var. Haftada 4 gece kendin oynarsan +2 bonus.</p>
+    ${start && start>espnToday() ? `<p>Asıl lig <b>${dayNice(start,{day:"numeric",month:"long"})}</b>'da başlıyor; o geceden itibaren her puan sayılır.</p>` : ""}
+    <button class="btn primary" id="spGo" type="button" style="width:100%">Bu gecenin maçlarına git</button></div>`);
+  $("#spGo").onclick=()=>{ closeSheet(); S.day=S.today; S.sub="maclar"; $$("#subSel button").forEach(x=>x.setAttribute("aria-pressed", x.dataset.v==="maclar")); $("#subMaclar")?.classList.remove("hide"); $("#subTahminler")?.classList.add("hide"); if(location.hash!=="#tahmin") location.hash="#tahmin"; else showDay(); };
+}
 function showLeaguePop(){
   if(!S.uid) return;
   const t=S.league?.trial; if(!t?.end) return;
@@ -1962,7 +2021,7 @@ function openRules(){
     <h4>Devamlılık bonusu</h4>
     <p>Bir haftada (pazartesi–pazar) en az <b>4 gece</b> kendin tahmin yaparsan o hafta <b>+2</b> puan alırsın. Puan, 4. gecenin sonunda eklenir. Otomatik tahminle geçen geceler sayılmaz. Bonus gecenin kazananını belirlemez.</p>
     <h4>Otomatik tahmin</h4>
-    <p>Kayıt olurken açık mı kapalı mı olacağını seçersin, sonra Profil → Ayarlar'dan değiştirebilirsin. Açıksa, hiç tahmin yapmadığın bir gecede her maçta ESPN'in favorisi senin yerine seçilir; doğru çıkan <b>her 2 kazanan 1 puan</b> getirir. Fark, skorer, banko, günün oyuncusu ve gecenin sorusu otomatik tahminde yoktur. O gece herhangi bir tahmin yaptıysan (bir maç, banko, günün oyuncusu ya da gecenin sorusu) otomatik tahmin devreye girmez.</p>
+    <p>Kayıt olurken açık mı kapalı mı olacağını seçersin, sonra Profil → Ayarlar'dan değiştirebilirsin. Açıksa, hiç tahmin yapmadığın bir gecede her maçta ESPN'in favorisi senin yerine seçilir; doğru çıkan <b>her 2 kazanan 1 puan</b> getirir. Fark, skorer, banko, günün oyuncusu ve gecenin sorusu otomatik tahminde yoktur. O gece herhangi bir tahmin yaptıysan (bir maç, banko, günün oyuncusu ya da gecenin sorusu) otomatik tahmin devreye girmez. Lige sonradan katılan, katılmadan önceki gecelerde otomatik tahmin yapmış sayılır; böylece aradaki farkı biraz kapatabilir.</p>
     <h4>Playoff serileri</h4>
     <p>Playoff'ta her seri başlamadan önce seriyi kimin kaç maçta kazanacağını tahmin edersin. Kazananı bilirsen <b>+3</b>, maç sayısını da bilirsen <b>+2</b> daha. Tahminler serinin ilk maçı başlayınca kilitlenir.</p>
     <h4>Uzun vade</h4>
@@ -5063,7 +5122,7 @@ if("serviceWorker" in navigator){ navigator.serviceWorker.getRegistrations?.().t
     else checkRecovery();
     loadLT(); setTimeout(installBanner, 6000); later(markSeen, 3000);
     // bilgilendirme pencereleri sıraya girer; açılıştan ~3 sn sonra en önemlisi (varsa) bir tane açılır
-    setTimeout(()=>{ maybeNews(); maybeCeremony(); maybeLeaguePop(); maybeScoringGuide(); maybeAskAuto(); maybeRealName(); }, 600);
+    setTimeout(()=>{ maybeNews(); maybeCeremony(); maybeLeaguePop(); maybeSelfPlay(); maybeScoringGuide(); maybeAskAuto(); maybeRealName(); }, 600);
     later(()=>{ getDoc(doc(S.db,"config","admin")).then(()=>{ S.isAdmin=true; maybeArchiveTrial(); }).catch(()=>{ S.isAdmin=false; });
       getDoc(doc(S.db,"config","secret")).then(r=>{ S.invite=r.data()?.invite||""; }).catch(()=>{});
       allPlayers().catch(()=>{}); }, 2000);
