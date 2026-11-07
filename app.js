@@ -45,7 +45,7 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.28.3";
+const VERSION = "1.28.4";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
@@ -2384,7 +2384,7 @@ function monthTable(){
    bronz 1, gümüş 2, altın 4, platin 7, efsane 12 rozet puanı. Rozet puanı ana sıralamadan ayrı tutulur.
    Hepsi eldeki verilerden hesaplanır (Firestore'dan ek okuma yok); giriş günleri players.vd listesinden gelir. */
 const BTIER = {b:{n:"Bronz",p:1}, g:{n:"Gümüş",p:2}, a:{n:"Altın",p:4}, p:{n:"Platin",p:7}};
-const BCATS = [["tahmin","🎯","Tahmin ustalığı"],["surpriz","🍀","Sürpriz ve şans"],["seri","🔥","Seriler"],["zafer","🏆","Zaferler"],["odul","🎖️","Ödüller"],["takim","🏟️","Takım uzmanlıkları"],["oyuncu","⛹️","Oyuncu uzmanlıkları"],["devam","📆","Devamlılık"],["sosyal","🤝","Sosyal"],["eglence","😅","Eğlence"]];
+const BCATS = [["tahmin","🎯","Tahmin ustalığı"],["surpriz","🍀","Sürpriz ve şans"],["seri","🔥","Seriler"],["zafer","🏆","Zaferler"],["odul","🎖️","Ödüller"],["takim","🏟️","Takım uzmanlıkları"],["oyuncu","⛹️","Oyuncu uzmanlıkları"],["devam","📆","Devamlılık"],["sosyal","🤝","Sosyal"],["eglence","😅","Eğlence (şanssızlık ve şaka rozetleri)"]];
 // [id, kategori, ikon, ad, eşikler, açıklama(t), ölçüt, kademeler (isteğe bağlı)]
 // En fazla 3 seviye (Bronz → Gümüş → Altın); tek seviyeli olanların kademesi elle verilir. Çeşitlilik seviyeyle değil farklı rozetlerle.
 const BFAM = [
@@ -3184,8 +3184,8 @@ function badgesFull(u){
       const prev = top ? top.t : 0, pct = next ? Math.min(100, Math.max(0,(v-prev)/(next.t-prev)*100)) : 100;
       if(cat==="takim" || cat==="oyuncu") return `<div class="bfam mini ${top?"on t-"+top.tier:"locked"}" title="${esc(lv[0].desc)}"><span class="bf-ico">${fico}</span><span class="bf-b"><b>${esc(name.replace(/ uzmanı$/,""))}</b><span class="bd-bar"><i style="width:${Math.min(100,v/lv[0].t*100)}%"></i></span><span class="bf-pr">${top?"✓ kazanıldı":`${v}/${lv[0].t}`}</span></span></div>`;
       return `<div class="bfam ${top?"on t-"+top.tier:"locked"}"><span class="bf-ico">${fico}</span>
-        <span class="bf-b"><b>${esc(name)}</b>${top?`<em class="bf-lv t-${top.tier}">${th.length>1?`Seviye ${top.lvl}/${th.length} · `:""}${BTIER[top.tier].n}</em>`:`<em class="bf-lv">Kilitli</em>`}
-        <small>${next?esc(next.desc):"Bütün seviyeler tamam 🎉"}</small>
+        <span class="bf-b"><b>${esc(name)}</b>${top?`<em class="bf-lv t-${top.tier}">${th.length>1?`Seviye ${top.lvl}/${th.length} · `:""}${BTIER[top.tier].n} · +${BTIER[top.tier].p}</em>`:`<em class="bf-lv">Kilitli · ${BTIER[lv[0].tier].n} +${BTIER[lv[0].tier].p}</em>`}
+        <small>${next?esc(next.desc):esc(lv[lv.length-1].desc)}</small>${!next?`<span class="bf-pr">✓ ${th.length>1?"Bütün seviyeler tamam":"Kazanıldı"}</span>`:""}
         ${next?`<span class="bd-bar"><i style="width:${pct}%"></i></span><span class="bf-pr">${v}/${next.t}${own[next.id]?` · ligde ${own[next.id]} kişide var`:""}</span>`:""}
         <span class="bf-dots">${lv.map(b=>`<i class="${b.n?"on t-"+b.tier:""}" title="${esc(b.name+" · "+BTIER[b.tier].n+" (+"+BTIER[b.tier].p+")")}"></i>`).join("")}</span></span></div>`; }).join("");
     const cGot=all.filter(b=>b.cat===cat && b.n).length, cAll=all.filter(b=>b.cat===cat).length;
