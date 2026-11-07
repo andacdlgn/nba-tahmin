@@ -45,12 +45,13 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.28.5";
+const VERSION = "1.28.6";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.28.6", d:"7 Kasım 2026", items:["Haftalık puan durumu sezon tablosuyla aynı: Hafta toplamı, Galip, Fark, Maçın skoreri, Günün oyuncusu, Gecenin sorusu ve ödül sütunu.","Haftalık ödül öne çıktı: tablonun üstünde +10 / +7 / +5 şeridi ve kalan süre, ilk 3 madalyayla; sezon tablosunda ve ana tabloda da bu haftanın ödül sırası görünüyor."]},
   {v:"1.28.5", d:"7 Kasım 2026", items:["Tek seferlik rozetler artık Bronz/Gümüş gibi kademe taşımıyor: hepsi \"Özel rozet\" (+3). Kademeler yalnızca seviyeli rozetlerde."]},
   {v:"1.28.3", d:"7 Kasım 2026", items:["Sıralama sayfası sadeleşti: Rekorlar ve Gece gece bölümleri kalktı, sezon grafiği oynatmasız, düz hâliyle duruyor."]},
   {v:"1.28.2", d:"7 Kasım 2026", items:["Puan durumu sütunları: Toplam, Galip, Fark, Maçın skoreri, Günün oyuncusu, Gecenin sorusu, Uzun vade, Bonus ve ödüller. Gece ve hafta birincilik sayıları tablodan çıktı.","Sıralama sayfası sadeleşti: sıralama grafiği, gece takvimi ve eski \"Bu hafta\" kutusu kalktı; sezon yarışı sezon grafiğiyle birleşti (▶ Oynat ile gece gece ilerler)."]},
@@ -780,11 +781,11 @@ const weekAwardPts = u => Object.values(S.arch.scores.weekAwards||{}).reduce((t,
 // Haftanın canlı sıralaması: yalnızca gece puanları (devamlılık bonusu, playoff serisi, ödüller ve uzun vade hariç)
 // Eşitlikte: haftadaki gece birincilikleri, kazanan, fark, en skorer, haftanın en iyi gecesi; o da eşitse sıra paylaşılır
 function weekStandings(wk){
-  const st={}; for(const u of S.order) st[u]={p:0, nw:0, w:0, m:0, s:0, bn:0, n:0};
+  const st={}; for(const u of S.order) st[u]={p:0, nw:0, w:0, m:0, s:0, bn:0, n:0, dp:0, q:0, auto:0};
   const ds=allDays().filter(d=>weekKey(d)===wk);
   for(const d of ds){ const dp=dayPoints(d), nv=u=>dp[u] ? dp[u].pts-(dp[u].bon||0)-(dp[u].sr||0) : null;
     const vals=S.order.map(nv).filter(v=>v!=null), best=vals.length?Math.max(...vals):null, top=S.order.filter(u=>nv(u)===best);
-    for(const u of S.order){ const x=dp[u]; if(!x) continue; const v=nv(u); st[u].p+=v; st[u].w+=x.w||0; st[u].m+=x.m||0; st[u].s+=x.s||0; st[u].bn=Math.max(st[u].bn,v); st[u].n+=x.n?1:0;
+    for(const u of S.order){ const x=dp[u]; if(!x) continue; const v=nv(u); st[u].p+=v; st[u].w+=x.w||0; st[u].m+=x.m||0; st[u].s+=x.s||0; st[u].dp+=x.dp||0; st[u].q+=x.q||0; st[u].auto+=x.auto||0; st[u].bn=Math.max(st[u].bn,v); st[u].n+=x.n?1:0;
       if(top.length===1 && top[0]===u && !S.order.some(o=>dp[o] && !dp[o].final)) st[u].nw++; } }
   const key=u=>[st[u].p, st[u].nw, st[u].w, st[u].m, st[u].s, st[u].bn];
   const cmp=(a,b)=>{ const A=key(a), B=key(b); for(let i=0;i<A.length;i++) if(A[i]!==B[i]) return B[i]-A[i]; return 0; };
@@ -923,7 +924,7 @@ function renderBoard(){
   for(const day of [S.today, shiftDay(S.today,-1)]){ if(weekKey(day)!==wk || !S.days[day] || !inLeague(day)) continue; const dp=dayPoints(day); for(const u of S.order) if(dp[u]?.src==="live") wkPts[u]+=dp[u].pts-(S.arch.scores.days?.[day]?.[u]?.pts||0); }
   const wkLead = [...S.order].sort((x,y)=>wkPts[y]-wkPts[x]);
   const wkTxt = !S.order.length ? "" : false ? `Bu hafta <b>${S.order.map(u=>wkPts[u]).join("–")}</b>`
-    : wkPts[wkLead[0]]>0 ? `Haftanın lideri <b style="color:${col(wkLead[0])}">${esc(pname(wkLead[0]))}</b> · ${wkPts[wkLead[0]]} puan` : "Yeni hafta başladı";
+    : wkPts[wkLead[0]]>0 ? `Haftanın lideri <b style="color:${col(wkLead[0])}">${esc(pname(wkLead[0]))}</b> · ${wkPts[wkLead[0]]} puan${weekKey(S.today)>=WEEK_FROM?` · <span class="wk-hint">ilk 3'e +10/+7/+5</span>`:""}` : "Yeni hafta başladı";
   html += `<div class="board-foot"><div class="lead">${lead}</div><div class="bf-meta">${[tn,wkTxt].filter(Boolean).join(" · ")}</div></div>`;
   // sıralama değiştiyse satırlar kayarak yer değiştirsin (FLIP), öne geçenin yanında ▲ çıksın
   const before = {}; $$("#board .lb-row[data-pu]").forEach(el=>{ before[el.dataset.pu]=el.getBoundingClientRect().top; });
@@ -2653,14 +2654,27 @@ function renderPuan(){
     const W=weekStandings(wkSel), awarded=S.arch.scores.weekAwards?.[wkSel], live=wkSel===curWk, on=wkSel>=WEEK_FROM;
     const prize=r=> awarded ? (awarded.find(x=>x.u===r.u)?.pts||0) : (on && r.p>0 && r.place<=3 ? WEEK_PRIZE[r.place] : 0);
     const range=`${dayNice(wkSel,{day:"numeric",month:"short"})} – ${dayNice(shiftDay(wkSel,6),{day:"numeric",month:"short"})}`;
-    weekTbl=`<div class="sec-title"><h2>${live?"Bu haftanın":"Geçen haftanın"} sıralaması</h2><span class="aside">${range}${live?" · canlı":""}</span></div>
-    ${!on?`<p class="note">Haftalık ilk 3 ödülü asıl ligle, 9 Kasım haftasından itibaren verilir.</p>`:""}
-    ${W.days?`<div class="tbl"><div class="tr th t-wk"><span>#</span><span>Oyuncu</span><span class="r">Puan</span><span class="c">Gece</span><span class="c">Ödül</span></div>
-    ${W.rows.map(r=>{ const pz=prize(r); return `<div class="tr t-wk${r.u===S.uid?" me":""}${pz?" wk-top wk-p"+r.place:""}" data-pu="${r.u}"><span class="muted">${r.p>0||W.days?r.place:"–"}</span><span class="pn"><i style="background:${col(r.u)}"></i><span>${S.players[r.u]?.club?`<b class="pn-club">${esc(S.players[r.u].club)}</b><small class="pn-name">${esc(pname(r.u))}</small>`:`<b class="pn-solo">${esc(pname(r.u))}</b>`}<span class="pt-ps"><span class="pt-p"><em>Kazanan</em> ${r.w}</span><span class="pt-p"><em>Fark</em> ${r.m}</span><span class="pt-p"><em>Skorer</em> ${r.s}</span><span class="pt-p"><em>Gece</em> ${r.n}</span></span></span></span><span class="r big tnum">${r.p}</span><span class="c tnum">${r.nw}</span><span class="c">${pz?`<b class="wk-prize">+${pz}</b>`:""}</span></div>`; }).join("")}</div>`
+    const medal={1:"🥇",2:"🥈",3:"🥉"};
+    // ödül şeridi: neden önemli olduğu ve kalan süre
+    const endMs = parseYmd(shiftDay(wkSel,7)).getTime() + 5*36e5;   // pazartesi ~08:00 TR (pazar gecesinin son maçı biter)
+    const left = endMs-Date.now(), dl=Math.floor(left/864e5), hl=Math.floor(left%864e5/36e5);
+    const leaders=W.rows.filter(r=>r.p>0 && r.place<=3);
+    const banner = `<div class="wk-ban${on?"":" off"}"><div class="wk-ban-h">🏆 Haftanın ilk 3'ü sezon puanı kazanır</div>
+      <div class="wk-ban-p"><span><b>🥇 +10</b><small>1.</small></span><span><b>🥈 +7</b><small>2.</small></span><span><b>🥉 +5</b><small>3.</small></span></div>
+      <div class="wk-ban-s">${!on ? "Asıl ligle, 9 Kasım haftasından itibaren verilir." : live ? (left>0 ? `Hafta pazar gecesinin son maçıyla kapanıyor · <b>${dl?dl+" gün ":""}${hl} saat</b> kaldı${leaders.length?` · şu an ödül sırasında: ${leaders.map(r=>`${medal[r.place]} ${esc(S.players[r.u]?.club||pname(r.u))}`).join(", ")}`:""}` : "Hafta kapandı, ödüller pazartesi sabahı ekleniyor.") : awarded ? `Bu haftanın ödülleri sezon puanına eklendi.` : "Ödüller hafta kapanınca eklenir."}</div></div>`;
+    const wc=[["Galip",r=>r.w+r.auto],["Fark",r=>r.m],["Maçın<br>skoreri",r=>r.s],["Günün<br>oyuncusu",r=>r.dp],["Gecenin<br>sorusu",r=>r.q]];
+    weekTbl=`<div class="sec-title"><h2>${live?"Bu haftanın":"Geçen haftanın"} puan durumu</h2><span class="aside">${range}${live?" · canlı":""}</span></div>${banner}
+    ${W.days?`<div class="st-wrap"><table class="st">
+      <thead><tr><th class="st-rk">#</th><th class="st-pl">Oyuncu</th><th class="st-tot">Hafta<br>toplamı</th>${wc.map(([l])=>`<th>${l}</th>`).join("")}<th class="st-pz">${awarded||!live?"Kazandığı<br>ödül":"Ödül<br>(şu an)"}</th></tr></thead>
+      <tbody>${W.rows.map(r=>{ const pz=prize(r); return `<tr class="${r.u===S.uid?"me ":""}${pz?"wk-p"+r.place:""}" data-pu="${r.u}"><td class="st-rk">${pz?medal[r.place]:r.place}</td><td class="st-pl"><span class="pn"><i style="background:${col(r.u)}"></i><span>${S.players[r.u]?.club?`<b class="pn-club">${esc(S.players[r.u].club)}</b><small class="pn-name">${esc(pname(r.u))}</small>`:`<b class="pn-solo">${esc(pname(r.u))}</b>`}</span></span></td><td class="st-tot tnum">${r.p}</td>${wc.map(([,f])=>{ const v=f(r)||0; return `<td class="tnum${v?"":" z"}">${v}</td>`; }).join("")}<td class="st-pz">${pz?`<b class="wk-prize">+${pz}</b>`:`<span class="z">–</span>`}</td></tr>`; }).join("")}</tbody>
+    </table></div>`
       : emptyBox("chart", live ? "Bu haftanın ilk gecesi bitince sıralama burada başlar." : "Bu hafta oynanmış gece yok.")}
-    <p class="muted" style="font-size:13px;margin:6px 2px">Hafta pazartesi başlar, pazar gecesinin son maçıyla biter. İlk 3'e sezon puanına <b>+10 / +7 / +5</b> eklenir${live?" (ödül sütunu şu anki sıraya göre)":""}. Yalnızca gece puanları sayılır. Eşitlikte sırayla: haftadaki gece birincilikleri, kazanan, fark, en skorer, haftanın en iyi gecesi; o da eşitse sıra paylaşılır.</p>`;
+    <p class="muted" style="font-size:13px;margin:6px 2px">Hafta toplamı yalnızca gece puanlarıdır (devamlılık bonusu, playoff serileri, aylık ödüller ve uzun vade hariç). Eşitlikte sırayla: haftadaki gece birincilikleri, galip, fark, maçın skoreri ve haftanın en iyi gecesi; o da eşitse sıra paylaşılır.</p>`;
   }
-  let html = pod + rivalBox + pvBar + (S.pv==="sezon" ? seasonTbl : weekTbl);
+  let wkStrip="";
+  if(S.pv==="sezon"){ const W=weekStandings(curWk), top=W.rows.filter(r=>r.p>0 && r.place<=3), on=curWk>=WEEK_FROM, medal={1:"🥇",2:"🥈",3:"🥉"};
+    wkStrip=`<button class="wk-strip" type="button" data-pv="hafta"><span class="wk-s-h">🏆 Bu haftanın ilk 3'ü sezon puanı kazanır <b>+10 / +7 / +5</b></span><span class="wk-s-l">${!on?"9 Kasım haftasından itibaren":top.length?top.map(r=>`${medal[r.place]} ${esc(S.players[r.u]?.club||pname(r.u))} <small>${r.p}</small>`).join(" · "):"Henüz puan yok"}</span><span class="wk-s-go">Haftalık tablo ›</span></button>`; }
+  let html = pod + rivalBox + pvBar + wkStrip + (S.pv==="sezon" ? seasonTbl : weekTbl);
   // rozet sıralaması (ana puandan ayrı)
   const bb=badgeBoard();
   html += `<div class="sec-title"><h2>🏅 Rozet sıralaması</h2><span class="aside">ana puandan ayrı · ${BLIST.length} rozet</span></div>

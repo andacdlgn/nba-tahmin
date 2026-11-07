@@ -2239,3 +2239,24 @@ body.bars-hidden .chat-fab{transform:none}
 /* 1.28.5: tek seferlik "Özel" rozet */
 :root{--t-o:#c084fc}
 .t-o{--tc:var(--t-o)}
+
+/* 1.28.6: haftalık ödülü öne çıkaran şeritler, haftalık tablo */
+.wk-ban{margin:4px 0 10px;padding:14px;border-radius:16px;border:1px solid color-mix(in srgb,#facc15 55%,transparent);background:linear-gradient(135deg,color-mix(in srgb,#facc15 16%,var(--panel)),var(--panel) 75%)}
+.wk-ban.off{opacity:.8}
+.wk-ban-h{font:800 18px/1.2 "Barlow Condensed",system-ui,sans-serif;letter-spacing:.01em}
+.wk-ban-p{display:flex;gap:8px;margin:10px 0 8px}
+.wk-ban-p span{flex:1;display:flex;flex-direction:column;align-items:center;padding:8px 6px;border-radius:12px;background:var(--panel);border:1px solid var(--line)}
+.wk-ban-p b{font:800 22px/1 "Barlow Condensed",system-ui,sans-serif;color:#facc15}
+.wk-ban-p small{color:var(--muted);font-size:12px;margin-top:2px}
+.wk-ban-s{font-size:13.5px;color:var(--muted);line-height:1.45}.wk-ban-s b{color:var(--ink)}
+.wk-strip{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;width:100%;margin:10px 0 0;padding:10px 14px;border-radius:14px;border:1px solid color-mix(in srgb,#facc15 45%,transparent);background:color-mix(in srgb,#facc15 9%,var(--panel));color:var(--ink);text-align:left;cursor:pointer;font:inherit}
+.wk-s-h{font-weight:700;font-size:14px}.wk-s-h b{color:#facc15}
+.wk-s-l{flex:1;min-width:0;font-size:13.5px}.wk-s-l small{color:var(--muted)}
+.wk-s-go{color:#facc15;font-weight:700;font-size:13px;white-space:nowrap}
+.wk-hint{color:#facc15;font-weight:700}
+.st th.st-pz,.st td.st-pz{border-left:1px solid var(--line)}
+.st td.st-pz .z{color:var(--muted)}
+.st tr.wk-p1 td{background:color-mix(in srgb,#facc15 10%,var(--panel))}
+.st tr.wk-p2 td{background:color-mix(in srgb,#b8c4d0 9%,var(--panel))}
+.st tr.wk-p3 td{background:color-mix(in srgb,#cd7f32 9%,var(--panel))}
+.st tr.wk-p1 td.st-rk,.st tr.wk-p2 td.st-rk,.st tr.wk-p3 td.st-rk{font-size:18px}
