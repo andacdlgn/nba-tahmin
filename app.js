@@ -45,7 +45,7 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.22.1";
+const VERSION = "1.22.2";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
@@ -4296,10 +4296,10 @@ const setChatSeen = v => lsSet("chatSeen", String(v));
 const chatMuted = () => lsGet("chatMute")==="1";
 function startChat(){
   if(S.chatUnsub) return;
-  S.chatUnsub = onSnapshot(query(collection(S.db,"chat"), orderBy("at","desc"), limit(100)), snap => {
+  S.chatUnsub = onSnapshot(query(collection(S.db,"chat"), orderBy("at","desc"), limit(40)), snap => {
     S.chat = snap.docs.map(d=>({id:d.id, ...d.data({serverTimestamps:"estimate"})}));
     S.chatErr=false;
-    if(!S.chatOld.length){ S.chatMore = snap.docs.length>=100; if(S.chatMore) S.chatLastDoc=snap.docs[snap.docs.length-1]; }
+    if(!S.chatOld.length){ S.chatMore = snap.docs.length>=40; if(S.chatMore) S.chatLastDoc=snap.docs[snap.docs.length-1]; }
     chatBadge(); if(S.chatOpen) paintChatList();
   }, () => { S.chatErr=true; S.chatUnsub=null; if(S.chatOpen) paintChatList(); });
   if(!S.pinUnsub) S.pinUnsub = onSnapshot(doc(S.db,"chatpin","main"), d => { S.chatPin = d.exists() && d.data().id ? d.data() : null; paintPin(); }, () => {});

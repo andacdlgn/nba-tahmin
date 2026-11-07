@@ -170,19 +170,22 @@ class Mailer:
             self.smtp.quit()
 
 
+_PEOPLE = {}
+
+
 def people(db, flag):
-    """Tercihi açık oyuncular: (uid, ad, e-posta)."""
+    """Tercihi açık oyuncular: (uid, ad, e-posta). Firestore okuma kotası için bir çalışmada bir kere okunur."""
+    if "all" not in _PEOPLE:
+        names = {d.id: (d.to_dict() or {}).get("name", "") for d in db.collection("players").stream()}
+        _PEOPLE["all"] = [(c.id, c.to_dict() or {}) for c in db.collection("contacts").stream() if c.id in names]
+        _PEOPLE["names"] = names
     out = []
-    for c in db.collection("contacts").stream():
-        info = c.to_dict() or {}
+    for uid, info in _PEOPLE["all"]:
         email = (info.get("email") or "").strip()
         if not info.get(flag) or not info.get("verified") or "@" not in email:
             continue  # yalnızca onaylanmış adreslere
-        p = db.collection("players").document(c.id).get()
-        if not p.exists:
-            continue
-        name = (p.to_dict() or {}).get("name", "")
-        out.append((c.id, name[:1].upper() + name[1:], email))
+        name = _PEOPLE["names"].get(uid, "")
+        out.append((uid, name[:1].upper() + name[1:], email))
     return out
 
 
@@ -661,8 +664,24 @@ def weekly(db, mail, force):
             ref.set({"at": firestore.SERVER_TIMESTAMP})
 
 
+def _due(secs):
+    """Döngü 10 dakikada bir çağırır; Firestore okuma kotası için 20 dakikada bir çalışılır."""
+    import tempfile, time as _t
+    f = os.path.join(tempfile.gettempdir(), "nbat_remind")
+    try:
+        if _t.time() - os.path.getmtime(f) < secs:
+            return False
+    except OSError:
+        pass
+    open(f, "w").close()
+    return True
+
+
 def main():
     dry, force = "--dry" in sys.argv, "--now" in sys.argv
+    if not (dry or force or os.environ.get("REMIND_DAY")) and not _due(19 * 60):
+        print("mailler: son çalışmadan beri 20 dakika geçmedi")
+        return 0
     db = init()
     if db is None:
         print("FIREBASE_SA yok; mailler devre dışı.")
@@ -687,12 +706,15 @@ def main():
         injuries(db, out, day, games, inj)
     else:
         print(day, "maç yok ya da gece bitti")
-    lt_alerts(db, out, inj)
+    # uzun vade sakatlık / 65 maç uyarıları 3 saatte bir yeter (Firestore okuma kotası)
+    now_utc = datetime.now(timezone.utc)
+    if force or (now_utc.hour % 3 == 0 and now_utc.minute < 20):
+        lt_alerts(db, out, inj)
     lt_lock_mail(db, out)
     out.flush()
     report_mail(db, mail)
     # uzun vade sonuçları (Wikipedia) saatte bir
-    if force or datetime.now(timezone.utc).minute < 12:
+    if force or datetime.now(timezone.utc).minute < 20:
         try:
             from awards import auto_awards
             auto_awards(db, dry)

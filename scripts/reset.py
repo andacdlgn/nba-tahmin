@@ -101,6 +101,19 @@ def answer_hash(salt: str, team: str, player_id: str) -> str:
     return hashlib.sha256(f"{salt}{team}:{player_id}".encode("utf-8")).hexdigest()
 
 
+def _due(name, secs):
+    """Arka plan döngüsü aynı makinede çalışır: son çalışma zamanı geçici dosyada tutulur."""
+    import tempfile, time as _t
+    f = os.path.join(tempfile.gettempdir(), f"nbat_{name}")
+    try:
+        if _t.time() - os.path.getmtime(f) < secs:
+            return False
+    except OSError:
+        pass
+    open(f, "w").close()
+    return True
+
+
 def main():
     sa = os.environ.get("FIREBASE_SA", "").strip()
     if os.environ.get("FIRESTORE_EMULATOR_HOST"):  # yerel test
@@ -141,6 +154,10 @@ def main():
         db.collection("resetStatus").document(r.id).set({"state": state, "at": firestore.SERVER_TIMESTAMP})
         r.reference.delete()
         print(r.id[:6], state)
+
+    # Aşağıdakiler acil değil: Firestore okuma kotası için her 20 saniyede değil, 2 dakikada bir çalışır
+    if not _due("reset_full", 120):
+        return 0
 
     # oyuncunun ad değiştirme isteği (varsa)
     try:

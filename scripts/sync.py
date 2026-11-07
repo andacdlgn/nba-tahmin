@@ -811,10 +811,11 @@ def main(full=False):
         if g["day"] >= league_start:
             by_day.setdefault(g["day"], []).append(g)
 
-    recheck_from = (first - timedelta(days=1)).strftime("%Y%m%d")
+    # tahminler kilitlendikten sonra değişmez: dünden eski, tamamlanmış geceler yeniden okunmaz (Firestore okuma kotası)
+    recheck_from = max(first - timedelta(days=1), today - timedelta(days=1)).strftime("%Y%m%d")
     for day, dgames in by_day.items():
         if day < recheck_from and not full and day in sc["days"] and all(g["id"] in sc["games"] for g in dgames) \
-           and all(uid in sc["days"][day] for uid in players):
+           and all(uid in sc["days"][day] for uid in players) and nights.get(day, {}).get("done"):
             continue
         first_start = min(g["start"] for g in dgames)
         night_top = max(max((t["pts"] for t in g["top"]), default=0) for g in dgames)
