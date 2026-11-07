@@ -728,6 +728,7 @@ def main(full=False):
     first = start if (full or not games) else max(start, today - timedelta(days=3))
 
     nights = load("nights.json", {})
+    done_before = {gid for gid, g in games.items() if g.get("top")}
     # 1) biten maçlar ve kutu skorları
     d = first
     while d <= today:
@@ -785,8 +786,24 @@ def main(full=False):
         if tr_today > str(trial["end"]):
             nxt = (datetime.strptime(str(trial["end"]), "%Y%m%d") + timedelta(days=1)).strftime("%Y%m%d")
             league_start = max(league_start, nxt)
-    players = fs_players()
+    # Firestore okuma kotası: yeni biten maç yoksa puanlar yeniden hesaplanmaz (gündüz saatleri boşa okumasın).
+    # Güvenlik için günde bir kez (TR 11.00'den sonra) ve lig başlangıcı değişince tam hesap yapılır.
     old = load("scores.json", {})
+    state = load("syncstate.json", {})
+    tr_now = datetime.now(TR_TZ)
+    daily_due = tr_now.hour >= 11 and state.get("full") != tr_now.strftime("%Y%m%d")
+    new_done = {gid for gid, g in games.items() if g.get("top")} - done_before
+    if not (full or new_done or daily_due or old.get("leagueStart") != league_start or not old.get("days")):
+        changed = [save("games.json", games), save("players.json", pstats), save("nights.json", nights)]
+        for fn in (save_injuries, save_all_players):
+            try:
+                changed.append(fn())
+            except Exception as e:
+                print(fn.__name__, "alınamadı:", e)
+        print(f"Yeni biten maç yok; puanlar yeniden hesaplanmadı (Firestore'dan yalnızca lig ayarı okundu). Değişen dosya: {sum(changed)}")
+        return 0
+    print("Puan hesabı:", "tam" if full else f"{len(new_done)} yeni maç" if new_done else "günlük kontrol" if daily_due else "lig başlangıcı değişti")
+    players = fs_players()
     # güvenlik: oyuncu listesi boş ya da öncekinin yarısından azsa (Firestore geçici hatası) hiçbir şey yazılmaz
     old_n = len(old.get("players") or {})
     if not players or (old_n >= 4 and len(players) < old_n / 2):
@@ -954,6 +971,8 @@ def main(full=False):
     sc["weeks"] = weeks
 
     changed = [save("games.json", games), save("players.json", pstats), save("scores.json", sc), save("nights.json", nights)]
+    if daily_due:
+        changed.append(save("syncstate.json", {"full": tr_now.strftime("%Y%m%d")}))
     try:
         changed.append(backup(players, today))
     except Exception as e:

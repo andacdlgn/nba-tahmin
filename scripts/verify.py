@@ -32,6 +32,59 @@ def main():
     if not mail.ok():
         print("GMAIL_USER / GMAIL_APP_PASSWORD yok; kod gönderilmiyor.")
         return 0
+    n = process(db, mail, dry)
+    mail.close()
+    # Arka plan döngüsünde: istek yokken Firestore'a sürekli sormak yerine dinle (boşta okuma harcamaz).
+    # Yeni bir istek gelince ya da en geç WAIT saniye sonra çıkar; döngü reset.py ve mailleri çalıştırıp geri döner.
+    if "Arka plan" in os.environ.get("GITHUB_WORKFLOW", "") and not dry and "--once" not in sys.argv:
+        hit = wait_for_requests(db, int(os.environ.get("VERIFY_WAIT", "480")))
+        if hit == "verifyReq":
+            mail = Mailer(dry)
+            process(db, mail, dry)
+            mail.close()
+    return 0
+
+
+WATCH = ["verifyReq", "mailReset", "resets", "renameReq", "deleteReq"]
+
+
+def wait_for_requests(db, secs):
+    """İzlenen koleksiyonlardan birine belge düşene (ya da yönetici 'Herkesi sil' isteyene) kadar bekler."""
+    import threading
+    ev, hit, seen = threading.Event(), {}, set()
+
+    def coll_cb(name):
+        def cb(docs, changes, read_time):
+            first = name not in seen
+            seen.add(name)
+            if (first and docs) or any(getattr(c.type, "name", "") == "ADDED" for c in changes):
+                hit.setdefault("name", name)
+                ev.set()
+        return cb
+
+    def purge_cb(docs, changes, read_time):
+        if any((d.to_dict() or {}).get("state") == "pending" for d in docs if d.exists):
+            hit.setdefault("name", "purge")
+            ev.set()
+
+    watches = []
+    try:
+        watches = [db.collection(c).on_snapshot(coll_cb(c)) for c in WATCH]
+        watches.append(db.collection("league").document("purge").on_snapshot(purge_cb))
+        ev.wait(secs)
+    except Exception as e:
+        print("dinleme hatası:", type(e).__name__, e)
+    finally:
+        for w in watches:
+            try:
+                w.unsubscribe()
+            except Exception:
+                pass
+    print("bekleme bitti:", hit.get("name", "süre doldu"))
+    return hit.get("name")
+
+
+def process(db, mail, dry):
     now = datetime.now(timezone.utc)
     reqs = list(db.collection("verifyReq").stream())
     print(f"{len(reqs)} onay isteği")
@@ -65,8 +118,7 @@ def main():
             continue
         db.collection("otp").document(uid).set({"email": email, "salt": salt, "h": h, "exp": now + VALID})
         db.collection("otpStatus").document(uid).set({"email": email, "sentAt": now, "exp": now + VALID})
-    mail.close()
-    return 0
+    return len(reqs)
 
 
 if __name__ == "__main__":

@@ -156,7 +156,7 @@ def main():
         print(r.id[:6], state)
 
     # Aşağıdakiler acil değil: Firestore okuma kotası için her 20 saniyede değil, 2 dakikada bir çalışır
-    if not _due("reset_full", 120):
+    if not _due("reset_full", 60):
         return 0
 
     # oyuncunun ad değiştirme isteği (varsa)

@@ -664,10 +664,10 @@ def weekly(db, mail, force):
             ref.set({"at": firestore.SERVER_TIMESTAMP})
 
 
-def _due(secs):
-    """Döngü 10 dakikada bir çağırır; Firestore okuma kotası için 20 dakikada bir çalışılır."""
+def _due(secs, name="nbat_remind"):
+    """Arka plan döngüsü aynı makinede çalışır; son çalışma zamanı geçici dosyada tutulur (Firestore okuma kotası)."""
     import tempfile, time as _t
-    f = os.path.join(tempfile.gettempdir(), "nbat_remind")
+    f = os.path.join(tempfile.gettempdir(), name)
     try:
         if _t.time() - os.path.getmtime(f) < secs:
             return False
@@ -679,9 +679,6 @@ def _due(secs):
 
 def main():
     dry, force = "--dry" in sys.argv, "--now" in sys.argv
-    if not (dry or force or os.environ.get("REMIND_DAY")) and not _due(19 * 60):
-        print("mailler: son çalışmadan beri 20 dakika geçmedi")
-        return 0
     db = init()
     if db is None:
         print("FIREBASE_SA yok; mailler devre dışı.")
@@ -693,6 +690,15 @@ def main():
     day = os.environ.get("REMIND_DAY") or espn_today().strftime("%Y%m%d")  # REMIND_DAY: yalnızca test
     games = night_games(day)
     upcoming = [g for g in games if g["state"] == "pre"]
+    # İstekler/sorun bildirimleri her turda (boşsa tek okuma)
+    report_mail(db, mail)
+    # Firestore okuma kotası: ilk maçtan 5 saat öncesinden son maçın kilidine kadar 20 dakikada bir, geri kalan saatlerde 2 saatte bir
+    now_utc = datetime.now(timezone.utc)
+    busy = bool(upcoming) and games[0]["night_lock"] - timedelta(hours=5) <= now_utc < max(g["lock"] for g in games)
+    if not (dry or force or os.environ.get("REMIND_DAY")) and not _due(15 * 60 if busy else 115 * 60):
+        print("mailler: sıra gelmedi (" + ("maç öncesi, 20 dk" if busy else "sakin saat, 2 saat") + ")")
+        mail.close()
+        return 0
     inj = injury_list()
     # günün özet saati: maç varsa hatırlatma saati, yoksa akşam 21.00 (Türkiye)
     hh, mm = (int(x) for x in REMIND_AT.split(":"))
@@ -707,14 +713,12 @@ def main():
     else:
         print(day, "maç yok ya da gece bitti")
     # uzun vade sakatlık / 65 maç uyarıları 3 saatte bir yeter (Firestore okuma kotası)
-    now_utc = datetime.now(timezone.utc)
-    if force or (now_utc.hour % 3 == 0 and now_utc.minute < 20):
+    if force or _due(170 * 60, "nbat_ltalert"):
         lt_alerts(db, out, inj)
     lt_lock_mail(db, out)
     out.flush()
-    report_mail(db, mail)
     # uzun vade sonuçları (Wikipedia) saatte bir
-    if force or datetime.now(timezone.utc).minute < 20:
+    if force or _due(55 * 60, "nbat_awards"):
         try:
             from awards import auto_awards
             auto_awards(db, dry)
