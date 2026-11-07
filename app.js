@@ -45,12 +45,13 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.25.0";
+const VERSION = "1.25.1";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.25.1", d:"7 Kasım 2026", items:["Ana ekrana ekle: iPhone ve Android için adım adım anlatım; Android'de tek dokunuşla yükleme. Profil → Ayarlar'dan da açılır."]},
   {v:"1.25.0", d:"7 Kasım 2026", items:["Davet linki WhatsApp, Instagram ve Telegram'da artık görselli bir kartla görünüyor.","Arada bir \"Ligi büyütelim\" penceresi davet linkini tek dokunuşla paylaşmayı hatırlatır (en fazla 4 kez)."]},
   {v:"1.24.0", d:"7 Kasım 2026", items:["Bu Gece sekmesinin üstünde \"Bu gece eksiklerin\" kutusu: eksik maç, banko, günün oyuncusu ve gecenin sorusu tek dokunuşla tamamlanır.","Bütün maçları doldurup banko ya da günün oyuncusunu unutursan bir pencere hatırlatır ve oradan hemen seçebilirsin.","Lige sonradan katılan, katılmadan önceki gecelerde otomatik tahmin yapmış sayılır."]},
   {v:"1.23.0", d:"7 Kasım 2026", items:["🎯 Nokta atışı: asıl ligden (9 Kasım) itibaren maçın farkını tam bilen +1 ek puan alır, fark puanı +2 olur. NBA Kupası ve playoff'ta bu da katlanır. \"40+\" tam sayılmaz.","Maç kartlarında nokta atışları 🎯 ile işaretlenir; yeni rozet: 5 nokta atışında \"Nokta atışı\". Aylık Fark ustası ödülünde nokta atışı 2 sayılır."]},
@@ -1941,15 +1942,16 @@ function selfPlayDue(){
   const rows=Object.values(S.arch.scores?.days||{}).map(r=>r[S.uid]).filter(Boolean);
   return rows.length>=1 && rows.every(r=>!r.n) && !Object.values(S.days).some(D=>D.games.some(g=>D.picks[g.id]?.[S.uid]));
 }
-// Arada bir arkadaş davet etme hatırlatması: ligde en az 2 gündür olana, 5 günde bir, en fazla 4 kez
+// Arkadaş davet etme hatırlatması: 2 günde bir, sabah sonuçlara bakılan saatlerde (TR 07–13), ligde en az 1 gündür olana
 function invitePopDue(){
   if(!S.uid) return false;
-  const n=+lsGet("invPopN")||0, last=+lsGet("invPopAt")||0, joined=S.players[S.uid]?.joined||0;
-  return n<4 && Date.now()-last > 5*864e5 && joined && Date.now()-joined > 2*864e5;
+  const last=+lsGet("invPopAt")||0, joined=S.players[S.uid]?.joined||0;
+  const h=+new Date().toLocaleString("en-GB",{timeZone:"Europe/Istanbul",hour:"2-digit",hour12:false});
+  return h>=7 && h<13 && Date.now()-last > 46*36e5 && joined && Date.now()-joined > 864e5;
 }
 function maybeInvitePop(){ autoPop(8, invitePopDue, showInvitePop); }
 function showInvitePop(){
-  lsSet("invPopN", String((+lsGet("invPopN")||0)+1)); lsSet("invPopAt", String(Date.now()));
+  lsSet("invPopAt", String(Date.now()));
   const n=S.order.length, mine=invitedBy(S.uid).length;
   openSheet(`<div class="nudge-d"><div class="lp-ico">🤝</div><h3 id="shTitle">Ligi büyütelim</h3>
     <p>Ligde şu an <b>${n} kişi</b> var. Ne kadar kalabalık olursa geceler o kadar çekişmeli geçer; sohbet de şenlenir.</p>
@@ -4857,6 +4859,7 @@ function paintProfile(){
     <div class="pf-sec"><button class="btn admin-btn" id="histBtn" type="button">${ICON.list}Tahmin geçmişim</button></div>
     ${S.isAdmin?`<div class="pf-sec"><button class="btn admin-btn" id="adminBtn" type="button">${ICON.tools}Yönetim paneli</button></div>`:""}
     <div class="pf-sec pf-acts"><button class="btn" id="secChange">Güvenlik sorusunu değiştir</button><button class="btn" id="logout">Çıkış yap</button></div>
+    ${isStandalone()?"":`<div class="pf-sec"><h4>Ana ekrana ekle</h4><small class="muted" style="display:block;margin:0 0 8px">Siteyi telefonunun ana ekranına uygulama gibi ekle; tek dokunuşla tam ekran açılır.</small><button class="btn" id="pfInstall" type="button">📲 Nasıl eklenir?</button></div>`}
     ${S.isAdmin?"":`<div class="pf-sec pf-del"><h4>Profilimi sil</h4><small class="muted" style="display:block;margin:0 0 8px">Hesabın, bütün tahminlerin, uzun vade seçimlerin, sohbet mesajların ve mail adresin <b>kalıcı olarak</b> silinir; puan tablosundan çıkarsın. Geri alınamaz. Aynı adla sonra yeniden kayıt olabilirsin.</small>
       <div class="adm-row"><input id="pfDelOk" class="adm-in" maxlength="40" autocomplete="off" placeholder="Onay için adını yaz: ${esc(me.name||"")}"><button class="btn danger" id="pfDel" type="button">Profilimi sil</button></div>
       <small class="err" id="pfDelErr"></small></div>`}`;
@@ -4890,6 +4893,7 @@ function paintProfile(){
     $("#pfBioErr").textContent=""; await saveProfile({bio:v}); toast(v?"Hakkında yazın kaydedildi.":"Hakkında yazın kaldırıldı.");
   };
   $("#logout").onclick=async()=>{ closeSheet(); S.contact=null; await signOut(S.auth); applyTheme(); };
+  $("#pfInstall")?.addEventListener("click", ()=>showInstallHelp());
   $("#pfDel")?.addEventListener("click", ()=>{
     const v=($("#pfDelOk").value||"").trim(), nm=(S.players[S.uid]?.name||"").trim();
     if(!nm || v.toLocaleLowerCase("tr")!==nm.toLocaleLowerCase("tr")){ $("#pfDelErr").textContent=`Onaylamak için kutuya adını (${nm}) yaz.`; return; }
@@ -5083,19 +5087,42 @@ async function openAdmin(){
     try{ await setDoc(doc(S.db,"config","secret"),{invite:v}); S.invite=v; $("#admInvMsg").textContent="Davet kodu değişti."; }catch(err){ $("#admInvMsg").textContent="Kaydedilemedi."; } };
 }
 /* ====================================================== ana ekrana ekle */
+// Android (Chrome / Samsung): tarayıcı izin verirse tek dokunuşla yükleme; vermezse menüden adım adım.
+// iOS: yalnızca Safari'den eklenebilir (Instagram / WhatsApp içindeki tarayıcıdan olmaz), adımlar gösterilir.
 let installEvt=null;
-addEventListener("beforeinstallprompt", e=>{ e.preventDefault(); installEvt=e; setTimeout(installBanner, 4000); });
+addEventListener("beforeinstallprompt", e=>{ e.preventDefault(); installEvt=e; });
+addEventListener("appinstalled", ()=>{ lsSet("installDone","1"); $("#installBar")?.remove(); });
 const isStandalone = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone;
+const UA = navigator.userAgent;
+const isIOS = () => /iphone|ipad|ipod/i.test(UA) || (/macintosh/i.test(UA) && navigator.maxTouchPoints>1);
+const isAndroid = () => /android/i.test(UA);
+const inAppBrowser = () => /instagram|fban|fbav|whatsapp|line\/|twitter|tiktok|telegram|snapchat/i.test(UA);
+const iosSafari = () => isIOS() && /safari/i.test(UA) && !/crios|fxios|edgios|opios/i.test(UA) && !inAppBrowser();
 function installBanner(){
-  if(!S.uid || isStandalone() || $("#installBar")) return;
-  const t=+(lsGet("installAsk")||0); if(Date.now()-t < 7*864e5) return;
-  const ios=/iphone|ipad|ipod/i.test(navigator.userAgent) && !installEvt;
-  if(!installEvt && !ios) return;
+  if(!S.uid || isStandalone() || lsGet("installDone") || $("#installBar")) return;
+  if(!isIOS() && !isAndroid() && !installEvt) return;          // bilgisayarda yalnızca tarayıcı önerirse
+  const t=+(lsGet("installAsk")||0); if(Date.now()-t < 5*864e5) return;
   const el=document.createElement("div"); el.id="installBar"; el.className="install-bar";
-  el.innerHTML=`<img src="icons/icon-192.png" alt=""><span><b>NBA Tahmin'i ana ekrana ekle</b><small>${ios?"Safari'de alttaki Paylaş düğmesine, sonra \"Ana Ekrana Ekle\"ye dokun.":"Uygulama gibi tek dokunuşla açılır."}</small></span>${ios?"":`<button class="btn" id="instOk" type="button">Ekle</button>`}<button class="linkish" id="instNo" type="button">Kapat</button>`;
+  el.innerHTML=`<img src="icons/icon-192.png" alt=""><span><b>NBA Tahmin'i ana ekrana ekle</b><small>Uygulama gibi tek dokunuşla açılır, tam ekran çalışır.</small></span><button class="btn" id="instOk" type="button">${installEvt?"Ekle":"Nasıl?"}</button><button class="linkish" id="instNo" type="button" aria-label="Kapat">✕</button>`;
   document.body.appendChild(el);
   $("#instNo").onclick=()=>{ lsSet("installAsk", String(Date.now())); el.remove(); };
-  $("#instOk")?.addEventListener("click", async()=>{ el.remove(); try{ installEvt.prompt(); await installEvt.userChoice; }catch(e){} installEvt=null; });
+  $("#instOk").onclick=async()=>{ el.remove(); lsSet("installAsk", String(Date.now()));
+    if(installEvt){ try{ installEvt.prompt(); const c=await installEvt.userChoice; if(c?.outcome==="accepted") lsSet("installDone","1"); }catch(e){} installEvt=null; return; }
+    showInstallHelp(); };
+}
+function showInstallHelp(){
+  const step = (n,t) => `<li><span class="ih-n">${n}</span><span>${t}</span></li>`;
+  const share = `<svg class="ih-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M8 7l4-4 4 4"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg>`;
+  let body;
+  if(isStandalone()) body=`<p>Site zaten ana ekrandan açılmış, her şey hazır 👍</p>`;
+  else if(isIOS() && !iosSafari()) body=`<p>iPhone'da ana ekrana yalnızca <b>Safari</b>'den eklenebilir. Şu an ${inAppBrowser()?"bir uygulamanın içindeki tarayıcıdasın":"başka bir tarayıcıdasın"}.</p>
+    <ol class="ih">${step(1,`Sağ üstteki <b>⋯</b> ya da <b>paylaş</b> menüsünden <b>"Safari'de aç"</b>ı seç (ya da adresi kopyalayıp Safari'ye yapıştır).`)}${step(2,`Safari'de alttaki ${share} <b>Paylaş</b> düğmesine dokun.`)}${step(3,`Listeyi aşağı kaydır, <b>"Ana Ekrana Ekle"</b>ye dokun, sonra <b>Ekle</b>.`)}</ol>`;
+  else if(isIOS()) body=`<ol class="ih">${step(1,`Alttaki (iPad'de üstteki) ${share} <b>Paylaş</b> düğmesine dokun.`)}${step(2,`Listeyi aşağı kaydır, <b>"Ana Ekrana Ekle"</b>ye dokun.`)}${step(3,`Sağ üstteki <b>Ekle</b>'ye bas. NBA Tahmin simgesi ana ekranında belirir.`)}</ol>`;
+  else if(isAndroid()) body=`${inAppBrowser()?`<p>Önce sayfayı <b>Chrome</b>'da aç: sağ üstteki <b>⋮</b> menüden "Tarayıcıda aç"ı seç.</p>`:""}<ol class="ih">${step(1,`Chrome'da sağ üstteki <b>⋮</b> menüye dokun.`)}${step(2,`<b>"Ana ekrana ekle"</b> ya da <b>"Uygulamayı yükle"</b>yi seç.`)}${step(3,`<b>Yükle / Ekle</b>'ye bas. NBA Tahmin simgesi ana ekranında belirir.`)}</ol><p class="muted">Samsung Internet'te: alttaki <b>☰</b> menü → "Sayfayı ekle" → "Ana ekran".</p>`;
+  else body=`<p>Bilgisayarda Chrome ya da Edge'de adres çubuğunun sağındaki <b>yükle</b> simgesine (⊕) basarak uygulama gibi açabilirsin. Telefonda bu pencereyi tekrar açarsan adımları gösteririm.</p>`;
+  openSheet(`<div class="nudge-d"><div class="lp-ico"><img src="icons/icon-192.png" alt="" width="64" height="64" style="border-radius:16px"></div><h3 id="shTitle">Ana ekrana ekle</h3>${body}
+    ${installEvt?`<button class="btn primary" id="ihGo" type="button" style="width:100%">Şimdi ekle</button>`:""}</div>`);
+  $("#ihGo")?.addEventListener("click", async()=>{ closeSheet(); try{ installEvt.prompt(); const c=await installEvt.userChoice; if(c?.outcome==="accepted") lsSet("installDone","1"); }catch(e){} installEvt=null; });
 }
 /* ====================================================== başlangıç */
 // Servis çalışanı kaldırıldı (mobilde eski/yeni dosya karışmasına yol açıyordu): telefonda kalmışsa silinir, önbelleği temizlenir
@@ -5143,7 +5170,7 @@ if("serviceWorker" in navigator){ navigator.serviceWorker.getRegistrations?.().t
     else checkRecovery();
     loadLT(); setTimeout(installBanner, 6000); later(markSeen, 3000);
     // bilgilendirme pencereleri sıraya girer; açılıştan ~3 sn sonra en önemlisi (varsa) bir tane açılır
-    setTimeout(()=>{ maybeNews(); maybeCeremony(); maybeLeaguePop(); maybeSelfPlay(); maybeScoringGuide(); maybeInvitePop(); maybeAskAuto(); maybeRealName(); }, 600);
+    setTimeout(()=>{ maybeNews(); maybeCeremony(); maybeLeaguePop(); maybeSelfPlay(); maybeScoringGuide(); maybeInvitePop(); setTimeout(installBanner, 9000); maybeAskAuto(); maybeRealName(); }, 600);
     later(()=>{ getDoc(doc(S.db,"config","admin")).then(()=>{ S.isAdmin=true; maybeArchiveTrial(); }).catch(()=>{ S.isAdmin=false; });
       getDoc(doc(S.db,"config","secret")).then(r=>{ S.invite=r.data()?.invite||""; }).catch(()=>{});
       allPlayers().catch(()=>{}); }, 2000);
