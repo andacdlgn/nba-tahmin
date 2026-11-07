@@ -134,8 +134,9 @@ service cloud.firestore {
             && exists(/databases/$(database)/documents/players/$(request.resource.data.ref))));
       // Profil: ad, renk, emoji, favori takım ve tema değiştirilebilir (listeden seçilir)
       allow update: if signedIn() && request.auth.uid == uid
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['color', 'emoji', 'favTeam', 'theme', 'av', 'bio', 'club', 'rival', 'autoPick', 'seen'])
-        // autoPick: yedek tahmin tercihi; seen: son giriş (yalnızca sunucu saati)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['color', 'emoji', 'favTeam', 'theme', 'av', 'bio', 'club', 'rival', 'autoPick', 'seen', 'vd'])
+        // autoPick: yedek tahmin tercihi; seen: son giriş (yalnızca sunucu saati); vd: siteye girilen günler (rozetler için, en fazla 1000)
+        && (!('vd' in request.resource.data) || (request.resource.data.vd is list && request.resource.data.vd.size() <= 1000))
         && (!('autoPick' in request.resource.data) || request.resource.data.autoPick is bool)
         && (!('seen' in request.resource.data.diff(resource.data).affectedKeys()) || request.resource.data.seen == request.time)
         && (!('name' in request.resource.data.diff(resource.data).affectedKeys()) || validName(request.resource.data.name))
