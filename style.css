@@ -2198,3 +2198,16 @@ body.bars-hidden .chat-fab{transform:none}
 .wkp .av{grid-row:1/3;width:44px;height:44px}
 .wkp small{color:var(--muted)}
 .wkp.wk-p1{border-color:#facc15}
+
+/* 1.28.0: logolu / fotoğraflı rozetler, takım ve oyuncu ızgarası */
+.bimg{width:30px;height:30px;object-fit:contain;display:block}
+.bimg.pl{width:100%;height:100%;object-fit:cover;border-radius:12px;object-position:center 15%}
+.bt .bimg{width:16px;height:16px}.bt .bimg.pl{border-radius:50%}
+.bdg .bimg{width:22px;height:22px}
+.bp-ico .bimg{width:72px;height:72px}.bp-ico .bimg.pl{border-radius:50%}
+.bfams.mini{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+.bfam.mini{padding:8px 10px;gap:8px;align-items:center}
+.bfam.mini .bf-ico{width:38px;height:38px;overflow:hidden}
+.bfam.mini .bf-b b{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bf-sub{font-size:13px;margin:-4px 2px 8px}
+@media (max-width:420px){ .bfams.mini{grid-template-columns:repeat(2,1fr)} }

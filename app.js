@@ -45,15 +45,16 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.27.0";
+const VERSION = "1.28.0";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.28.0", d:"7 Kasım 2026", items:["Rozetler: seviyeler en fazla 3 (Bronz, Gümüş, Altın), Efsane kaldırıldı. Çeşitlilik artık farklı rozetlerle: 120 ayrı rozet ailesi, toplam 190 rozet.","Yeni: 30 takımın her biri için takım uzmanlığı (takım logolu), 25 yıldız için oyuncu uzmanlığı (oyuncu fotoğraflı), haftalık birincilik / ikincilik / üçüncülük, podyum müdavimi ve her aylık ödül için ayrı rozet."]},
   {v:"1.27.0", d:"7 Kasım 2026", items:["Haftalık ilk 3: her haftanın 1.sine +10, 2.sine +7, 3.süne +5 sezon puanı (9 Kasım haftasından itibaren). Eşitlikte gece birincilikleri, kazanan, fark, en skorer ve en iyi gece bakılır.","Sıralama sekmesinde Sezon / Bu hafta / Geçen hafta geçişli tablo; pazartesi geçen haftanın ilk 3'ü penceresi."]},
   {v:"1.26.1", d:"7 Kasım 2026", items:["Puan tablosu ile \"Puanlar nereden geldi\" tek bir Puan durumu tablosunda birleşti: puanın dağılımı adının altında.","Yeni rozetler: Ev sahibi dostu, Deplasman fatihi, Ezici galibiyet, Çekişmeli maç, 40'lık gece, Skorer üçlemesi, Üçlü kombo, Lig turu, Cesur banko, Ortaklık, Zirvede, Roket, Maraton, Haftanın her günü, Akıl hocası, Kanlı bıçaklı, Kötü gece."]},
-  {v:"1.26.0", d:"7 Kasım 2026", items:["🏅 Rozetler yenilendi: 57 ailede 232 rozet (tahmin, sürpriz ve şans, seriler, zaferler, devamlılık, sosyal, eğlence).","Kademeler: Bronz +1, Gümüş +2, Altın +4, Platin +7, Efsane +12 rozet puanı. Rozet puanı ana puandan ayrı, Sıralama sekmesinde Rozet sıralaması var.","Siteye düzenli girmek, lige arkadaş getirmek ve tek başına doğru bilmek de rozet kazandırıyor."]},
+  {v:"1.26.0", d:"7 Kasım 2026", items:["🏅 Rozetler yenilendi: tahmin, sürpriz ve şans, seriler, zaferler, devamlılık, sosyal, eğlence.","Kademeler: Bronz +1, Gümüş +2, Altın +4, Platin +7 rozet puanı. Rozet puanı ana puandan ayrı, Sıralama sekmesinde Rozet sıralaması var.","Siteye düzenli girmek, lige arkadaş getirmek ve tek başına doğru bilmek de rozet kazandırıyor."]},
   {v:"1.25.1", d:"7 Kasım 2026", items:["Ana ekrana ekle: iPhone ve Android için adım adım anlatım; Android'de tek dokunuşla yükleme. Profil → Ayarlar'dan da açılır."]},
   {v:"1.25.0", d:"7 Kasım 2026", items:["Davet linki WhatsApp, Instagram ve Telegram'da artık görselli bir kartla görünüyor.","Arada bir \"Ligi büyütelim\" penceresi davet linkini tek dokunuşla paylaşmayı hatırlatır (en fazla 4 kez)."]},
   {v:"1.24.0", d:"7 Kasım 2026", items:["Bu Gece sekmesinin üstünde \"Bu gece eksiklerin\" kutusu: eksik maç, banko, günün oyuncusu ve gecenin sorusu tek dokunuşla tamamlanır.","Bütün maçları doldurup banko ya da günün oyuncusunu unutursan bir pencere hatırlatır ve oradan hemen seçebilirsin.","Lige sonradan katılan, katılmadan önceki gecelerde otomatik tahmin yapmış sayılır."]},
@@ -2101,7 +2102,7 @@ function openRules(){
     <h4>Yeni oyuncu</h4>
     <p>Davet linkiyle siteye girip "Yeni oyuncu" adımlarını izlersin: gerçek adın, 6 haneli şifren, güvenlik sorusu (gizli takım ve gizli oyuncu), takım adın, favori takımın, avatarın, otomatik tahmin tercihin ve mail adresin. Linkle gelmediysen davet kodu da sorulur. Mail adresi zorunludur; onay kodunu hemen ya da sonra Profil → Ayarlar'dan girebilirsin. Kod girilene kadar sana hiçbir mail (hatırlatma, haftalık özet, şifre sıfırlama kodu) gelmez.</p>
     <h4>Rozetler</h4>
-    <p>Oynadıkça <b>${BLIST.length} rozet</b> kazanabilirsin: tahmin ustalığı, sürpriz ve şans, seriler, zaferler, devamlılık (düzenli girmek ve oynamak), sosyal (lige arkadaş getirmek) ve eğlence. Her rozetin kademesi var: Bronz +1, Gümüş +2, Altın +4, Platin +7, Efsane +12 rozet puanı. Rozet puanı ana puana eklenmez; Sıralama sekmesindeki ayrı <b>Rozet sıralaması</b>nda yarışır. Bütün rozetler ve ilerlemen Profil → Rozetler'de.</p>
+    <p>Oynadıkça <b>${BLIST.length} rozet</b> kazanabilirsin: tahmin ustalığı, sürpriz ve şans, seriler, zaferler, haftalık ve aylık ödüller, 30 takımın her biri için takım uzmanlığı, yıldız oyuncular için oyuncu uzmanlığı, devamlılık (düzenli girmek ve oynamak), sosyal (lige arkadaş getirmek) ve eğlence. Her rozetin kademesi var: Bronz +1, Gümüş +2, Altın +4, Platin +7 rozet puanı. Rozet puanı ana puana eklenmez; Sıralama sekmesindeki ayrı <b>Rozet sıralaması</b>nda yarışır. Bütün rozetler ve ilerlemen Profil → Rozetler'de.</p>
     <h4>Sohbet ve yorumlar</h4>
     <p>Sağ alttaki baloncuktan lig sohbetine girersin: mesajlara yanıt verebilir, @ ile birini etiketleyebilir, emoji tepkisi bırakabilir, kendi mesajını gönderdikten sonraki 2 dakika içinde düzenleyebilir, istediğin zaman silebilirsin. Maçlar kilitlendikten sonra maç kartlarına da emoji ve kısa yorum bırakılabilir. Sohbette ve yorumlarda küfür, kısaltmaları (amk, aq, oç…) ve hakaret yazılamaz.</p>
     <p class="muted" style="margin-top:18px;font-size:12px;text-align:center">Sürüm ${VERSION}</p></div>`);
@@ -2368,71 +2369,86 @@ function monthTable(){
    Her rozet ailesinin seviyeleri var (ör. Kazanan avcısı 1–8). Her seviye ayrı bir rozettir ve bir kademe taşır:
    bronz 1, gümüş 2, altın 4, platin 7, efsane 12 rozet puanı. Rozet puanı ana sıralamadan ayrı tutulur.
    Hepsi eldeki verilerden hesaplanır (Firestore'dan ek okuma yok); giriş günleri players.vd listesinden gelir. */
-const BTIER = {b:{n:"Bronz",p:1}, g:{n:"Gümüş",p:2}, a:{n:"Altın",p:4}, p:{n:"Platin",p:7}, e:{n:"Efsane",p:12}};
-const BCATS = [["tahmin","🎯","Tahmin ustalığı"],["surpriz","🍀","Sürpriz ve şans"],["seri","🔥","Seriler"],["zafer","🏆","Zaferler"],["devam","📆","Devamlılık"],["sosyal","🤝","Sosyal"],["eglence","😅","Eğlence"]];
-// [id, kategori, ikon, ad, eşikler, açıklama(t), ölçüt]
+const BTIER = {b:{n:"Bronz",p:1}, g:{n:"Gümüş",p:2}, a:{n:"Altın",p:4}, p:{n:"Platin",p:7}};
+const BCATS = [["tahmin","🎯","Tahmin ustalığı"],["surpriz","🍀","Sürpriz ve şans"],["seri","🔥","Seriler"],["zafer","🏆","Zaferler"],["odul","🎖️","Ödüller"],["takim","🏟️","Takım uzmanlıkları"],["oyuncu","⛹️","Oyuncu uzmanlıkları"],["devam","📆","Devamlılık"],["sosyal","🤝","Sosyal"],["eglence","😅","Eğlence"]];
+// [id, kategori, ikon, ad, eşikler, açıklama(t), ölçüt, kademeler (isteğe bağlı)]
+// En fazla 3 seviye (Bronz → Gümüş → Altın); tek seviyeli olanların kademesi elle verilir. Çeşitlilik seviyeyle değil farklı rozetlerle.
 const BFAM = [
-  ["kazanan","tahmin","✅","Kazanan avcısı",[1,10,25,50,100,250,500,1000],t=>`${t} maçın kazananını bil`, s=>s.w],
-  ["fark","tahmin","📏","Fark bilgini",[1,5,10,25,50,100,250],t=>`${t} maçın farkını (±3) bil`, s=>s.m],
-  ["nokta","tahmin","🎯","Nokta atışı",[1,3,5,10,25,50],t=>`${t} maçın farkını tam bil`, s=>s.mx],
-  ["skorer","tahmin","🏀","Skorer avcısı",[1,5,10,25,50,100,250],t=>`${t} maçın en skorerini bil`, s=>s.s],
-  ["kusursuz","tahmin","💯","Kusursuz maç",[1,3,5,10,25,50],t=>`${t} maçta kazanan, fark ve en skoreri birlikte bil`, s=>s.full],
-  ["kahin","tahmin","🔮","Kâhin",[1,3,5,10,25],t=>`${t} gece bütün maçların kazananını bil (en az 3 maç)`, s=>s.kahin],
-  ["farkgece","tahmin","📐","Fark ustası",[1,3,5,10],t=>`${t} gece en az 3 maçın farkını bil`, s=>s.farkGece],
-  ["dp","tahmin","🌟","Keskin göz",[1,3,5,10,25],t=>`Günün oyuncusunu ${t} kez bil`, s=>s.dp],
-  ["soru","tahmin","🦉","Bilge",[1,5,10,25,50,100],t=>`Gecenin sorusunu ${t} kez bil`, s=>s.q],
-  ["banko","tahmin","⭐","Banko ustası",[1,5,10,25,50,100],t=>`${t} bankoyu tuttur`, s=>s.bOk],
-  ["evsahibi","tahmin","🏠","Ev sahibi dostu",[10,25,50,100],t=>`Ev sahibi takımın kazandığı ${t} maçı bil`, s=>s.home],
-  ["deplasman","tahmin","✈️","Deplasman fatihi",[10,25,50,100],t=>`Deplasman takımının kazandığı ${t} maçı bil`, s=>s.away],
-  ["ezici","tahmin","🔨","Ezici galibiyet",[1,3,5,10],t=>`20 ve üstü farkla biten ${t} maçın farkını bil`, s=>s.blowM],
-  ["cekismeli","tahmin","⚔️","Çekişmeli maç",[1,5,10,25],t=>`5 ve altı farkla biten ${t} maçın farkını bil`, s=>s.tightM],
-  ["kirk","tahmin","💥","40'lık gece",[1,3,5],t=>`En skoreri 40+ sayı atan ${t} maçta en skoreri bil`, s=>s.s40],
-  ["ucleme","tahmin","🎩","Skorer üçlemesi",[1,3,5],t=>`${t} gece en az 3 maçın en skorerini bil`, s=>s.s3night],
-  ["kombo","tahmin","🎰","Üçlü kombo",[1,3],t=>`${t} gece banko, günün oyuncusu ve gecenin sorusunu birlikte bil`, s=>s.combo],
-  ["ligturu","tahmin","🗺️","Lig turu",[10,20,30],t=>`${t} farklı takımı kazanan olarak doğru seç`, s=>s.teams],
-  ["kupa","tahmin","🏅","Büyük sahne",[1,5,10,25],t=>`NBA Kupası ya da playoff'ta ${t} maçın kazananını bil`, s=>s.cup],
-  ["surpriz","surpriz","🎲","Sürpriz avcısı",[1,5,10,25,50,100],t=>`ESPN şansı %33 ve altı ${t} kazananı bil`, s=>s.sur],
-  ["deprem","surpriz","🌋","Deprem",[1,3,5,10,25],t=>`ESPN şansı %20 ve altı ${t} kazananı bil`, s=>s.sur3],
-  ["tek","surpriz","🦄","Tek doğru",[1,3,5,10,25],t=>`Ligde yalnızca senin bildiğin ${t} maç kazananı`, s=>s.onlyW],
-  ["tekskorer","surpriz","🔭","Tek görüş",[1,3,5,10],t=>`En skoreri ligde yalnızca sen bil, ${t} kez`, s=>s.onlyS],
-  ["yazitura","surpriz","🪙","Yazı tura",[1,5,10,25],t=>`2 sayı ya da daha az farkla biten ${t} maçın kazananını bil`, s=>s.close],
-  ["uzatma","surpriz","⏱️","Uzatma ustası",[1,5,10],t=>`Uzatmaya giden ${t} maçın kazananını bil`, s=>s.ot],
-  ["cesur","surpriz","🦁","Cesur banko",[1,3,5],t=>`ESPN şansı %33 ve altı bir takımı bankoya koyup ${t} kez tuttur`, s=>s.braveB],
-  ["ortak","surpriz","🤝","Ortaklık",[1,3],t=>`${t} gece birinciliği paylaş`, s=>s.tieWin],
-  ["kilpayi","surpriz","🤏","Kıl payı",[1,3,5],t=>`${t} geceyi tek puan farkla kazan`, s=>s.nightBy1],
-  ["seriw","seri","🔥","Alev aldı",[5,10,15,20,30],t=>`Üst üste ${t} maçın kazananını bil`, s=>s.wRun],
-  ["serib","seri","💫","Banko serisi",[3,5,8,12],t=>`Üst üste ${t} bankoyu tuttur`, s=>s.bRun],
-  ["serig","seri","🌙","Gece kralı",[2,3,5],t=>`Üst üste ${t} gece kazan`, s=>s.nRun],
-  ["serio","seri","🗓️","Durmak yok",[3,7,14,30,60],t=>`Üst üste ${t} gece kendin tahmin yap`, s=>s.playRun],
-  ["gece","zafer","🏆","Gecenin kazananı",[1,3,5,10,25,50],t=>`${t} gece tek başına birinci ol`, s=>s.nWins],
-  ["hafta","zafer","👑","Haftanın şampiyonu",[1,3,5,10],t=>`${t} haftayı kazan`, s=>s.wkWins],
-  ["ay","zafer","📅","Ayın şampiyonu",[1,2,3,6],t=>`${t} ayı kazan`, s=>s.moWins],
+  ["kazanan","tahmin","✅","Kazanan avcısı",[25,100,500],t=>`${t} maçın kazananını bil`, s=>s.w],
+  ["fark","tahmin","📏","Fark bilgini",[10,50,150],t=>`${t} maçın farkını (±3) bil`, s=>s.m],
+  ["nokta","tahmin","🎯","Nokta atışı",[1,5,20],t=>`${t} maçın farkını tam bil`, s=>s.mx],
+  ["skorer","tahmin","🏀","Skorer avcısı",[10,50,150],t=>`${t} maçın en skorerini bil`, s=>s.s],
+  ["kusursuz","tahmin","💯","Kusursuz maç",[1,5,20],t=>`${t} maçta kazanan, fark ve en skoreri birlikte bil`, s=>s.full],
+  ["kahin","tahmin","🔮","Kâhin",[1,5],t=>`${t} gece bütün maçların kazananını bil (en az 3 maç)`, s=>s.kahin, "ap"],
+  ["farkgece","tahmin","📐","Fark ustası",[1,5],t=>`${t} gece en az 3 maçın farkını bil`, s=>s.farkGece],
+  ["dp","tahmin","🌟","Keskin göz",[1,5,15],t=>`Günün oyuncusunu ${t} kez bil`, s=>s.dp],
+  ["soru","tahmin","🦉","Bilge",[5,25,75],t=>`Gecenin sorusunu ${t} kez bil`, s=>s.q],
+  ["banko","tahmin","⭐","Banko ustası",[5,25,75],t=>`${t} bankoyu tuttur`, s=>s.bOk],
+  ["evsahibi","tahmin","🏠","Ev sahibi dostu",[25,100],t=>`Ev sahibinin kazandığı ${t} maçı bil`, s=>s.home],
+  ["deplasman","tahmin","✈️","Deplasman fatihi",[25,100],t=>`Deplasman takımının kazandığı ${t} maçı bil`, s=>s.away],
+  ["ezici","tahmin","🔨","Ezici galibiyet",[1,5],t=>`20 ve üstü farkla biten ${t} maçın farkını bil`, s=>s.blowM],
+  ["cekismeli","tahmin","⚔️","Çekişmeli maç",[5,25],t=>`5 ve altı farkla biten ${t} maçın farkını bil`, s=>s.tightM],
+  ["kirk","tahmin","💥","40'lık gece",[1,3],t=>`En skoreri 40+ sayı atan ${t} maçta en skoreri bil`, s=>s.s40],
+  ["ucleme","tahmin","🎩","Skorer üçlemesi",[1,5],t=>`${t} gece en az 3 maçın en skorerini bil`, s=>s.s3night],
+  ["kombo","tahmin","🎰","Üçlü kombo",[1],t=>`Aynı gece banko, günün oyuncusu ve gecenin sorusunu birlikte bil`, s=>s.combo, "p"],
+  ["ligturu","tahmin","🗺️","Lig turu",[30],t=>`30 takımın hepsini en az bir kez doğru kazanan seç`, s=>s.teams, "a"],
+  ["kupa","tahmin","🏅","Büyük sahne",[1,10],t=>`NBA Kupası ya da playoff'ta ${t} maçın kazananını bil`, s=>s.cup],
+  ["surpriz","surpriz","🎲","Sürpriz avcısı",[5,25,75],t=>`ESPN şansı %33 ve altı ${t} kazananı bil`, s=>s.sur],
+  ["deprem","surpriz","🌋","Deprem",[1,5,15],t=>`ESPN şansı %20 ve altı ${t} kazananı bil`, s=>s.sur3],
+  ["tek","surpriz","🦄","Tek doğru",[1,5,15],t=>`Ligde yalnızca senin bildiğin ${t} maç kazananı`, s=>s.onlyW],
+  ["tekskorer","surpriz","🔭","Tek görüş",[1,5],t=>`En skoreri ligde yalnızca sen bil, ${t} kez`, s=>s.onlyS],
+  ["yazitura","surpriz","🪙","Yazı tura",[5,20],t=>`2 sayı ya da daha az farkla biten ${t} maçın kazananını bil`, s=>s.close],
+  ["uzatma","surpriz","⏱️","Uzatma ustası",[1,5],t=>`Uzatmaya giden ${t} maçın kazananını bil`, s=>s.ot],
+  ["cesur","surpriz","🦁","Cesur banko",[1,5],t=>`ESPN şansı %33 ve altı bir takımı bankoya koyup ${t} kez tuttur`, s=>s.braveB],
+  ["ortak","surpriz","🤝","Ortaklık",[1],t=>`Gece birinciliğini paylaş`, s=>s.tieWin, "b"],
+  ["kilpayi","surpriz","🤏","Kıl payı",[1,3],t=>`${t} geceyi tek puan farkla kazan`, s=>s.nightBy1],
+  ["seriw","seri","🔥","Alev aldı",[5,10,20],t=>`Üst üste ${t} maçın kazananını bil`, s=>s.wRun],
+  ["serib","seri","💫","Banko serisi",[3,6,10],t=>`Üst üste ${t} bankoyu tuttur`, s=>s.bRun],
+  ["serig","seri","🌙","Gece kralı",[2,3,5],t=>`Üst üste ${t} gece kazan`, s=>s.nRun, "gap"],
+  ["serio","seri","🗓️","Durmak yok",[7,30],t=>`Üst üste ${t} gece kendin tahmin yap`, s=>s.playRun],
+  ["gece","zafer","🏆","Gecenin kazananı",[1,10,25],t=>`${t} gece tek başına birinci ol`, s=>s.nWins],
   ["zirve","zafer","⛰️","Zirvede",[1,7,30],t=>`${t} gece sonunda genel sıralamada tek başına lider ol`, s=>s.leadN],
   ["roket","zafer","🛫","Roket",[1,3],t=>`Bir gecede genel sıralamada en az 3 basamak yüksel (${t} kez)`, s=>s.climb],
-  ["rekor","zafer","🚀","Büyük gece",[15,20,25,30,40,50],t=>`Bir gecede ${t} puan topla`, s=>s.bestNight],
-  ["toplam","zafer","💰","Puan kasası",[50,100,250,500,1000],t=>`Sezonda ${t} puana ulaş`, s=>s.total],
-  ["oynadi","devam","🎮","Sahada",[1,5,10,25,50,100,150],t=>`${t} gece kendin tahmin yap`, s=>s.played],
-  ["tamgece","devam","🧩","Eksiksiz",[1,5,10,25,50,100],t=>`${t} gece bütün maçları, bankoyu, günün oyuncusunu ve soruyu doldur`, s=>s.fullNight],
+  ["rekor","zafer","🚀","Büyük gece",[20,30,40],t=>`Bir gecede ${t} puan topla`, s=>s.bestNight],
+  ["toplam","zafer","💰","Puan kasası",[100,500,1000],t=>`Sezonda ${t} puana ulaş`, s=>s.total],
+  ["w1","odul","🥇","Haftanın birincisi",[1,5],t=>`Haftayı ${t} kez birinci bitir`, s=>s.wk1, "ap"],
+  ["w2","odul","🥈","Haftanın ikincisi",[1],t=>`Haftayı ikinci bitir`, s=>s.wk2, "g"],
+  ["w3","odul","🥉","Haftanın üçüncüsü",[1],t=>`Haftayı üçüncü bitir`, s=>s.wk3, "b"],
+  ["podyum","odul","🏁","Podyum müdavimi",[5],t=>`5 hafta ilk 3'te bitir`, s=>s.wkTop3, "p"],
+  ["ay","odul","📅","Ayın şampiyonu",[1,3],t=>`${t} ayı birinci bitir`, s=>s.moWins, "ap"],
+  ["a_top","odul","👑","Ayın tahmincisi",[1],t=>`Aylık ödüllerde "Ayın tahmincisi" ol`, s=>s.aw.top, "a"],
+  ["a_banko","odul","★","Ayın banko ustası",[1],t=>`Aylık ödüllerde "Banko ustası" ol`, s=>s.aw.banko, "a"],
+  ["a_surpriz","odul","🎯","Ayın sürpriz avcısı",[1],t=>`Aylık ödüllerde "Sürpriz avcısı" ol`, s=>s.aw.surpriz, "a"],
+  ["a_skorer","odul","🔥","Ayın skorer ustası",[1],t=>`Aylık ödüllerde "Skorer ustası" ol`, s=>s.aw.skorer, "a"],
+  ["a_fark","odul","📏","Ayın fark ustası",[1],t=>`Aylık ödüllerde "Fark ustası" ol`, s=>s.aw.fark, "a"],
+  ["oynadi","devam","🎮","Sahada",[10,50,100],t=>`${t} gece kendin tahmin yap`, s=>s.played],
+  ["tamgece","devam","🧩","Eksiksiz",[5,25,75],t=>`${t} gece bütün maçları, bankoyu, günün oyuncusunu ve soruyu doldur`, s=>s.fullNight],
   ["maraton","devam","🏃","Maraton",[1,5],t=>`En az 12 maçlı ${t} gecede bütün maçları kendin tahmin et`, s=>s.marathon],
-  ["hergun","devam","🌈","Haftanın her günü",[7],t=>`Haftanın 7 farklı gününde kendin tahmin yap`, s=>s.weekdays],
-  ["devamlilik","devam","📈","Devamlılık",[1,4,8,16],t=>`${t} hafta en az 4 gece kendin oyna`, s=>s.weeks4],
-  ["girisseri","devam","🔁","Sadık ziyaretçi",[3,7,14,30,60,100],t=>`Üst üste ${t} gün siteye gir`, s=>s.visitRun],
-  ["giris","devam","🚪","Müdavim",[7,30,60,100,180],t=>`${t} farklı gün siteye gir`, s=>s.visits],
-  ["kidem","devam","🎖️","Kıdemli",[7,30,90,180],t=>`${t} gündür ligde ol`, s=>s.age],
-  ["uzunvade","devam","🔭","Uzak görüş",[1,5,10],t=>`${t} uzun vade turunda tahmin yap`, s=>s.lt],
-  ["davet","sosyal","🤝","Elçi",[1,3,5,10,20],t=>`Lige ${t} kişi getir`, s=>s.inv],
+  ["hergun","devam","🌈","Haftanın her günü",[7],t=>`Haftanın 7 farklı gününde kendin tahmin yap`, s=>s.weekdays, "g"],
+  ["devamlilik","devam","📈","Devamlılık",[1,8],t=>`${t} hafta en az 4 gece kendin oyna`, s=>s.weeks4],
+  ["girisseri","devam","🔁","Sadık ziyaretçi",[7,30,100],t=>`Üst üste ${t} gün siteye gir`, s=>s.visitRun],
+  ["giris","devam","🚪","Müdavim",[30,100],t=>`${t} farklı gün siteye gir`, s=>s.visits],
+  ["kidem","devam","🎖️","Kıdemli",[30,180],t=>`${t} gündür ligde ol`, s=>s.age],
+  ["uzunvade","devam","🔭","Uzak görüş",[1,10],t=>`${t} uzun vade turunda tahmin yap`, s=>s.lt],
+  ["davet","sosyal","🤝","Elçi",[1,5,15],t=>`Lige ${t} kişi getir`, s=>s.inv],
   ["akilhocasi","sosyal","🧑‍🏫","Akıl hocası",[1,3],t=>`Getirdiğin ${t} kişi en az 5 gece kendisi oynasın`, s=>s.mentor],
-  ["rakip","sosyal","🥊","Kanlı bıçaklı",[1],t=>`Profilinden bir rakip seç`, s=>s.rival],
-  ["profil","sosyal","🪪","Kimlik kartı",[1],t=>`Profilini tamamla: avatar, takım adı, favori takım ve hakkında yazısı`, s=>s.profile],
-  ["sadik","eglence","💛","Sadık taraftar",[10,25,50],t=>`Favori takımını ${t} kez kazanan seç`, s=>s.loyal],
-  ["ihanet","eglence","🐍","İhanet",[1,5],t=>`Favori takımının maçında ${t} kez rakibini seç`, s=>s.betray],
-  ["yanik","eglence","🔥","Banko kurbanı",[1,5,10],t=>`${t} bankonun yanması`, s=>s.bLost],
-  ["dip","eglence","🕳️","Kötü gece",[1,3],t=>`${t} gece ligin sonuncusu ol`, s=>s.lastN],
-  ["kortalih","eglence","🙈","Kör talih",[1,3],t=>`${t} gece bütün kazananları kaçır (en az 3 maç)`, s=>s.allWrong],
+  ["rakip","sosyal","🥊","Kanlı bıçaklı",[1],t=>`Profilinden bir rakip seç`, s=>s.rival, "b"],
+  ["profil","sosyal","🪪","Kimlik kartı",[1],t=>`Profilini tamamla: avatar, takım adı, favori takım ve hakkında yazısı`, s=>s.profile, "b"],
+  ["sadik","eglence","💛","Sadık taraftar",[10,50],t=>`Favori takımını ${t} kez kazanan seç`, s=>s.loyal, "bg"],
+  ["ihanet","eglence","🐍","İhanet",[1],t=>`Favori takımının maçında rakibini seç`, s=>s.betray, "b"],
+  ["yanik","eglence","🔥","Banko kurbanı",[1,10],t=>`${t} bankonun yanması`, s=>s.bLost, "bg"],
+  ["dip","eglence","🕳️","Kötü gece",[1],t=>`Bir gece ligin sonuncusu ol`, s=>s.lastN, "b"],
+  ["kortalih","eglence","🙈","Kör talih",[1],t=>`Bir gecede bütün kazananları kaçır (en az 3 maç)`, s=>s.allWrong, "b"],
 ];
-const TIERMAP = {1:"a",2:"ba",3:"bga",4:"bgap",5:"bgape",6:"bggape",7:"bggaape",8:"bbggaape"};
-const bTierOf = (i,n,cat) => { const t=TIERMAP[n][i]; return cat==="eglence" && "ape".includes(t) ? "g" : t; };
-const BLIST = BFAM.flatMap(([id,cat,ico,name,th,desc]) => th.map((t,i)=>({id:`${id}${i+1}`, fam:id, cat, ico, lvl:i+1, of:th.length, t, name:th.length>1?`${name} ${i+1}`:name, base:name, desc:desc(t), tier:bTierOf(i,th.length,cat)})));
+// Takım uzmanlıkları: her takım için ayrı rozet (o takımın maçlarında 10 kez doğru kazanan)
+const TEAM_NICK = {ATL:"Hawks",BOS:"Celtics",BKN:"Nets",CHA:"Hornets",CHI:"Bulls",CLE:"Cavaliers",DAL:"Mavericks",DEN:"Nuggets",DET:"Pistons",GS:"Warriors",HOU:"Rockets",IND:"Pacers",LAC:"Clippers",LAL:"Lakers",MEM:"Grizzlies",MIA:"Heat",MIL:"Bucks",MIN:"Timberwolves",NO:"Pelicans",NY:"Knicks",OKC:"Thunder",ORL:"Magic",PHI:"76ers",PHX:"Suns",POR:"Trail Blazers",SA:"Spurs",SAC:"Kings",TOR:"Raptors",UTAH:"Jazz",WSH:"Wizards"};
+for(const [a,n] of Object.entries(TEAM_NICK)) BFAM.push([`tm_${a}`,"takim",`<img class="bimg" src="${LOGO_SMALL(a)}" alt="">`,`${n} uzmanı`,[10],()=>`${n} maçlarında 10 kez kazananı doğru bil`, s=>s.teamW[a]||0, "g"]);
+// Oyuncu uzmanlıkları: yıldızlar için ayrı rozet (maçın en skorerini o oyuncu olarak 3 kez doğru bil)
+const BSTARS = [...STARS.slice(0,24), ...STARS.filter(x=>/Sengun/.test(x[1]))];
+for(const [id,n] of BSTARS) BFAM.push([`pl_${id}`,"oyuncu",`<img class="bimg pl" src="${HEADSHOT(id)}" alt="" loading="lazy">`,`${n} uzmanı`,[3],()=>`3 maçta en skoreri ${n} olarak doğru bil`, s=>s.plS[n.toLowerCase()]||0, "a"]);
+const BTIERMAP = {1:"g",2:"ba",3:"bga"};
+const bTierOf = (i,n,cat,ov) => ov ? ov[i] : BTIERMAP[n][i];
+const BLIST = BFAM.flatMap(([id,cat,ico,name,th,desc,m,ov]) => th.map((t,i)=>({id:`${id}${i+1}`, fam:id, cat, ico, lvl:i+1, of:th.length, t, name:th.length>1?`${name} ${["I","II","III"][i]}`:name, base:name, desc:desc(t), tier:bTierOf(i,th.length,cat,ov)})));
 const BADGES = BLIST;   // eski adla da kullanılıyor
 
 // Lig genelinde bir kere hesaplanan bağlam (geceler, maç başına kim bildi)
@@ -2471,7 +2487,7 @@ function bctx(){
 function bstats(u){
   const C=bctx(); if(C.cache[u]) return C.cache[u];
   const recs=userRecs(u), s={w:0,m:0,mx:0,s:0,full:0,cup:0,sur:0,sur3:0,close:0,ot:0,bOk:0,bLost:0,loyal:0,betray:0,home:0,away:0,blowM:0,tightM:0,s40:0,braveB:0};
-  const teams=new Set();
+  const teams=new Set(); s.teamW={}; s.plS={};
   const fav=(S.players[u]?.favTeam||"").toUpperCase();
   let wRun=0, bRun=0; s.wRun=0; s.bRun=0;
   const byDay={};
@@ -2482,6 +2498,8 @@ function bstats(u){
     if(r.w>0 && (r.tier||1)>=2) s.sur++; if(r.w>0 && (r.tier||1)>=3) s.sur3++;
     if(r.w>0 && g.margin!=null && g.margin<=2) s.close++;
     if(r.w>0 && g.ot) s.ot++;
+    if(r.w>0) for(const t of [x.home?.abbr, x.away?.abbr]) if(t) s.teamW[t]=(s.teamW[t]||0)+1;
+    if(r.s>0 && r.pick?.s){ const k=String(r.pick.s).toLowerCase(); s.plS[k]=(s.plS[k]||0)+1; }
     if(r.w>0){ teams.add(r.pick?.w); if(x.winner===x.home?.abbr) s.home++; else s.away++; }
     if(r.m>0 && g.margin>=20) s.blowM++; if(r.m>0 && g.margin!=null && g.margin<=5) s.tightM++;
     if(r.s>0 && (g.top?.[0]?.pts||0)>=40) s.s40++;
@@ -2499,7 +2517,11 @@ function bstats(u){
     if(n.w?.st==="w" && n.w.u===u){ s.nWins++; nr++; s.nRun=Math.max(s.nRun,nr);
       const others=S.order.filter(x=>x!==u && n.p[x]).map(x=>n.p[x].pts-(n.p[x].bon||0)); if(others.length && n.w.pts-Math.max(...others)===1) s.nightBy1++; }
     else nr=0; }
-  s.wkWins=C.wk[u]||0; s.moWins=C.mo[u]||0;
+  s.moWins=C.mo[u]||0;
+  s.wk1=0; s.wk2=0; s.wk3=0; s.wkTop3=0;
+  for(const l of Object.values(S.arch.scores.weekAwards||{})) for(const x of l) if(x.u===u){ s["wk"+x.place]++; s.wkTop3++; }
+  s.aw={top:0,banko:0,surpriz:0,skorer:0,fark:0};
+  for(const a of Object.values(S.arch.scores.awards||{})) for(const x of a.list||[]) if(x.u?.includes(u) && x.k in s.aw) s.aw[x.k]++;
   s.leadN=C.leadN[u]||0; s.climb=C.climb[u]||0; s.lastN=C.lastN[u]||0; s.tieWin=C.tieWin[u]||0;
   s.total=S.arch.scores.totals?.[u]?.pts||0;
   // kendi oynadığı geceler
@@ -2625,7 +2647,7 @@ function renderPuan(){
     <div class="bb">${bb.map((x,i)=>`<div class="bb-row${x.u===S.uid?" me":""}" data-pb="${x.u}" role="button" tabindex="0" style="--pc:${col(x.u)}"><span class="rk">${i+1}</span>${avatar(x.u,"sm")}
       <span class="bb-nm"><b style="color:${col(x.u)}">${esc(S.players[x.u]?.club||pname(x.u))}</b><small>${x.n} rozet${x.top.length?" · "+x.top.map(b=>`<i class="bt t-${b.tier}" title="${esc(b.name)}">${b.ico}</i>`).join(""):""}</small></span>
       <span class="bb-p">${x.pts}<small>puan</small></span></div>`).join("")}</div>
-    <p class="muted" style="font-size:13px;margin:6px 2px">Rozet puanı: Bronz 1 · Gümüş 2 · Altın 4 · Platin 7 · Efsane 12. Satıra dokunarak rozetleri gör.</p>`;
+    <p class="muted" style="font-size:13px;margin:6px 2px">Rozet puanı: Bronz 1 · Gümüş 2 · Altın 4 · Platin 7. Satıra dokunarak rozetleri gör.</p>`;
   // aylık şampiyonlar duvarı
   const mt=monthTable(), curM=monthKey(S.today), mks=Object.keys(mt).sort().reverse();
   if(mks.length){
@@ -3178,13 +3200,15 @@ function badgesFull(u){
     const cards=fams.map(([id,,fico,name,th])=>{
       const lv=all.filter(b=>b.fam===id), have=lv.filter(b=>b.n), top=have[have.length-1], next=lv.find(b=>!b.n), v=lv[0].val;
       const prev = top ? top.t : 0, pct = next ? Math.min(100, Math.max(0,(v-prev)/(next.t-prev)*100)) : 100;
+      if(cat==="takim" || cat==="oyuncu") return `<div class="bfam mini ${top?"on t-"+top.tier:"locked"}" title="${esc(lv[0].desc)}"><span class="bf-ico">${fico}</span><span class="bf-b"><b>${esc(name.replace(/ uzmanı$/,""))}</b><span class="bd-bar"><i style="width:${Math.min(100,v/lv[0].t*100)}%"></i></span><span class="bf-pr">${top?"✓ kazanıldı":`${v}/${lv[0].t}`}</span></span></div>`;
       return `<div class="bfam ${top?"on t-"+top.tier:"locked"}"><span class="bf-ico">${fico}</span>
         <span class="bf-b"><b>${esc(name)}</b>${top?`<em class="bf-lv t-${top.tier}">${th.length>1?`Seviye ${top.lvl}/${th.length} · `:""}${BTIER[top.tier].n}</em>`:`<em class="bf-lv">Kilitli</em>`}
         <small>${next?esc(next.desc):"Bütün seviyeler tamam 🎉"}</small>
         ${next?`<span class="bd-bar"><i style="width:${pct}%"></i></span><span class="bf-pr">${v}/${next.t}${own[next.id]?` · ligde ${own[next.id]} kişide var`:""}</span>`:""}
         <span class="bf-dots">${lv.map(b=>`<i class="${b.n?"on t-"+b.tier:""}" title="${esc(b.name+" · "+BTIER[b.tier].n+" (+"+BTIER[b.tier].p+")")}"></i>`).join("")}</span></span></div>`; }).join("");
     const cGot=all.filter(b=>b.cat===cat && b.n).length, cAll=all.filter(b=>b.cat===cat).length;
-    html+=`<div class="sec-title"><h2 style="font-size:19px">${ico} ${cname}</h2><span class="aside">${cGot}/${cAll}</span></div><div class="bfams">${cards}</div>`;
+    const sub = cat==="takim" ? `<p class="muted bf-sub">Bir takımın maçlarında 10 kez kazananı doğru bil · Gümüş +2</p>` : cat==="oyuncu" ? `<p class="muted bf-sub">Maçın en skorerini bu oyuncu olarak 3 kez doğru bil · Altın +4</p>` : "";
+    html+=`<div class="sec-title"><h2 style="font-size:19px">${ico} ${cname}</h2><span class="aside">${cGot}/${cAll}</span></div>${sub}<div class="bfams${sub?" mini":""}">${cards}</div>`;
   }
   return html;
 }
@@ -3940,8 +3964,8 @@ function showBadgeIntro(){
   lsSet("bIntro1","1");
   const all=badgesOf(S.uid), got=all.filter(b=>b.n), pts=badgePts(all), rank=badgeBoard().findIndex(x=>x.u===S.uid)+1;
   openSheet(`<div class="nudge-d"><div class="lp-ico">🏅</div><h3 id="shTitle">Rozetler yenilendi</h3>
-    <p>Artık <b>${BLIST.length} rozet</b> var: tahmin ustalığı, sürpriz ve şans, seriler, zaferler, devamlılık (düzenli girmek ve oynamak), sosyal (lige arkadaş getirmek) ve eğlence.</p>
-    <p>Her rozetin bir kademesi var: <span class="bt-chip t-b">Bronz +1</span> <span class="bt-chip t-g">Gümüş +2</span> <span class="bt-chip t-a">Altın +4</span> <span class="bt-chip t-p">Platin +7</span> <span class="bt-chip t-e">Efsane +12</span>. Topladığın <b>rozet puanı</b> ana puandan ayrı, Sıralama sekmesindeki <b>Rozet sıralaması</b>nda yarışıyor.</p>
+    <p>Artık <b>${BLIST.length} rozet</b> var: tahmin ustalığı, sürpriz ve şans, seriler, zaferler, haftalık ve aylık ödüller, her takım için takım uzmanlığı, yıldız oyuncular için oyuncu uzmanlığı, devamlılık, sosyal ve eğlence.</p>
+    <p>Her rozetin bir kademesi var: <span class="bt-chip t-b">Bronz +1</span> <span class="bt-chip t-g">Gümüş +2</span> <span class="bt-chip t-a">Altın +4</span> <span class="bt-chip t-p">Platin +7</span>. Topladığın <b>rozet puanı</b> ana puandan ayrı, Sıralama sekmesindeki <b>Rozet sıralaması</b>nda yarışıyor.</p>
     <p>Şu an <b>${got.length} rozetin</b> ve <b>${pts} rozet puanın</b> var${rank?`; rozet sıralamasında <b>${rank}.</b> sıradasın`:""}.</p>
     <button class="btn primary" id="biGo" type="button" style="width:100%">Rozetlerime bak</button></div>`);
   $("#biGo").onclick=()=>{ closeSheet(); setTimeout(()=>openProf(S.uid,"roz"), 350); };
