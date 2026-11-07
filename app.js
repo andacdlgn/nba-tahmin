@@ -45,12 +45,13 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.28.0";
+const VERSION = "1.28.1";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.28.1", d:"7 Kasım 2026", items:["Puan durumu: her puan kategorisi kendi sütununda (Kazanan, Fark, Skorer, Günün oyuncusu, Gecenin sorusu, Uzun vade, Ödül); sütunların toplamı puana eşit. Telefonda tablo yana kaydırılır, oyuncu adı sabit kalır."]},
   {v:"1.28.0", d:"7 Kasım 2026", items:["Rozetler: seviyeler en fazla 3 (Bronz, Gümüş, Altın), Efsane kaldırıldı. Çeşitlilik artık farklı rozetlerle: 120 ayrı rozet ailesi, toplam 190 rozet.","Yeni: 30 takımın her biri için takım uzmanlığı (takım logolu), 25 yıldız için oyuncu uzmanlığı (oyuncu fotoğraflı), haftalık birincilik / ikincilik / üçüncülük, podyum müdavimi ve her aylık ödül için ayrı rozet."]},
   {v:"1.27.0", d:"7 Kasım 2026", items:["Haftalık ilk 3: her haftanın 1.sine +10, 2.sine +7, 3.süne +5 sezon puanı (9 Kasım haftasından itibaren). Eşitlikte gece birincilikleri, kazanan, fark, en skorer ve en iyi gece bakılır.","Sıralama sekmesinde Sezon / Bu hafta / Geçen hafta geçişli tablo; pazartesi geçen haftanın ilk 3'ü penceresi."]},
   {v:"1.26.1", d:"7 Kasım 2026", items:["Puan tablosu ile \"Puanlar nereden geldi\" tek bir Puan durumu tablosunda birleşti: puanın dağılımı adının altında.","Yeni rozetler: Ev sahibi dostu, Deplasman fatihi, Ezici galibiyet, Çekişmeli maç, 40'lık gece, Skorer üçlemesi, Üçlü kombo, Lig turu, Cesur banko, Ortaklık, Zirvede, Roket, Maraton, Haftanın her günü, Akıl hocası, Kanlı bıçaklı, Kötü gece."]},
@@ -2619,12 +2620,16 @@ function renderPuan(){
   if(rv && S.players[rv] && tot[rv]!=null){ const d=tot[S.uid]-tot[rv], wk=weekKey(S.today), wkP=u=>dayRows.filter(x=>weekKey(x.d)===wk).reduce((s,x)=>s+(x.pts[u]?.pts||0),0), wd=wkP(S.uid)-wkP(rv);
     rivalBox=`<div class="rival-card" style="--pc:${col(rv)}">${avatar(S.uid,"sm")}<span class="rv-vs">VS</span>${avatar(rv,"sm")}<span class="rv-t"><b>Rakibin ${esc(pname(rv))}</b><small>${d>0?`Sezonda ${d} puan öndesin`:d<0?`Sezonda ${-d} puan gerisindesin`:"Sezonda puanlar eşit"} · bu hafta ${wd>0?`+${wd}`:wd}</small></span><button class="linkish" data-pu="${rv}" type="button">Profil</button></div>`; }
   const brk = seasonBreakdown();
-  const parts = u => { const b=brk[u]||{}; const o=(b.dp||0)+(b.q||0)+(b.sr||0)+(b.aw||0);
-    return [["Kazanan",b.w],["Fark",b.m],["Skorer",b.s],["Diğer",o],...(b.wa?[["Hafta ödülü",b.wa]]:[])].map(([l,v])=>`<span class="pt-p"><em>${l}</em> ${v||0}</span>`).join(""); };
+  const anySr = S.order.some(u=>brk[u]?.sr);
+  // Sezon tablosu: her puan kategorisi kendi sütununda; sütunların toplamı Puan'a eşit
+  const cols = [["Kazanan",u=>brk[u].w+brk[u].auto,"Kazanan puanı (banko ve otomatik tahmin dahil)"],["Fark",u=>brk[u].m,"Fark puanı"],["Skorer",u=>brk[u].s,"Maçın en skoreri"],["G. oyuncusu",u=>brk[u].dp,"Günün oyuncusu"],["Soru",u=>brk[u].q,"Gecenin sorusu"],
+    ...(anySr?[["Playoff",u=>brk[u].sr,"Playoff serileri"]]:[]),["Uzun vade",u=>brk[u].lt,"Uzun vade tahminleri"],["Ödül",u=>brk[u].bon+brk[u].aw+brk[u].wa,"Devamlılık bonusu + haftalık ilk 3 + aylık ödüller"],["Gece",u=>wins[u],"Tek başına kazandığı gece sayısı"],["Hafta",u=>wks[u],"Birinci bitirdiği hafta sayısı"]];
   const seasonTbl = `<div class="sec-title"><h2>Puan durumu</h2><span class="aside">${trialActive() ? `<span class="trial-tag">Deneme haftası</span> ${dayNice(shiftDay(trialOf().end,1),{day:"numeric",month:"long"})}'da sıfırlanır` : S.league?.start ? dayNice(leagueStart(),{day:"numeric",month:"long"})+" gecesinden beri" : "sezon"}</span></div>
-    <div class="tbl"><div class="tr th t-lb"><span>#</span><span>Oyuncu</span><span class="r">Puan</span><span class="c">Gece</span><span class="c">Hafta</span><span class="c" title="Uzun vade puanı">UV</span></div>
-    ${ranked.map((u,i)=>`<div class="tr t-lb${u===rv?" rival":""}${u===S.uid?" me":""}" data-pu="${u}"><span class="muted">${i+1}</span><span class="pn"><i style="background:${col(u)}"></i><span>${S.players[u]?.club?`<b class="pn-club">${esc(S.players[u].club)}</b><small class="pn-name">${esc(pname(u))} · <span class="nm-bp">🏅 ${badgePtsOf(u)}</span></small>`:`<b class="pn-solo">${esc(pname(u))}</b><small class="pn-name"><span class="nm-bp">🏅 ${badgePtsOf(u)}</span></small>`}<span class="pt-ps">${parts(u)}</span></span></span><span class="r big tnum">${tot[u]}</span><span class="c tnum">${wins[u]}</span><span class="c tnum">${wks[u]}</span><span class="c tnum">${S.lt?.loaded?ltPoints(u):"–"}</span></div>`).join("")}</div>
-    <p class="muted" style="font-size:13px;margin:6px 2px">Adın altında puanın nereden geldiği: Kazanan (banko dahil), Fark, Skorer ve Diğer (günün oyuncusu, gecenin sorusu, playoff serileri, lig ödülleri). Gece: tek başına en çok puan aldığın geceler. Hafta: kazandığın haftalar. UV: uzun vade puanı (Puan'a dahil). 🏅 rozet puanı (ayrı).</p>`;
+    <div class="st-wrap"><table class="st">
+      <thead><tr><th class="st-rk">#</th><th class="st-pl">Oyuncu</th><th class="st-tot">Puan</th>${cols.map(([l,,t],k)=>`<th title="${t}"${k>=cols.length-2?' class="st-cnt"':""}>${l}</th>`).join("")}</tr></thead>
+      <tbody>${ranked.map((u,i)=>`<tr class="${u===rv?"rival ":""}${u===S.uid?"me":""}" data-pu="${u}"><td class="st-rk">${i+1}</td><td class="st-pl"><span class="pn"><i style="background:${col(u)}"></i><span>${S.players[u]?.club?`<b class="pn-club">${esc(S.players[u].club)}</b><small class="pn-name">${esc(pname(u))}</small>`:`<b class="pn-solo">${esc(pname(u))}</b>`}</span></span></td><td class="st-tot tnum">${tot[u]}</td>${cols.map(([,f],k)=>{ const v=f(u)||0; return `<td class="tnum${k>=cols.length-2?" st-cnt":""}${v?"":" z"}">${v}</td>`; }).join("")}</tr>`).join("")}</tbody>
+    </table></div>
+    <p class="muted" style="font-size:13px;margin:6px 2px">Kazanan: banko ve otomatik tahmin dahil. Ödül: devamlılık bonusu, haftalık ilk 3 ve aylık ödüller. Puan bu sütunların toplamıdır. Gece ve Hafta: tek başına kazanılan gece ve birinci bitirilen hafta sayısı. Tablo telefonda yana kaydırılır.</p>`;
   S.pv ||= "sezon";
   const curWk=weekKey(S.today), lastWk=weekKey(shiftDay(curWk,-1)), wkSel = S.pv==="gecen" ? lastWk : curWk;
   const pvBar=`<div class="pv-seg" role="tablist">${[["sezon","Sezon"],["hafta","Bu hafta"],["gecen","Geçen hafta"]].map(([k,l])=>`<button type="button" data-pv="${k}" aria-pressed="${S.pv===k}">${l}</button>`).join("")}</div>`;
@@ -3070,7 +3075,7 @@ $("#banners").addEventListener("click", e=>{
 });
 
 /* ====================================================== oyuncu kartı, tahmin geçmişi, takım sayfası */
-document.addEventListener("click", e=>{ const p=e.target.closest(".podium [data-pu], .t-lb[data-pu], .t-wk[data-pu], .wkp[data-pu]"); if(p) openPlayer(p.dataset.pu); });
+document.addEventListener("click", e=>{ const p=e.target.closest(".podium [data-pu], .t-lb[data-pu], .st tr[data-pu], .t-wk[data-pu], .wkp[data-pu]"); if(p) openPlayer(p.dataset.pu); });
 document.addEventListener("click", e=>{ const b=e.target.closest("[data-pb]"); if(b) openProf(b.dataset.pb, "roz"); });
 $("#board").addEventListener("click", e=>{ if(e.target.closest("#lbInvite")) return openInvite(); if(e.target.closest("#lbMore")){ S.boardAll=!S.boardAll; return renderBoard(); } const p=e.target.closest("[data-pu]"); if(p) openPlayer(p.dataset.pu); });
 document.addEventListener("click", e=>{ const t=e.target.closest("[data-tp]"); if(t) { e.stopPropagation(); openTeam(t.dataset.tp); } });
