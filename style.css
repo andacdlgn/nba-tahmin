@@ -2126,3 +2126,7 @@ body.bars-hidden .chat-fab{transform:none}
 .ih-why{background:color-mix(in srgb,var(--amber) 10%,var(--panel));border:1px solid color-mix(in srgb,var(--amber) 35%,transparent);border-radius:12px;padding:10px 12px}
 .ih-btns{display:flex;flex-direction:column;gap:8px;margin-top:14px}
 .ih-btns .btn{width:100%}
+
+/* 1.25.3: alt menü dolu renk (arkadaki içerik gölge gibi görünmesin), iPhone'da altta daha az boşluk */
+.nav{background:var(--panel);backdrop-filter:none;-webkit-backdrop-filter:none;padding-bottom:max(6px, calc(env(safe-area-inset-bottom) - 14px))}
+.topbar{box-shadow:none}
