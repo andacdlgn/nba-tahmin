@@ -45,12 +45,13 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.24.1";
+const VERSION = "1.25.0";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.25.0", d:"7 Kasım 2026", items:["Davet linki WhatsApp, Instagram ve Telegram'da artık görselli bir kartla görünüyor.","Arada bir \"Ligi büyütelim\" penceresi davet linkini tek dokunuşla paylaşmayı hatırlatır (en fazla 4 kez)."]},
   {v:"1.24.0", d:"7 Kasım 2026", items:["Bu Gece sekmesinin üstünde \"Bu gece eksiklerin\" kutusu: eksik maç, banko, günün oyuncusu ve gecenin sorusu tek dokunuşla tamamlanır.","Bütün maçları doldurup banko ya da günün oyuncusunu unutursan bir pencere hatırlatır ve oradan hemen seçebilirsin.","Lige sonradan katılan, katılmadan önceki gecelerde otomatik tahmin yapmış sayılır."]},
   {v:"1.23.0", d:"7 Kasım 2026", items:["🎯 Nokta atışı: asıl ligden (9 Kasım) itibaren maçın farkını tam bilen +1 ek puan alır, fark puanı +2 olur. NBA Kupası ve playoff'ta bu da katlanır. \"40+\" tam sayılmaz.","Maç kartlarında nokta atışları 🎯 ile işaretlenir; yeni rozet: 5 nokta atışında \"Nokta atışı\". Aylık Fark ustası ödülünde nokta atışı 2 sayılır."]},
   {v:"1.22.0", d:"5 Kasım 2026", items:["Özel mesajlar: sohbet baloncuğunda artık \"Lig sohbeti\" ve \"Özel mesajlar\" sekmeleri var. Ligdeki birine yalnızca ikinizin görebileceği mesaj gönderebilirsin; yönetici dahil kimse okuyamaz.","Bir oyuncunun profilinden \"Mesaj gönder\" ile doğrudan yazabilirsin. İstemediğin birini konuşmanın üstündeki \"Engelle\" ile engelleyebilirsin. Küfür filtresi özel mesajlarda da geçerli."]},
@@ -1939,6 +1940,24 @@ function selfPlayDue(){
   if(!S.uid || lsGet("selfPlayPop1")) return false;
   const rows=Object.values(S.arch.scores?.days||{}).map(r=>r[S.uid]).filter(Boolean);
   return rows.length>=1 && rows.every(r=>!r.n) && !Object.values(S.days).some(D=>D.games.some(g=>D.picks[g.id]?.[S.uid]));
+}
+// Arada bir arkadaş davet etme hatırlatması: ligde en az 2 gündür olana, 5 günde bir, en fazla 4 kez
+function invitePopDue(){
+  if(!S.uid) return false;
+  const n=+lsGet("invPopN")||0, last=+lsGet("invPopAt")||0, joined=S.players[S.uid]?.joined||0;
+  return n<4 && Date.now()-last > 5*864e5 && joined && Date.now()-joined > 2*864e5;
+}
+function maybeInvitePop(){ autoPop(8, invitePopDue, showInvitePop); }
+function showInvitePop(){
+  lsSet("invPopN", String((+lsGet("invPopN")||0)+1)); lsSet("invPopAt", String(Date.now()));
+  const n=S.order.length, mine=invitedBy(S.uid).length;
+  openSheet(`<div class="nudge-d"><div class="lp-ico">🤝</div><h3 id="shTitle">Ligi büyütelim</h3>
+    <p>Ligde şu an <b>${n} kişi</b> var. Ne kadar kalabalık olursa geceler o kadar çekişmeli geçer; sohbet de şenlenir.</p>
+    <p>NBA izleyen bir arkadaşın varsa davet linkini gönder. Linkle gelen kodu yazmadan katılır${mine?`; şimdiye kadar <b>${mine} kişi</b> getirdin, profilinde görünüyor`:""}.</p>
+    <button class="btn primary" id="ipShare" type="button" style="width:100%">Davet linkimi paylaş</button>
+    <button class="linkish nd-later" id="ipLater" type="button">Şimdi değil</button><p class="msg" id="ipMsg"></p></div>`);
+  $("#ipShare").onclick=()=>shareInvite($("#ipMsg"));
+  $("#ipLater").onclick=()=>closeSheet();
 }
 function maybeSelfPlay(){ autoPop(2.5, selfPlayDue, showSelfPlay); }
 function showSelfPlay(){
@@ -5124,7 +5143,7 @@ if("serviceWorker" in navigator){ navigator.serviceWorker.getRegistrations?.().t
     else checkRecovery();
     loadLT(); setTimeout(installBanner, 6000); later(markSeen, 3000);
     // bilgilendirme pencereleri sıraya girer; açılıştan ~3 sn sonra en önemlisi (varsa) bir tane açılır
-    setTimeout(()=>{ maybeNews(); maybeCeremony(); maybeLeaguePop(); maybeSelfPlay(); maybeScoringGuide(); maybeAskAuto(); maybeRealName(); }, 600);
+    setTimeout(()=>{ maybeNews(); maybeCeremony(); maybeLeaguePop(); maybeSelfPlay(); maybeScoringGuide(); maybeInvitePop(); maybeAskAuto(); maybeRealName(); }, 600);
     later(()=>{ getDoc(doc(S.db,"config","admin")).then(()=>{ S.isAdmin=true; maybeArchiveTrial(); }).catch(()=>{ S.isAdmin=false; });
       getDoc(doc(S.db,"config","secret")).then(r=>{ S.invite=r.data()?.invite||""; }).catch(()=>{});
       allPlayers().catch(()=>{}); }, 2000);

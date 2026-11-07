@@ -8,6 +8,21 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>NBA Tahmin</title>
 <meta name="description" content="Her gecenin NBA maçlarına tahmin: kazanan, fark ve en skorer. Canlı skor ve puan tablosu.">
+<!-- Paylaşılan link önizlemesi (WhatsApp, Instagram, X, Telegram) -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="NBA Tahmin">
+<meta property="og:title" content="NBA Tahmin · Arkadaşlarınla her gece NBA tahmin ligi">
+<meta property="og:description" content="Her gece maçların kazananını, farkını ve en skorerini tahmin et, ligde arkadaşlarınla yarış. Davetle katıl, ücretsiz.">
+<meta property="og:url" content="https://andacdlgn.github.io/nba-tahmin/">
+<meta property="og:image" content="https://andacdlgn.github.io/nba-tahmin/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="NBA Tahmin: arkadaşlarınla her gece NBA tahmin ligi">
+<meta property="og:locale" content="tr_TR">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="NBA Tahmin · Arkadaşlarınla her gece NBA tahmin ligi">
+<meta name="twitter:description" content="Her gece maçların kazananını, farkını ve en skorerini tahmin et, ligde arkadaşlarınla yarış.">
+<meta name="twitter:image" content="https://andacdlgn.github.io/nba-tahmin/og.png">
 <!-- Hız: bağlantıları önceden aç, Firebase dosyalarını app.js ile aynı anda indir, yazı tipi sayfayı bekletmesin -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -17,7 +32,7 @@
 <link rel="preconnect" href="https://securetoken.googleapis.com" crossorigin>
 <link rel="preconnect" href="https://site.web.api.espn.com" crossorigin>
 <link rel="preconnect" href="https://a.espncdn.com">
-<link rel="modulepreload" href="app.js?v=1.24.1">
+<link rel="modulepreload" href="app.js?v=1.25.0">
 <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js" crossorigin>
 <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js" crossorigin>
 <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js" crossorigin>
@@ -32,7 +47,7 @@
 <script>
 // Açılış ekranı + sürüm kontrolü. Her güncellemede BUILD, version.json, app.js'deki VERSION ve
 // aşağıdaki ?v= numaraları birlikte artırılır (scripts/surum.py hepsini birden yapar).
-window.BUILD = "1.24.1";
+window.BUILD = "1.25.0";
 (function(){
   var t0 = Date.now(), MIN = 1000, MAX = 8000, ready = false, done = false;
   function hide(){ if(done) return; done = true; var s = document.getElementById("splash"); if(!s) return; s.classList.add("out"); setTimeout(function(){ s.remove(); }, 450); }
@@ -59,7 +74,7 @@ window.BUILD = "1.24.1";
   }).catch(function(){});
 })();
 </script>
-<link rel="stylesheet" href="style.css?v=1.24.1">
+<link rel="stylesheet" href="style.css?v=1.25.0">
 </head>
 <body>
 
@@ -241,6 +256,6 @@ window.BUILD = "1.24.1";
 
 <div class="toast hide" id="toast" role="status" aria-live="polite"></div>
 
-<script type="module" src="app.js?v=1.24.1"></script>
+<script type="module" src="app.js?v=1.25.0"></script>
 </body>
 </html>
