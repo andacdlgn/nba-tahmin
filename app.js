@@ -45,12 +45,13 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.28.1";
+const VERSION = "1.28.2";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.28.2", d:"7 Kasım 2026", items:["Puan durumu sütunları: Toplam, Galip, Fark, Maçın skoreri, Günün oyuncusu, Gecenin sorusu, Uzun vade, Bonus ve ödüller. Gece ve hafta birincilik sayıları tablodan çıktı.","Sıralama sayfası sadeleşti: sıralama grafiği, gece takvimi ve eski \"Bu hafta\" kutusu kalktı; sezon yarışı sezon grafiğiyle birleşti (▶ Oynat ile gece gece ilerler)."]},
   {v:"1.28.1", d:"7 Kasım 2026", items:["Puan durumu: her puan kategorisi kendi sütununda (Kazanan, Fark, Skorer, Günün oyuncusu, Gecenin sorusu, Uzun vade, Ödül); sütunların toplamı puana eşit. Telefonda tablo yana kaydırılır, oyuncu adı sabit kalır."]},
   {v:"1.28.0", d:"7 Kasım 2026", items:["Rozetler: seviyeler en fazla 3 (Bronz, Gümüş, Altın), Efsane kaldırıldı. Çeşitlilik artık farklı rozetlerle: 120 ayrı rozet ailesi, toplam 190 rozet.","Yeni: 30 takımın her biri için takım uzmanlığı (takım logolu), 25 yıldız için oyuncu uzmanlığı (oyuncu fotoğraflı), haftalık birincilik / ikincilik / üçüncülük, podyum müdavimi ve her aylık ödül için ayrı rozet."]},
   {v:"1.27.0", d:"7 Kasım 2026", items:["Haftalık ilk 3: her haftanın 1.sine +10, 2.sine +7, 3.süne +5 sezon puanı (9 Kasım haftasından itibaren). Eşitlikte gece birincilikleri, kazanan, fark, en skorer ve en iyi gece bakılır.","Sıralama sekmesinde Sezon / Bu hafta / Geçen hafta geçişli tablo; pazartesi geçen haftanın ilk 3'ü penceresi."]},
@@ -2285,6 +2286,12 @@ function raceFrame(f){
   return `<div class="rc-day">${dayNice(f.d,{day:"numeric",month:"long"})}</div><div class="rc-rows" style="height:${S.order.length*30}px">${S.order.map(u=>{ const i=rk.indexOf(u);
     return `<div class="rc-r" data-rcu="${u}" style="transform:translateY(${i*30}px)"><span class="rc-n">${esc(pname(u))}</span><span class="rc-b"><i style="width:${Math.max(2,f.v[u]/max*100)}%;background:${col(u)}"></i></span><b class="tnum">${f.v[u]}</b></div>`; }).join("")}</div>`;
 }
+function playChart(){
+  const box=$("#chartSvg"), btn=$("#chartPlay"); if(!box) return;
+  if(playChart.t){ clearInterval(playChart.t); playChart.t=null; box.innerHTML=seasonChart(0,true); btn.textContent="▶ Oynat"; return; }
+  const N=allDays().length; let i=1; btn.textContent="■ Durdur"; box.innerHTML=seasonChart(i,true);
+  playChart.t=setInterval(()=>{ i++; if(i>N || !$("#chartSvg")){ clearInterval(playChart.t); playChart.t=null; if($("#chartPlay")) $("#chartPlay").textContent="▶ Tekrar"; return; } $("#chartSvg").innerHTML=seasonChart(i,true); }, 700);
+}
 function playRace(){
   const box=$("#race"); if(!box || playRace.t) return; const F=raceData(); let i=0;
   box.innerHTML=raceFrame(F[0]); $("#raceBtn").textContent="■ Durdur";
@@ -2294,14 +2301,17 @@ function playRace(){
     for(const u of S.order){ const r=box.querySelector(`[data-rcu="${u}"]`); if(!r) continue; r.style.transform=`translateY(${rk.indexOf(u)*30}px)`; r.querySelector("i").style.width=Math.max(2,f.v[u]/max*100)+"%"; r.querySelector("b").textContent=f.v[u]; } };
   playRace.t=setInterval(step, 900);
 }
-function seasonChart(){
-  const days=[...allDays()].reverse();
-  if(days.length<2) return "";
+function seasonChart(upto, bare){
+  const daysAll=[...allDays()].reverse();
+  if(daysAll.length<2) return "";
+  const days = upto ? daysAll.slice(0, upto) : daysAll;
   const cum={}, series={}; S.order.forEach(u=>{cum[u]=0; series[u]=[0];});
   for(const d of days){ const p=dayPoints(d); for(const u of S.order){ cum[u]+=p[u]?.pts||0; series[u].push(cum[u]); } }
   const W=600, H=210, L=8, R=64, T=12, B=26, n=days.length;
-  const max=Math.max(4,...S.order.map(u=>cum[u])), min=Math.min(0,...S.order.flatMap(u=>series[u]));
-  const x=i=>L+(W-L-R)*i/n, y=v=>T+(H-T-B)*(1-(v-min)/(max-min||1));
+  // ölçek her zaman bütün sezona göre (oynatırken eksenler zıplamasın)
+  const fc={}, fs=[]; S.order.forEach(u=>fc[u]=0); for(const d of daysAll){ const p=dayPoints(d); for(const u of S.order){ fc[u]+=p[u]?.pts||0; fs.push(fc[u]); } }
+  const N=daysAll.length, max=Math.max(4,...fs), min=Math.min(0,...fs);
+  const x=i=>L+(W-L-R)*i/N, y=v=>T+(H-T-B)*(1-(v-min)/(max-min||1));
   const step=Math.max(1,Math.ceil(max/4/5)*5);
   let g=""; for(let v=0; v<=max; v+=step) g+=`<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" class="gl"/>${v?`<text x="${L}" y="${y(v)-4}" class="gt">${v}</text>`:""}`;
   const ranked=[...S.order].sort((a,b)=>cum[b]-cum[a]);
@@ -2317,9 +2327,11 @@ function seasonChart(){
     ? `<text x="${W-R+8}" y="${o.ly}" class="el" fill="${col(o.us[0])}">${o.v}</text>`
     : `<text x="${W-R+8}" y="${o.ly}" class="el" fill="var(--muted)">${o.v}<tspan class="el-n" dx="3">×${o.us.length}</tspan></text>`).join("");
   const dl=d=>dayNice(d,{day:"numeric",month:"short"});
-  return `<div class="sec-title"><h2>Sezon grafiği</h2><span class="aside">gece gece toplam puan</span></div>
-    <div class="box chart"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Sezon boyunca toplam puan">${g}${lines}${labels}
-    <text x="${L}" y="${H-6}" class="gt">${dl(days[0])}</text><text x="${W-R}" y="${H-6}" class="gt" text-anchor="end">${dl(days[n-1])}</text></svg>
+  const svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Sezon boyunca toplam puan">${g}${lines}${labels}
+    <text x="${L}" y="${H-6}" class="gt">${dl(days[0])}</text><text x="${W-R}" y="${H-6}" class="gt" text-anchor="end">${dl(days[n-1])}</text></svg>`;
+  if(bare) return svg;
+  return `<div class="sec-title"><h2>Sezon grafiği</h2><button class="btn sm" id="chartPlay" type="button">▶ Oynat</button></div>
+    <div class="box chart"><div id="chartSvg">${svg}</div>
     <div class="chart-leg">${ranked.map(u=>`<span class="pn"><i style="background:${col(u)}"></i>${esc(pname(u))}</span>`).join("")}</div></div>`;
 }
 function nightCalendar(){
@@ -2622,14 +2634,14 @@ function renderPuan(){
   const brk = seasonBreakdown();
   const anySr = S.order.some(u=>brk[u]?.sr);
   // Sezon tablosu: her puan kategorisi kendi sütununda; sütunların toplamı Puan'a eşit
-  const cols = [["Kazanan",u=>brk[u].w+brk[u].auto,"Kazanan puanı (banko ve otomatik tahmin dahil)"],["Fark",u=>brk[u].m,"Fark puanı"],["Skorer",u=>brk[u].s,"Maçın en skoreri"],["G. oyuncusu",u=>brk[u].dp,"Günün oyuncusu"],["Soru",u=>brk[u].q,"Gecenin sorusu"],
-    ...(anySr?[["Playoff",u=>brk[u].sr,"Playoff serileri"]]:[]),["Uzun vade",u=>brk[u].lt,"Uzun vade tahminleri"],["Ödül",u=>brk[u].bon+brk[u].aw+brk[u].wa,"Devamlılık bonusu + haftalık ilk 3 + aylık ödüller"],["Gece",u=>wins[u],"Tek başına kazandığı gece sayısı"],["Hafta",u=>wks[u],"Birinci bitirdiği hafta sayısı"]];
+  const cols = [["Galip",u=>brk[u].w+brk[u].auto,"Maçın kazananını bilmek: sürpriz, banko ve otomatik tahmin dahil"],["Fark",u=>brk[u].m,"Sayı farkını ±3 ya da tam bilmek"],["Maçın<br>skoreri",u=>brk[u].s,"Maçın en çok sayı atanını bilmek"],["Günün<br>oyuncusu",u=>brk[u].dp,"Gecenin en skorerini bilmek"],["Gecenin<br>sorusu",u=>brk[u].q,"Evet/hayır sorusunu bilmek"],
+    ...(anySr?[["Playoff<br>serileri",u=>brk[u].sr,"Playoff serileri"]]:[]),["Uzun<br>vade",u=>brk[u].lt,"Uzun vade tahminleri"],["Bonus ve<br>ödüller",u=>brk[u].bon+brk[u].aw+brk[u].wa,"Haftada 4 gece oynama bonusu, haftalık ilk 3 ve aylık ödüller"]];
   const seasonTbl = `<div class="sec-title"><h2>Puan durumu</h2><span class="aside">${trialActive() ? `<span class="trial-tag">Deneme haftası</span> ${dayNice(shiftDay(trialOf().end,1),{day:"numeric",month:"long"})}'da sıfırlanır` : S.league?.start ? dayNice(leagueStart(),{day:"numeric",month:"long"})+" gecesinden beri" : "sezon"}</span></div>
     <div class="st-wrap"><table class="st">
-      <thead><tr><th class="st-rk">#</th><th class="st-pl">Oyuncu</th><th class="st-tot">Puan</th>${cols.map(([l,,t],k)=>`<th title="${t}"${k>=cols.length-2?' class="st-cnt"':""}>${l}</th>`).join("")}</tr></thead>
-      <tbody>${ranked.map((u,i)=>`<tr class="${u===rv?"rival ":""}${u===S.uid?"me":""}" data-pu="${u}"><td class="st-rk">${i+1}</td><td class="st-pl"><span class="pn"><i style="background:${col(u)}"></i><span>${S.players[u]?.club?`<b class="pn-club">${esc(S.players[u].club)}</b><small class="pn-name">${esc(pname(u))}</small>`:`<b class="pn-solo">${esc(pname(u))}</b>`}</span></span></td><td class="st-tot tnum">${tot[u]}</td>${cols.map(([,f],k)=>{ const v=f(u)||0; return `<td class="tnum${k>=cols.length-2?" st-cnt":""}${v?"":" z"}">${v}</td>`; }).join("")}</tr>`).join("")}</tbody>
+      <thead><tr><th class="st-rk">#</th><th class="st-pl">Oyuncu</th><th class="st-tot">Toplam</th>${cols.map(([l,,t])=>`<th title="${t}">${l}</th>`).join("")}</tr></thead>
+      <tbody>${ranked.map((u,i)=>`<tr class="${u===rv?"rival ":""}${u===S.uid?"me":""}" data-pu="${u}"><td class="st-rk">${i+1}</td><td class="st-pl"><span class="pn"><i style="background:${col(u)}"></i><span>${S.players[u]?.club?`<b class="pn-club">${esc(S.players[u].club)}</b><small class="pn-name">${esc(pname(u))}</small>`:`<b class="pn-solo">${esc(pname(u))}</b>`}</span></span></td><td class="st-tot tnum">${tot[u]}</td>${cols.map(([,f])=>{ const v=f(u)||0; return `<td class="tnum${v?"":" z"}">${v}</td>`; }).join("")}</tr>`).join("")}</tbody>
     </table></div>
-    <p class="muted" style="font-size:13px;margin:6px 2px">Kazanan: banko ve otomatik tahmin dahil. Ödül: devamlılık bonusu, haftalık ilk 3 ve aylık ödüller. Puan bu sütunların toplamıdır. Gece ve Hafta: tek başına kazanılan gece ve birinci bitirilen hafta sayısı. Tablo telefonda yana kaydırılır.</p>`;
+    <p class="muted" style="font-size:13px;margin:6px 2px">Toplam, sütunların toplamıdır. Galip: sürpriz, banko ve otomatik tahmin dahil. Bonus ve ödüller: haftada 4 gece oynama bonusu, haftalık ilk 3 ve aylık ödüller. Telefonda tablo yana kaydırılır.</p>`;
   S.pv ||= "sezon";
   const curWk=weekKey(S.today), lastWk=weekKey(shiftDay(curWk,-1)), wkSel = S.pv==="gecen" ? lastWk : curWk;
   const pvBar=`<div class="pv-seg" role="tablist">${[["sezon","Sezon"],["hafta","Bu hafta"],["gecen","Geçen hafta"]].map(([k,l])=>`<button type="button" data-pv="${k}" aria-pressed="${S.pv===k}">${l}</button>`).join("")}</div>`;
@@ -2667,16 +2679,7 @@ function renderPuan(){
   if(hist.length) html += `<div class="sec-title"><h2>Geçmiş ligler</h2></div><div class="months">${hist.map((h,hi)=>{ const w=h.rows?.[0];
     return `<div class="mo done" data-arch="${hist.length-1-hi}" role="button" tabindex="0"><span class="mo-n" style="text-transform:none">${h.name?`<b>${esc(h.name)}</b> · `:""}${dayNice(h.start,{day:"numeric",month:"short"})} – ${dayNice(h.end,{day:"numeric",month:"short"})}</span>
       <span class="mo-w">👑 <b>${esc(w?.name||"?")}</b><small>${w?.pts??0} puan</small></span><span class="mo-s">${(h.rows||[]).slice(1).map(r=>`${esc(r.name)} ${r.pts}`).join(" · ")}</span></div>`; }).join("")}</div>`;
-  html += seasonChart() + raceHTML() + rankChart() + nightCalendar();
-
-  // bu hafta
-  const wk = weekKey(S.today);
-  const wkDays = dayRows.filter(x=>weekKey(x.d)===wk).reverse();
-  if(wkDays.length){
-    const wt={}; S.order.forEach(u=>wt[u]=wkDays.reduce((s,x)=>s+(x.pts[u]?.pts||0),0));
-    html += `<div class="sec-title"><h2>Bu hafta</h2><span class="aside">${dayNice(wk,{day:"numeric",month:"short"})}'den beri</span></div>
-      <div class="box"><div style="display:flex;flex-wrap:wrap;gap:6px 18px">${[...S.order].sort((a,b)=>wt[b]-wt[a]).map(u=>`<span class="pn"><i style="background:${col(u)}"></i>${esc(pname(u))} <span class="big tnum">${wt[u]}</span></span>`).join("")}</div></div>`;
-  }
+  html += seasonChart();
 
   // rekorlar
   let bestNight=null, streak={}, maxStreak={};
@@ -2707,7 +2710,7 @@ function renderPuan(){
     }).join("") : `${emptyBox("chart", "İlk gece bitince puan tablosu burada dolmaya başlayacak.")}`) + `</div>`;
   $("#puan").innerHTML = html;
 }
-$("#puan").addEventListener("click", e => { const pv=e.target.closest("[data-pv]"); if(pv){ S.pv=pv.dataset.pv; return renderPuan(); } if(e.target.closest("#raceBtn")){ if(playRace.t){ clearInterval(playRace.t); playRace.t=null; e.target.textContent="▶ Oynat"; } else playRace(); return; } if(e.target.closest("#awardsBtn")) return openAwards(); if(e.target.closest("#archBtn")) return openArchive(); const ar=e.target.closest("[data-arch]"); if(ar) return openArchive(+ar.dataset.arch); const aw=e.target.closest("[data-awshow]"); if(aw) return openCeremony(aw.dataset.awshow); const b=e.target.closest("[data-day]"); if(!b) return; S.day=b.dataset.day; location.hash="#tahmin"; showDay(); });
+$("#puan").addEventListener("click", e => { const pv=e.target.closest("[data-pv]"); if(pv){ S.pv=pv.dataset.pv; return renderPuan(); } if(e.target.closest("#chartPlay")) return playChart(); if(e.target.closest("#raceBtn")){ if(playRace.t){ clearInterval(playRace.t); playRace.t=null; e.target.textContent="▶ Oynat"; } else playRace(); return; } if(e.target.closest("#awardsBtn")) return openAwards(); if(e.target.closest("#archBtn")) return openArchive(); const ar=e.target.closest("[data-arch]"); if(ar) return openArchive(+ar.dataset.arch); const aw=e.target.closest("[data-awshow]"); if(aw) return openCeremony(aw.dataset.awshow); const b=e.target.closest("[data-day]"); if(!b) return; S.day=b.dataset.day; location.hash="#tahmin"; showDay(); });
 
 /* ====================================================== İSTATİSTİK */
 function renderStats(){

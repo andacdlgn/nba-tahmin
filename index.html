@@ -32,7 +32,7 @@
 <link rel="preconnect" href="https://securetoken.googleapis.com" crossorigin>
 <link rel="preconnect" href="https://site.web.api.espn.com" crossorigin>
 <link rel="preconnect" href="https://a.espncdn.com">
-<link rel="modulepreload" href="app.js?v=1.28.1">
+<link rel="modulepreload" href="app.js?v=1.28.2">
 <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js" crossorigin>
 <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js" crossorigin>
 <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js" crossorigin>
@@ -47,7 +47,7 @@
 <script>
 // Açılış ekranı + sürüm kontrolü. Her güncellemede BUILD, version.json, app.js'deki VERSION ve
 // aşağıdaki ?v= numaraları birlikte artırılır (scripts/surum.py hepsini birden yapar).
-window.BUILD = "1.28.1";
+window.BUILD = "1.28.2";
 (function(){
   var t0 = Date.now(), MIN = 1000, MAX = 8000, ready = false, done = false;
   function hide(){ if(done) return; done = true; var s = document.getElementById("splash"); if(!s) return; s.classList.add("out"); setTimeout(function(){ s.remove(); }, 450); }
@@ -74,7 +74,7 @@ window.BUILD = "1.28.1";
   }).catch(function(){});
 })();
 </script>
-<link rel="stylesheet" href="style.css?v=1.28.1">
+<link rel="stylesheet" href="style.css?v=1.28.2">
 </head>
 <body>
 
@@ -256,6 +256,6 @@ window.BUILD = "1.28.1";
 
 <div class="toast hide" id="toast" role="status" aria-live="polite"></div>
 
-<script type="module" src="app.js?v=1.28.1"></script>
+<script type="module" src="app.js?v=1.28.2"></script>
 </body>
 </html>

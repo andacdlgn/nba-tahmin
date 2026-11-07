@@ -2232,3 +2232,7 @@ body.bars-hidden .chat-fab{transform:none}
 .st tbody tr.me td.st-rk,.st tbody tr.me td.st-pl{background:color-mix(in srgb,var(--amber) 8%,var(--panel))}
 .st .pn-club{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px}
 @media (max-width:520px){ .st{font-size:13px} .st .st-pl{min-width:120px;max-width:150px} .st .pn-club{max-width:120px} }
+/* 1.28.2: sıfır hücreler soluk renkle (saydamlık kendi satır vurgusunu bozuyordu), çok satırlı başlıklar */
+.st td.z{opacity:1;color:color-mix(in srgb,var(--muted) 60%,transparent)}
+.st th{line-height:1.25;vertical-align:bottom}
+.st{min-width:700px}
