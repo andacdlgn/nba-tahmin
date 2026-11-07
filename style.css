@@ -2236,3 +2236,6 @@ body.bars-hidden .chat-fab{transform:none}
 .st td.z{opacity:1;color:color-mix(in srgb,var(--muted) 60%,transparent)}
 .st th{line-height:1.25;vertical-align:bottom}
 .st{min-width:700px}
+/* 1.28.5: tek seferlik "Özel" rozet */
+:root{--t-o:#c084fc}
+.t-o{--tc:var(--t-o)}

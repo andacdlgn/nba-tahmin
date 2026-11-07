@@ -45,12 +45,13 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.28.4";
+const VERSION = "1.28.5";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.28.5", d:"7 Kasım 2026", items:["Tek seferlik rozetler artık Bronz/Gümüş gibi kademe taşımıyor: hepsi \"Özel rozet\" (+3). Kademeler yalnızca seviyeli rozetlerde."]},
   {v:"1.28.3", d:"7 Kasım 2026", items:["Sıralama sayfası sadeleşti: Rekorlar ve Gece gece bölümleri kalktı, sezon grafiği oynatmasız, düz hâliyle duruyor."]},
   {v:"1.28.2", d:"7 Kasım 2026", items:["Puan durumu sütunları: Toplam, Galip, Fark, Maçın skoreri, Günün oyuncusu, Gecenin sorusu, Uzun vade, Bonus ve ödüller. Gece ve hafta birincilik sayıları tablodan çıktı.","Sıralama sayfası sadeleşti: sıralama grafiği, gece takvimi ve eski \"Bu hafta\" kutusu kalktı; sezon yarışı sezon grafiğiyle birleşti (▶ Oynat ile gece gece ilerler)."]},
   {v:"1.28.1", d:"7 Kasım 2026", items:["Puan durumu: her puan kategorisi kendi sütununda (Kazanan, Fark, Skorer, Günün oyuncusu, Gecenin sorusu, Uzun vade, Ödül); sütunların toplamı puana eşit. Telefonda tablo yana kaydırılır, oyuncu adı sabit kalır."]},
@@ -2105,7 +2106,7 @@ function openRules(){
     <h4>Yeni oyuncu</h4>
     <p>Davet linkiyle siteye girip "Yeni oyuncu" adımlarını izlersin: gerçek adın, 6 haneli şifren, güvenlik sorusu (gizli takım ve gizli oyuncu), takım adın, favori takımın, avatarın, otomatik tahmin tercihin ve mail adresin. Linkle gelmediysen davet kodu da sorulur. Mail adresi zorunludur; onay kodunu hemen ya da sonra Profil → Ayarlar'dan girebilirsin. Kod girilene kadar sana hiçbir mail (hatırlatma, haftalık özet, şifre sıfırlama kodu) gelmez.</p>
     <h4>Rozetler</h4>
-    <p>Oynadıkça <b>${BLIST.length} rozet</b> kazanabilirsin: tahmin ustalığı, sürpriz ve şans, seriler, zaferler, haftalık ve aylık ödüller, 30 takımın her biri için takım uzmanlığı, yıldız oyuncular için oyuncu uzmanlığı, devamlılık (düzenli girmek ve oynamak), sosyal (lige arkadaş getirmek) ve eğlence. Her rozetin kademesi var: Bronz +1, Gümüş +2, Altın +4, Platin +7 rozet puanı. Rozet puanı ana puana eklenmez; Sıralama sekmesindeki ayrı <b>Rozet sıralaması</b>nda yarışır. Bütün rozetler ve ilerlemen Profil → Rozetler'de.</p>
+    <p>Oynadıkça <b>${BLIST.length} rozet</b> kazanabilirsin: tahmin ustalığı, sürpriz ve şans, seriler, zaferler, haftalık ve aylık ödüller, 30 takımın her biri için takım uzmanlığı, yıldız oyuncular için oyuncu uzmanlığı, devamlılık (düzenli girmek ve oynamak), sosyal (lige arkadaş getirmek) ve eğlence. Seviyeli rozetlerin kademesi var: Bronz +1, Gümüş +2, Altın +4, Platin +7 rozet puanı. Tek seferlik rozetler (takım ve oyuncu uzmanlıkları, ödüller, özel anlar) <b>Özel</b> rozettir: +3. Rozet puanı ana puana eklenmez; Sıralama sekmesindeki ayrı <b>Rozet sıralaması</b>nda yarışır. Bütün rozetler ve ilerlemen Profil → Rozetler'de.</p>
     <h4>Sohbet ve yorumlar</h4>
     <p>Sağ alttaki baloncuktan lig sohbetine girersin: mesajlara yanıt verebilir, @ ile birini etiketleyebilir, emoji tepkisi bırakabilir, kendi mesajını gönderdikten sonraki 2 dakika içinde düzenleyebilir, istediğin zaman silebilirsin. Maçlar kilitlendikten sonra maç kartlarına da emoji ve kısa yorum bırakılabilir. Sohbette ve yorumlarda küfür, kısaltmaları (amk, aq, oç…) ve hakaret yazılamaz.</p>
     <p class="muted" style="margin-top:18px;font-size:12px;text-align:center">Sürüm ${VERSION}</p></div>`);
@@ -2383,7 +2384,8 @@ function monthTable(){
    Her rozet ailesinin seviyeleri var (ör. Kazanan avcısı 1–8). Her seviye ayrı bir rozettir ve bir kademe taşır:
    bronz 1, gümüş 2, altın 4, platin 7, efsane 12 rozet puanı. Rozet puanı ana sıralamadan ayrı tutulur.
    Hepsi eldeki verilerden hesaplanır (Firestore'dan ek okuma yok); giriş günleri players.vd listesinden gelir. */
-const BTIER = {b:{n:"Bronz",p:1}, g:{n:"Gümüş",p:2}, a:{n:"Altın",p:4}, p:{n:"Platin",p:7}};
+// Seviyeli rozetler Bronz → Gümüş → Altın (→ Platin); tek seferlik rozetler ayrı: "Özel" (+3)
+const BTIER = {b:{n:"Bronz",p:1}, g:{n:"Gümüş",p:2}, a:{n:"Altın",p:4}, p:{n:"Platin",p:7}, o:{n:"Özel",p:3}};
 const BCATS = [["tahmin","🎯","Tahmin ustalığı"],["surpriz","🍀","Sürpriz ve şans"],["seri","🔥","Seriler"],["zafer","🏆","Zaferler"],["odul","🎖️","Ödüller"],["takim","🏟️","Takım uzmanlıkları"],["oyuncu","⛹️","Oyuncu uzmanlıkları"],["devam","📆","Devamlılık"],["sosyal","🤝","Sosyal"],["eglence","😅","Eğlence (şanssızlık ve şaka rozetleri)"]];
 // [id, kategori, ikon, ad, eşikler, açıklama(t), ölçüt, kademeler (isteğe bağlı)]
 // En fazla 3 seviye (Bronz → Gümüş → Altın); tek seviyeli olanların kademesi elle verilir. Çeşitlilik seviyeyle değil farklı rozetlerle.
@@ -2461,7 +2463,7 @@ for(const [a,n] of Object.entries(TEAM_NICK)) BFAM.push([`tm_${a}`,"takim",`<img
 const BSTARS = [...STARS.slice(0,24), ...STARS.filter(x=>/Sengun/.test(x[1]))];
 for(const [id,n] of BSTARS) BFAM.push([`pl_${id}`,"oyuncu",`<img class="bimg pl" src="${HEADSHOT(id)}" alt="" loading="lazy">`,`${n} uzmanı`,[3],()=>`3 maçta en skoreri ${n} olarak doğru bil`, s=>s.plS[n.toLowerCase()]||0, "a"]);
 const BTIERMAP = {1:"g",2:"ba",3:"bga"};
-const bTierOf = (i,n,cat,ov) => ov ? ov[i] : BTIERMAP[n][i];
+const bTierOf = (i,n,cat,ov) => n===1 ? "o" : ov ? ov[i] : BTIERMAP[n][i];
 const BLIST = BFAM.flatMap(([id,cat,ico,name,th,desc,m,ov]) => th.map((t,i)=>({id:`${id}${i+1}`, fam:id, cat, ico, lvl:i+1, of:th.length, t, name:th.length>1?`${name} ${["I","II","III"][i]}`:name, base:name, desc:desc(t), tier:bTierOf(i,th.length,cat,ov)})));
 const BADGES = BLIST;   // eski adla da kullanılıyor
 
@@ -2566,7 +2568,7 @@ function badgesOf(u){
 const badgePts = list => list.reduce((t,b)=>t+(b.n?BTIER[b.tier].p:0),0);
 function badgePtsOf(u){ const C=bctx(); C.pts ||= {}; if(C.pts[u]==null) C.pts[u]=badgePts(badgesOf(u)); return C.pts[u]; }
 function badgeBoard(){
-  return S.order.map(u=>{ const l=badgesOf(u), got=l.filter(b=>b.n); const top=[...got].sort((a,b)=>BTIER[b.tier].p-BTIER[a.tier].p||b.lvl-a.lvl).filter((b,i,a)=>a.findIndex(x=>x.fam===b.fam)===i).slice(0,4);
+  return S.order.map(u=>{ const l=badgesOf(u), got=l.filter(b=>b.n); const top=[...got].filter(b=>b.cat!=="eglence").sort((a,b)=>BTIER[b.tier].p-BTIER[a.tier].p||b.lvl-a.lvl).filter((b,i,a)=>a.findIndex(x=>x.fam===b.fam)===i).slice(0,4);
     return {u, pts:badgePts(l), n:got.length, top}; }).sort((a,b)=>b.pts-a.pts||b.n-a.n);
 }
 const badgeHTML = (list, compact=false) => `<div class="badges ${compact?"compact":""}">${list.filter(b=>b.n).map(b=>`<div class="bdg on t-${b.tier}" title="${esc(b.name+": "+b.desc)}"><span class="bi">${b.ico}</span><span class="bn">${esc(b.name)}</span></div>`).join("")}</div>`;
@@ -2665,7 +2667,7 @@ function renderPuan(){
     <div class="bb">${bb.map((x,i)=>`<div class="bb-row${x.u===S.uid?" me":""}" data-pb="${x.u}" role="button" tabindex="0" style="--pc:${col(x.u)}"><span class="rk">${i+1}</span>${avatar(x.u,"sm")}
       <span class="bb-nm"><b style="color:${col(x.u)}">${esc(S.players[x.u]?.club||pname(x.u))}</b><small>${x.n} rozet${x.top.length?" · "+x.top.map(b=>`<i class="bt t-${b.tier}" title="${esc(b.name)}">${b.ico}</i>`).join(""):""}</small></span>
       <span class="bb-p">${x.pts}<small>puan</small></span></div>`).join("")}</div>
-    <p class="muted" style="font-size:13px;margin:6px 2px">Rozet puanı: Bronz 1 · Gümüş 2 · Altın 4 · Platin 7. Satıra dokunarak rozetleri gör.</p>`;
+    <p class="muted" style="font-size:13px;margin:6px 2px">Rozet puanı: Bronz 1 · Gümüş 2 · Altın 4 · Platin 7 · Özel (tek seferlik) 3. Satıra dokunarak rozetleri gör.</p>`;
   // aylık şampiyonlar duvarı
   const mt=monthTable(), curM=monthKey(S.today), mks=Object.keys(mt).sort().reverse();
   if(mks.length){
@@ -3184,12 +3186,12 @@ function badgesFull(u){
       const prev = top ? top.t : 0, pct = next ? Math.min(100, Math.max(0,(v-prev)/(next.t-prev)*100)) : 100;
       if(cat==="takim" || cat==="oyuncu") return `<div class="bfam mini ${top?"on t-"+top.tier:"locked"}" title="${esc(lv[0].desc)}"><span class="bf-ico">${fico}</span><span class="bf-b"><b>${esc(name.replace(/ uzmanı$/,""))}</b><span class="bd-bar"><i style="width:${Math.min(100,v/lv[0].t*100)}%"></i></span><span class="bf-pr">${top?"✓ kazanıldı":`${v}/${lv[0].t}`}</span></span></div>`;
       return `<div class="bfam ${top?"on t-"+top.tier:"locked"}"><span class="bf-ico">${fico}</span>
-        <span class="bf-b"><b>${esc(name)}</b>${top?`<em class="bf-lv t-${top.tier}">${th.length>1?`Seviye ${top.lvl}/${th.length} · `:""}${BTIER[top.tier].n} · +${BTIER[top.tier].p}</em>`:`<em class="bf-lv">Kilitli · ${BTIER[lv[0].tier].n} +${BTIER[lv[0].tier].p}</em>`}
+        <span class="bf-b"><b>${esc(name)}</b>${top?`<em class="bf-lv t-${top.tier}">${th.length>1?`Seviye ${top.lvl}/${th.length} · `:""}${top.tier==="o"?"Özel rozet":BTIER[top.tier].n} · +${BTIER[top.tier].p}</em>`:`<em class="bf-lv">Kilitli · ${lv[0].tier==="o"?"Özel rozet":BTIER[lv[0].tier].n} +${BTIER[lv[0].tier].p}</em>`}
         <small>${next?esc(next.desc):esc(lv[lv.length-1].desc)}</small>${!next?`<span class="bf-pr">✓ ${th.length>1?"Bütün seviyeler tamam":"Kazanıldı"}</span>`:""}
         ${next?`<span class="bd-bar"><i style="width:${pct}%"></i></span><span class="bf-pr">${v}/${next.t}${own[next.id]?` · ligde ${own[next.id]} kişide var`:""}</span>`:""}
         <span class="bf-dots">${lv.map(b=>`<i class="${b.n?"on t-"+b.tier:""}" title="${esc(b.name+" · "+BTIER[b.tier].n+" (+"+BTIER[b.tier].p+")")}"></i>`).join("")}</span></span></div>`; }).join("");
     const cGot=all.filter(b=>b.cat===cat && b.n).length, cAll=all.filter(b=>b.cat===cat).length;
-    const sub = cat==="takim" ? `<p class="muted bf-sub">Bir takımın maçlarında 10 kez kazananı doğru bil · Gümüş +2</p>` : cat==="oyuncu" ? `<p class="muted bf-sub">Maçın en skorerini bu oyuncu olarak 3 kez doğru bil · Altın +4</p>` : "";
+    const sub = cat==="takim" ? `<p class="muted bf-sub">Bir takımın maçlarında 10 kez kazananı doğru bil · Özel rozet +3</p>` : cat==="oyuncu" ? `<p class="muted bf-sub">Maçın en skorerini bu oyuncu olarak 3 kez doğru bil · Özel rozet +3</p>` : "";
     html+=`<div class="sec-title"><h2 style="font-size:19px">${ico} ${cname}</h2><span class="aside">${cGot}/${cAll}</span></div>${sub}<div class="bfams${sub?" mini":""}">${cards}</div>`;
   }
   return html;
@@ -3947,7 +3949,7 @@ function showBadgeIntro(){
   const all=badgesOf(S.uid), got=all.filter(b=>b.n), pts=badgePts(all), rank=badgeBoard().findIndex(x=>x.u===S.uid)+1;
   openSheet(`<div class="nudge-d"><div class="lp-ico">🏅</div><h3 id="shTitle">Rozetler yenilendi</h3>
     <p>Artık <b>${BLIST.length} rozet</b> var: tahmin ustalığı, sürpriz ve şans, seriler, zaferler, haftalık ve aylık ödüller, her takım için takım uzmanlığı, yıldız oyuncular için oyuncu uzmanlığı, devamlılık, sosyal ve eğlence.</p>
-    <p>Her rozetin bir kademesi var: <span class="bt-chip t-b">Bronz +1</span> <span class="bt-chip t-g">Gümüş +2</span> <span class="bt-chip t-a">Altın +4</span> <span class="bt-chip t-p">Platin +7</span>. Topladığın <b>rozet puanı</b> ana puandan ayrı, Sıralama sekmesindeki <b>Rozet sıralaması</b>nda yarışıyor.</p>
+    <p>Her rozetin bir kademesi var: <span class="bt-chip t-b">Bronz +1</span> <span class="bt-chip t-g">Gümüş +2</span> <span class="bt-chip t-a">Altın +4</span> <span class="bt-chip t-p">Platin +7</span> <span class="bt-chip t-o">Özel +3</span>. Topladığın <b>rozet puanı</b> ana puandan ayrı, Sıralama sekmesindeki <b>Rozet sıralaması</b>nda yarışıyor.</p>
     <p>Şu an <b>${got.length} rozetin</b> ve <b>${pts} rozet puanın</b> var${rank?`; rozet sıralamasında <b>${rank}.</b> sıradasın`:""}.</p>
     <button class="btn primary" id="biGo" type="button" style="width:100%">Rozetlerime bak</button></div>`);
   $("#biGo").onclick=()=>{ closeSheet(); setTimeout(()=>openProf(S.uid,"roz"), 350); };
