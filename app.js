@@ -45,12 +45,13 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.30.1";
+const VERSION = "1.30.2";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.30.2", d:"8 Kasım 2026", items:["Güvenlik: kolay tahmin edilen şifreler sıfırlamada da kabul edilmiyor; davet kodu olmadan açılıp ligde kaydı oluşmayan giriş hesapları 1 saat sonra siliniyor; haftalık yedek artık şifreli."]},
   {v:"1.30.1", d:"8 Kasım 2026", items:["Güvenlik iyileştirmeleri: site yalnızca kendi adreslerinden kod ve veri yükler, tahmin alanları daha sıkı denetlenir, şifre sıfırlama kötüye kullanıma karşı sınırlandı."]},
   {v:"1.30.0", d:"7 Kasım 2026", items:["Anket: \"Lig pazartesi başlasın mı?\" Açılışta bir kez sorulur; oylar anonim, sonuçlar pazar 22:00'ye kadar Bu Gece ekranında görünür."]},
   {v:"1.29.1", d:"7 Kasım 2026", items:["Maç önü karşılaştırma çubukları sadeleşti: her takımın çubuğu ortadan kendi tarafına, ikisi aynı ölçekte; deplasman mavi, ev sahibi kırmızı, iyi olan koyu."]},
@@ -5095,11 +5096,12 @@ document.addEventListener("visibilitychange", ()=>{ if(!document.hidden && S.cha
 const RESET_MSG = {
   ok:      ["ok",   "Şifren değişti. Yeni şifrenle giriş yapabilirsin."],
   wrong:   ["bad",  "Takım ya da oyuncu tutmadı. Tekrar deneyebilirsin (3 yanlıştan sonra 1 saat beklenir)."],
-  badcode: ["bad",  "Maildeki kod tutmadı. Tekrar deneyebilirsin (3 yanlıştan sonra 1 saat beklenir)."],
+  badcode: ["bad",  "Maildeki kod tutmadı. Tekrar deneyebilirsin (3 yanlıştan sonra kod geçersiz olur, 1 saat sonra yenisini isteyebilirsin)."],
   expired: ["bad",  "Kodun süresi dolmuş. Yeni bir kod iste."],
   locked:  ["bad",  "Çok fazla yanlış deneme oldu. 1 saat sonra tekrar dene."],
   nouser:  ["bad",  "Bu adla bir oyuncu bulunamadı. Adı kayıttaki gibi yazdığından emin ol."],
   nosetup: ["bad",  "Bu hesapta güvenlik sorusu yok. Oyunu kuran kişiden yardım iste."],
+  weak:    ["bad",  "Bu şifre çok kolay tahmin edilir; başka bir şifre seç."],
   error:   ["bad",  "İstek işlenemedi. Tekrar dene."]
 };
 let resetTimer=null;

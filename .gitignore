@@ -2,3 +2,6 @@ __pycache__/
 .DS_Store
 *.bak
 node_modules/
+
+# Yedekleri açan özel anahtar: ASLA GitHub'a gönderme
+YEDEK-ANAHTARI-GIZLI/

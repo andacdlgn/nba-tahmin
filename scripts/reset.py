@@ -31,6 +31,12 @@ from google.cloud.firestore_v1.base_query import FieldFilter
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONFIG = json.load(open(os.path.join(ROOT, "config.json"), encoding="utf-8"))
 MAX_FAILS = 3
+# Güvenlik (1.30.2): sitedeki weakPin ile aynı liste; sıfırlamada kolay PIN sunucuda da reddedilir
+WEAK_PINS = {"123456", "654321", "012345", "543210", "123123", "121212", "112233", "098765", "987654", "456789", "147258", "159753"}
+
+
+def weak_pin(p: str) -> bool:
+    return bool(re.fullmatch(r"(\d)\1{5}", p) or re.fullmatch(r"(\d\d)\1\1", p) or re.fullmatch(r"(\d{3})\1", p)) or p in WEAK_PINS
 LOCK = timedelta(hours=1)
 
 
@@ -114,6 +120,22 @@ def _due(name, secs):
     return True
 
 
+def clean_orphans(db):
+    keep = {d.id for d in db.collection("players").stream()}
+    keep |= {d.id for d in db.collection("banned").stream()}   # ligden çıkarılan aynı adla yeniden kayıt olamasın
+    adm = db.collection("config").document("admin").get().to_dict() or {}
+    keep |= set(adm.get("uids") or [])
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=1)).timestamp() * 1000
+    gone = 0
+    for u in auth.list_users().iterate_all():
+        if u.uid in keep or (u.user_metadata.creation_timestamp or 0) > cutoff:
+            continue
+        auth.delete_user(u.uid)
+        gone += 1
+    if gone:
+        print(f"{gone} sahipsiz giriş hesabı silindi")
+
+
 def main():
     sa = os.environ.get("FIREBASE_SA", "").strip()
     if os.environ.get("FIRESTORE_EMULATOR_HOST"):  # yerel test
@@ -164,6 +186,14 @@ def main():
         run_rename(db)
     except Exception as e:
         print("ad değiştirme görevi hatası:", type(e).__name__)
+
+    # Güvenlik (1.30.2): davet kodu doğrulanmadan açılıp ligde oyuncu kaydı hiç oluşmamış giriş hesapları
+    # 1 saat sonra silinir (böylece biri gerçek bir oyuncunun adını önceden kapıp tutamaz). Saatte bir bakılır.
+    if _due("orphans", 3600):
+        try:
+            clean_orphans(db)
+        except Exception as e:
+            print("sahipsiz hesap temizliği hatası:", type(e).__name__)
 
     # yönetim panelindeki "Herkesi sil" isteği (varsa)
     try:
@@ -241,6 +271,8 @@ def handle(db, d, now):
     name, team, pid, pin, code = (str(d.get(k, "")) for k in ("name", "team", "playerId", "pin", "code"))
     if not re.fullmatch(r"[0-9]{6}", pin) or not slug(name):
         return "error"
+    if weak_pin(pin):
+        return "weak"
     try:
         user = auth.get_user_by_email(f"{slug(name)}@{CONFIG['authEmailDomain']}")
     except auth.UserNotFoundError:

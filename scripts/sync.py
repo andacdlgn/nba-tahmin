@@ -480,8 +480,12 @@ def backup(players, today):
     """Haftalık yedek: data/backup/<pazartesi>.json. Herkese açık okunabilen veriler (oyuncular, lig ayarları,
     uzun vade sonuçları ve kilitlenmiş uzun vade seçimleri). Gece gece tahminler zaten scores.json'da (git geçmişinde) duruyor."""
     wk = week_key(today.strftime("%Y%m%d"))
-    path = os.path.join(DATA, "backup", f"{wk}.json")
-    if os.path.exists(path):
+    # Güvenlik (1.30.2): depo herkese açık, o yüzden yedek şifreli yazılır (openssl cms, scripts/backup-cert.pem ile).
+    # Açmak için özel anahtar gerekir (yalnızca yöneticide, GitHub'da yok):
+    #   openssl cms -decrypt -inform DER -in data/backup/<gün>.json.cms -inkey yedek-ozel-anahtar.pem -out yedek.json
+    path = os.path.join(DATA, "backup", f"{wk}.json.cms")
+    cert = os.path.join(os.path.dirname(os.path.abspath(__file__)), "backup-cert.pem")
+    if os.path.exists(path) or not os.path.exists(cert):
         return False
     res = fs_list("ltResults")
     lt = {}
@@ -493,8 +497,15 @@ def backup(players, today):
     data = {"at": datetime.now(timezone.utc).isoformat(), "players": fs_list("players"), "league": fs_list("league"),
             "ltResults": res, "lt": lt}
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=1, sort_keys=True)
+    import subprocess
+    raw = json.dumps(data, ensure_ascii=False, indent=1, sort_keys=True).encode("utf-8")
+    r = subprocess.run(["openssl", "cms", "-encrypt", "-aes256", "-binary", "-outform", "DER", "-out", path, cert],
+                       input=raw, capture_output=True)
+    if r.returncode != 0:
+        print("yedek şifrelenemedi, yazılmadı:", r.stderr.decode()[-200:])
+        if os.path.exists(path):
+            os.remove(path)
+        return False
     return True
 
 
