@@ -45,7 +45,7 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.24.0";
+const VERSION = "1.24.1";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
@@ -1730,7 +1730,7 @@ $("#subSel").addEventListener("click", e => {
   const b=e.target.closest("button"); if(!b) return; S.sub=b.dataset.v;
   $$("#subSel button").forEach(x=>x.setAttribute("aria-pressed", x===b));
   $("#subMaclar").classList.toggle("hide", S.sub!=="maclar");
-  $("#subTahminler").classList.toggle("hide", S.sub!=="tahminler");
+  $("#subTahminler").classList.toggle("hide", S.sub!=="tahminler"); renderAlert();
   render();
 });
 
@@ -3079,6 +3079,8 @@ function renderAlert(){
   if(noDp) parts.push("Günün oyuncusu seçilmedi");
   if(noQ) parts.push("Gecenin sorusu cevaplanmadı");
   const urgent = ms < 60*60e3;
+  // Bu Gece sekmesinde aynı bilgi "Bu gece eksiklerin" kutusunda var; son 1 saate kadar ikinci kez gösterme
+  if(!urgent && S.tab==="tahmin" && S.sub==="maclar" && S.day===S.today){ el.innerHTML=""; return; }
   el.classList.toggle("sticky", urgent);   // son 1 saatte ekranın üstüne yapışır
   el.innerHTML = `<button class="alert ${urgent?"urgent":""}" id="alertBtn"><span class="al-dot"></span><span class="al-tx"><span>${when}</span><span>${parts.join(" · ")}</span></span><span class="al-go">Tamamla ›</span></button>`;
   $("#alertBtn").onclick = () => {
