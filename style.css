@@ -2181,3 +2181,20 @@ body.bars-hidden .chat-fab{transform:none}
 .pt-p{font-size:11.5px;color:var(--ink);font-weight:700;white-space:nowrap}
 .pt-p em{font-style:normal;color:var(--muted);font-weight:600}
 .t-lb[data-pu]{cursor:pointer}
+
+/* 1.27.0: Sezon / Bu hafta / Geçen hafta tablosu ve haftalık ödül */
+.pv-seg{display:flex;gap:4px;padding:4px;margin:14px 0 2px;background:var(--panel);border:1px solid var(--line);border-radius:14px}
+.pv-seg button{flex:1;height:36px;border:0;border-radius:10px;background:none;color:var(--muted);font:700 14px Barlow,system-ui,sans-serif;cursor:pointer}
+.pv-seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.t-wk{grid-template-columns:24px 1fr 48px 40px 46px}
+@media (max-width:520px){ .t-wk{grid-template-columns:20px 1fr 42px 34px 40px;gap:6px;padding:9px 10px} }
+.t-wk[data-pu],.wkp[data-pu]{cursor:pointer}
+.wk-prize{color:var(--t-a,#facc15);font-weight:800}
+.wk-top.wk-p1{background:color-mix(in srgb,#facc15 9%,var(--panel))}
+.wk-top.wk-p2{background:color-mix(in srgb,#b8c4d0 8%,var(--panel))}
+.wk-top.wk-p3{background:color-mix(in srgb,#cd7f32 8%,var(--panel))}
+.wk-pod{display:flex;flex-direction:column;gap:8px;margin:10px 0}
+.wkp{display:grid;grid-template-columns:44px 1fr;grid-template-rows:auto auto;column-gap:10px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:10px 12px}
+.wkp .av{grid-row:1/3;width:44px;height:44px}
+.wkp small{color:var(--muted)}
+.wkp.wk-p1{border-color:#facc15}

@@ -367,6 +367,60 @@ def award_month(day):
     return "202611" if day < "20261201" else day[:6]
 
 
+WEEK_AWARD_FROM = "20261109"            # haftalık ilk 3 ödülü asıl ligle başlar
+WEEK_PRIZE = {1: 10, 2: 7, 3: 5}
+
+
+def week_awards(sc, games, players, nights, cur_week):
+    """Biten her haftanın ilk 3'üne ek puan (10 / 7 / 5).
+    Sıralama yalnızca o haftanın gece puanlarıyla (devamlılık bonusu, playoff serisi, aylık ödül ve uzun vade hariç).
+    Eşitlikte sırayla: haftadaki gece birincilikleri, kazanan puanı, fark, en skorer, haftanın en iyi gecesi.
+    Bunlar da eşitse sıra paylaşılır (ikisi de o sıranın puanını alır, ardından gelen bir sıra atlar)."""
+    out = {}
+    by_wk = {}
+    for d in sc["days"]:
+        if d >= WEEK_AWARD_FROM:
+            by_wk.setdefault(week_key(d), []).append(d)
+    for wk, days in sorted(by_wk.items()):
+        if wk >= cur_week or not all(nights.get(d, {}).get("done") for d in days):
+            continue
+        st = {}
+        for d in sorted(days):
+            row = sc["days"][d]
+            pts = {u: v.get("pts", 0) for u, v in row.items() if u in players}
+            if not pts:
+                continue
+            best = max(pts.values())
+            top = [u for u, v in pts.items() if v == best]
+            for u, v in pts.items():
+                x = st.setdefault(u, {"p": 0, "nw": 0, "w": 0, "m": 0, "s": 0, "bn": 0})
+                x["p"] += v
+                x["bn"] = max(x["bn"], v)
+                if len(top) == 1 and top[0] == u and any(r.get("n") for r in row.values()):
+                    x["nw"] += 1
+        dayset = set(days)
+        for gid, row in sc["games"].items():
+            if games.get(gid, {}).get("day") not in dayset:
+                continue
+            for u, r in row.items():
+                if u in st and r.get("pick"):
+                    st[u]["w"] += r.get("w", 0)
+                    st[u]["m"] += r.get("m", 0)
+                    st[u]["s"] += r.get("s", 0)
+        key = lambda u: (st[u]["p"], st[u]["nw"], st[u]["w"], st[u]["m"], st[u]["s"], st[u]["bn"])
+        order = sorted((u for u in st if st[u]["p"] > 0), key=key, reverse=True)
+        lst, place = [], 0
+        for i, u in enumerate(order):
+            if i == 0 or key(u) != key(order[i - 1]):
+                place = i + 1
+            if place > 3:
+                break
+            lst.append({"u": u, "place": place, "pts": WEEK_PRIZE[place], "wp": st[u]["p"]})
+        if lst:
+            out[wk] = lst
+    return out
+
+
 def league_awards(sc, games, players, today, league_start):
     """Biten her ay için 5 ödül. Eşitlikte ödül paylaşılır (hepsi puanı alır). Kimse şartı sağlamazsa ödül boş kalır."""
     out = {}
@@ -975,6 +1029,13 @@ def main(full=False):
         winners = [u for u, p in row.items() if p == best]
         if len(winners) == 1 and winners[0] in tot:
             tot[winners[0]]["weekWins"] += 1
+    # haftalık ilk 3 ödülü (10 / 7 / 5)
+    sc["weekAwards"] = week_awards(sc, games, players, nights, cur_week)
+    for lst in sc["weekAwards"].values():
+        for x in lst:
+            if x["u"] in tot:
+                tot[x["u"]]["pts"] += x["pts"]
+                tot[x["u"]]["wa"] = tot[x["u"]].get("wa", 0) + x["pts"]
     sc["totals"] = tot
     sc["leagueStart"] = league_start
     sc["weeks"] = weeks
