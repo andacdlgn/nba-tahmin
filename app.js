@@ -45,7 +45,7 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.25.1";
+const VERSION = "1.25.2";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
@@ -5098,6 +5098,14 @@ const isIOS = () => /iphone|ipad|ipod/i.test(UA) || (/macintosh/i.test(UA) && na
 const isAndroid = () => /android/i.test(UA);
 const inAppBrowser = () => /instagram|fban|fbav|whatsapp|line\/|twitter|tiktok|telegram|snapchat/i.test(UA);
 const iosSafari = () => isIOS() && /safari/i.test(UA) && !/crios|fxios|edgios|opios/i.test(UA) && !inAppBrowser();
+// Telefonda ana ekrandan açmayanlara önemli pencere: ilk girişte, sonra eklenene kadar 2 günde bir (en fazla 6 kez)
+function installPopDue(){
+  if(!S.uid || isStandalone() || lsGet("installDone")) return false;
+  if(!isIOS() && !isAndroid()) return false;
+  const n=+lsGet("installPopN")||0, last=+lsGet("installPopAt")||0;
+  return n<6 && Date.now()-last > 46*36e5;
+}
+function maybeInstallPop(){ autoPop(1.5, installPopDue, ()=>{ lsSet("installPopN", String((+lsGet("installPopN")||0)+1)); lsSet("installPopAt", String(Date.now())); showInstallHelp.auto=true; showInstallHelp(); }); }
 function installBanner(){
   if(!S.uid || isStandalone() || lsGet("installDone") || $("#installBar")) return;
   if(!isIOS() && !isAndroid() && !installEvt) return;          // bilgisayarda yalnızca tarayıcı önerirse
@@ -5120,8 +5128,13 @@ function showInstallHelp(){
   else if(isIOS()) body=`<ol class="ih">${step(1,`Alttaki (iPad'de üstteki) ${share} <b>Paylaş</b> düğmesine dokun.`)}${step(2,`Listeyi aşağı kaydır, <b>"Ana Ekrana Ekle"</b>ye dokun.`)}${step(3,`Sağ üstteki <b>Ekle</b>'ye bas. NBA Tahmin simgesi ana ekranında belirir.`)}</ol>`;
   else if(isAndroid()) body=`${inAppBrowser()?`<p>Önce sayfayı <b>Chrome</b>'da aç: sağ üstteki <b>⋮</b> menüden "Tarayıcıda aç"ı seç.</p>`:""}<ol class="ih">${step(1,`Chrome'da sağ üstteki <b>⋮</b> menüye dokun.`)}${step(2,`<b>"Ana ekrana ekle"</b> ya da <b>"Uygulamayı yükle"</b>yi seç.`)}${step(3,`<b>Yükle / Ekle</b>'ye bas. NBA Tahmin simgesi ana ekranında belirir.`)}</ol><p class="muted">Samsung Internet'te: alttaki <b>☰</b> menü → "Sayfayı ekle" → "Ana ekran".</p>`;
   else body=`<p>Bilgisayarda Chrome ya da Edge'de adres çubuğunun sağındaki <b>yükle</b> simgesine (⊕) basarak uygulama gibi açabilirsin. Telefonda bu pencereyi tekrar açarsan adımları gösteririm.</p>`;
-  openSheet(`<div class="nudge-d"><div class="lp-ico"><img src="icons/icon-192.png" alt="" width="64" height="64" style="border-radius:16px"></div><h3 id="shTitle">Ana ekrana ekle</h3>${body}
-    ${installEvt?`<button class="btn primary" id="ihGo" type="button" style="width:100%">Şimdi ekle</button>`:""}</div>`);
+  const auto = showInstallHelp.auto; showInstallHelp.auto=false;
+  openSheet(`<div class="nudge-d"><div class="lp-ico"><img src="icons/icon-192.png" alt="" width="64" height="64" style="border-radius:16px"></div><h3 id="shTitle">📲 NBA Tahmin'i ana ekrana ekle</h3>
+    ${isStandalone()?"":`<p class="ih-why">Uygulama gibi çalışır: ana ekrandaki simgeye dokununca <b>tek dokunuşla, tam ekran</b> açılır; linki aramana, sekmeler arasında kaybetmene gerek kalmaz. 10 saniye sürer.</p>`}${body}
+    ${installEvt?`<button class="btn primary" id="ihGo" type="button" style="width:100%">Şimdi ekle</button>`:""}
+    ${auto && !isStandalone()?`<div class="ih-btns"><button class="btn primary" id="ihDone" type="button">Ekledim ✓</button><button class="linkish" id="ihLater" type="button">Sonra hatırlat</button></div>`:""}</div>`);
+  $("#ihDone")?.addEventListener("click", ()=>{ lsSet("installDone","1"); closeSheet(); toast("Süper! Artık ana ekrandaki simgeden açabilirsin."); });
+  $("#ihLater")?.addEventListener("click", ()=>closeSheet());
   $("#ihGo")?.addEventListener("click", async()=>{ closeSheet(); try{ installEvt.prompt(); const c=await installEvt.userChoice; if(c?.outcome==="accepted") lsSet("installDone","1"); }catch(e){} installEvt=null; });
 }
 /* ====================================================== başlangıç */
@@ -5170,7 +5183,7 @@ if("serviceWorker" in navigator){ navigator.serviceWorker.getRegistrations?.().t
     else checkRecovery();
     loadLT(); setTimeout(installBanner, 6000); later(markSeen, 3000);
     // bilgilendirme pencereleri sıraya girer; açılıştan ~3 sn sonra en önemlisi (varsa) bir tane açılır
-    setTimeout(()=>{ maybeNews(); maybeCeremony(); maybeLeaguePop(); maybeSelfPlay(); maybeScoringGuide(); maybeInvitePop(); setTimeout(installBanner, 9000); maybeAskAuto(); maybeRealName(); }, 600);
+    setTimeout(()=>{ maybeNews(); maybeCeremony(); maybeLeaguePop(); maybeSelfPlay(); maybeScoringGuide(); maybeInvitePop(); maybeInstallPop(); maybeAskAuto(); maybeRealName(); }, 600);
     later(()=>{ getDoc(doc(S.db,"config","admin")).then(()=>{ S.isAdmin=true; maybeArchiveTrial(); }).catch(()=>{ S.isAdmin=false; });
       getDoc(doc(S.db,"config","secret")).then(r=>{ S.invite=r.data()?.invite||""; }).catch(()=>{});
       allPlayers().catch(()=>{}); }, 2000);

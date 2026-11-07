@@ -2123,3 +2123,6 @@ body.bars-hidden .chat-fab{transform:none}
 .ih-n{flex:none;width:26px;height:26px;border-radius:50%;background:var(--amber);color:#111;font-weight:800;display:grid;place-items:center;font-size:14px}
 .ih-ico{width:18px;height:18px;vertical-align:-3px;color:var(--amber)}
 .install-bar #instNo{font-size:18px;padding:4px 6px}
+.ih-why{background:color-mix(in srgb,var(--amber) 10%,var(--panel));border:1px solid color-mix(in srgb,var(--amber) 35%,transparent);border-radius:12px;padding:10px 12px}
+.ih-btns{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.ih-btns .btn{width:100%}
