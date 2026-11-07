@@ -45,12 +45,13 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.29.0";
+const VERSION = "1.29.1";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.29.1", d:"7 Kasım 2026", items:["Maç önü karşılaştırma çubukları sadeleşti: her takımın çubuğu ortadan kendi tarafına, ikisi aynı ölçekte; deplasman mavi, ev sahibi kırmızı, iyi olan koyu."]},
   {v:"1.29.0", d:"7 Kasım 2026", items:["Maç önü: iki takım yan yana çubuklarla (sayı, yediği sayı, averaj, son 5 maç, isabet yüzdeleri, ribaund, asist, top çalma, blok, top kaybı) ve ligdeki sıraları.","Maç önü: yorgunluk etiketleri (arka arkaya maç, dinlenme günü, deplasman serisi, yarın da maçı var).","Maç önü: aralarındaki maçlarda henüz karşılaşmadılarsa bu yazıyor; her takımın en skorer 6 oyuncusu tabloyla.","Takım sayfası ve Takımım: bütün sezon fikstürü (oynanan, kalan, skorlar), sıradaki maça kendiliğinden kayar."]},
   {v:"1.28.7", d:"7 Kasım 2026", items:["Maç önü: son 5 maçta rakip ve skor görünüyor; sakat oyuncuların sezon ortalaması (sayı, ribaund, asist) yazıyor."]},
   {v:"1.28.6", d:"7 Kasım 2026", items:["Haftalık puan durumu sezon tablosuyla aynı: Hafta toplamı, Galip, Fark, Maçın skoreri, Günün oyuncusu, Gecenin sorusu ve ödül sütunu.","Haftalık ödül öne çıktı: tablonun üstünde +10 / +7 / +5 şeridi ve kalan süre, ilk 3 madalyayla; sezon tablosunda ve ana tabloda da bu haftanın ödül sırası görünüyor."]},
@@ -1890,17 +1891,17 @@ async function openInfo(g){
     ["Sayı averajı",net,1,1],["Son 5 maçta attığı",a=>L5[a===g.away.abbr?"a":"h"]?.f??null,1,1],["Son 5 maçta yediği",a=>L5[a===g.away.abbr?"a":"h"]?.a??null,0,1],
     ["Saha içi %",a=>num(a,"fieldGoalPct"),1,0],["Üçlük %",a=>num(a,"threePointFieldGoalPct"),1,0],["Ribaund",a=>num(a,"avgRebounds"),1,1],["Asist",a=>num(a,"avgAssists"),1,1],
     ["Top çalma",a=>num(a,"avgSteals"),1,1],["Blok",a=>num(a,"avgBlocks"),1,1],["Top kaybı",a=>num(a,"avgTotalTurnovers"),0,1]];
-  const A=g.away.abbr, H=g.home.abbr, ca=tcol(A), chh=tcol(H);
+  const A=g.away.abbr, H=g.home.abbr;
   const bar=([l,f,hi,dec,rk])=>{ const x=f(A), y=f(H); if(x==null&&y==null) return "";
     const fm=v=>v==null?"–":(l==="Sayı averajı"&&v>0?"+":"")+(dec?v.toFixed(1):Math.round(v)+"%");
     const bx=x==null||y==null||x===y?0:((hi?x>y:x<y)?1:-1);
-    let pa=50; if(x!=null&&y!=null){ const rel=(x-y)/((Math.abs(x)+Math.abs(y))/2||1); pa=Math.max(15,Math.min(85,50+(hi?1:-1)*rel*250)); }
+    const mx=Math.max(Math.abs(x??0),Math.abs(y??0))||1, wa=x==null?0:Math.abs(x)/mx*100, wh=y==null?0:Math.abs(y)/mx*100;
     const r1=rk?.(A), r2=rk?.(H);
-    return `<div class="cb-r"><span class="cb-v ${bx>0?"win":""}">${fm(x)}${r1?`<small>${r1}.</small>`:""}</span><div class="cb-m"><small>${l}</small><div class="cb-b"><i style="width:${pa}%;background:${bx>=0?ca:"var(--line)"}"></i><i style="width:${100-pa}%;background:${bx<=0?chh:"var(--line)"}"></i></div></div><span class="cb-v r ${bx<0?"win":""}">${r2?`<small>${r2}.</small>`:""}${fm(y)}</span></div>`; };
+    return `<div class="cb-r"><span class="cb-v ${bx>0?"win":""}">${fm(x)}${r1?`<small>${r1}.</small>`:""}</span><div class="cb-m"><small>${l}</small><div class="cb-b"><span class="l"><i class="${bx<0?"lo":""}" style="width:${wa}%"></i></span><span class="r"><i class="${bx>0?"lo":""}" style="width:${wh}%"></i></span></div></div><span class="cb-v r ${bx<0?"win":""}">${r2?`<small>${r2}.</small>`:""}${fm(y)}</span></div>`; };
   const txt=(l,x,y)=>`<div class="cb-r t"><span class="cb-v">${esc(x||"–")}</span><div class="cb-m"><small>${l}</small></div><span class="cb-v r">${esc(y||"–")}</span></div>`;
   const eA=stE(A), eH=stE(H);
-  const comp = (eA||BS[A]) ? `<div class="box"><div class="row-lbl" style="margin-top:0">Takımlar yan yana <span class="muted">· bu sezon, maç başına · küçük sayı: ligdeki sırası</span></div>
-    <div class="cb-h"><span><img src="${LOGO_SMALL(A)}" alt="">${esc(A)}</span><span>${esc(H)}<img src="${LOGO_SMALL(H)}" alt=""></span></div>
+  const comp = (eA||BS[A]) ? `<div class="box"><div class="row-lbl" style="margin-top:0">Takımlar yan yana <span class="muted">· bu sezon, maç başına · kalın yazan o istatistikte daha iyi olan · küçük sayı: ligdeki sırası</span></div>
+    <div class="cb-h"><span><img src="${LOGO_SMALL(A)}" alt="">${esc(A)}<i class="cb-dot" style="background:var(--p0)"></i></span><span><i class="cb-dot" style="background:var(--p1)"></i>${esc(H)}<img src="${LOGO_SMALL(H)}" alt=""></span></div>
     ${txt("Galibiyet-mağlubiyet", eA&&wlOf(eA), eH&&wlOf(eH))}${txt("Bu maçtaki sahada", eA&&("Deplasmanda "+(stOf(eA,"Road")||"–")), eH&&("Evinde "+(stOf(eH,"Home")||"–")))}
     ${txt("Son 10 maç", BS[A]?.["Last Ten Games"]||(eA&&stOf(eA,"Last Ten Games")), BS[H]?.["Last Ten Games"]||(eH&&stOf(eH,"Last Ten Games")))}${txt("Seri", streakTR(BS[A]?.streak||(eA&&stOf(eA,"streak"))), streakTR(BS[H]?.streak||(eH&&stOf(eH,"streak"))))}
     ${ROWS.map(bar).join("")}</div>` : "";

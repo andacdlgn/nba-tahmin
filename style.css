@@ -2304,3 +2304,11 @@ body.bars-hidden .chat-fab{transform:none}
 .fx-s.up{color:var(--muted);font-weight:600;font-size:13px}
 .fx-r.next{background:color-mix(in srgb,var(--p0) 10%,transparent);box-shadow:inset 3px 0 0 var(--p0)}
 @media (max-width:420px){ .cb-r{grid-template-columns:56px 1fr 56px;gap:6px} }
+/* 1.29.1: karşılaştırma çubukları ortadan iki yana, aynı ölçekte */
+.cb-b{display:grid;grid-template-columns:1fr 1fr;gap:3px;height:8px;border-radius:0;overflow:visible;background:none}
+.cb-b span{display:flex;background:var(--panel-2);border-radius:5px;overflow:hidden}
+.cb-b .l{justify-content:flex-end}
+.cb-b span i{display:block;height:100%;border-radius:5px}
+.cb-b .l i{background:var(--p0)}.cb-b .r i{background:var(--p1)}
+.cb-b i.lo{opacity:.35}
+.cb-dot{display:inline-block;width:9px;height:9px;border-radius:50%}
