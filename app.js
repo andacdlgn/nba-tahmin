@@ -45,12 +45,13 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.30.5";
+const VERSION = "1.30.6";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.30.6", d:"8 Kasım 2026", items:["Telefonda: canlı ve biten maç kartında skor artık \"Ev sahibi / Deplasman\" yazısıyla çakışmıyor; Sıralama sayfası (kürsü, hafta şeridi, puan tablosu) daha küçük ve derli toplu."]},
   {v:"1.30.5", d:"8 Kasım 2026", items:["En skorer düzeltmesinin ikinci adımı: biten maçta ESPN \"bitti\" demeden alınmış veri hiç gösterilmiyor; puan hesaplayan iş de kutu skoru takım skoruyla tutmadan en skoreri kaydetmiyor."]},
   {v:"1.30.4", d:"8 Kasım 2026", items:["Düzeltme: site gece boyunca açık kaldığında biten maçların \"En skorer\" bilgisi maçın ortasındaki sayılarla ya da boş kalıyordu; artık maç bitince yenileniyor Puanlar etkilenmedi."]},
   {v:"1.30.3", d:"8 Kasım 2026", items:["Güvenlik: sohbet ve özel mesajlarda mesaj kimliğine kod gizlenemez; site başka bir sitenin içinde çerçeve olarak açılamaz."]},
@@ -1156,8 +1157,8 @@ function gameCard(g){
     const nm = g.state==="pre" ? esc(s.name) : `<span title="${esc(s.name)}">${s.abbr}</span>`;
     const key = g.id+side, prev = S.prevSc[key], flash = g.state==="in" && prev!=null && s.score!=null && s.score!==prev;
     if(s.score!=null) S.prevSc[key] = s.score;
-    return `<button class="tbtn ${loser?"loser":""} ${winner?"winner":""}" style="--tc:${tcol(s.abbr)}" data-act="win" data-g="${g.id}" data-v="${s.abbr}" aria-pressed="${sel}" ${lock?"disabled":""}>
-      <span class="tlogo"><img src="${s.logo||""}" alt=""></span><span class="tt"><b>${nm}</b>${s.rec&&g.state==="pre"?`<small class="rec">${s.rec}</small>`:""}<small class="ha">${side==="home"?ICON.home+"Ev sahibi":ICON.plane+"Deplasman"}</small></span>${g.state==="pre"?oddsTag(g,s.abbr):""}
+    return `<button class="tbtn ${loser?"loser":""} ${winner?"winner":""} ${g.state!=="pre"?"has-sc":""}" style="--tc:${tcol(s.abbr)}" data-act="win" data-g="${g.id}" data-v="${s.abbr}" aria-pressed="${sel}" ${lock?"disabled":""}>
+      <span class="tlogo"><img src="${s.logo||""}" alt=""></span><span class="tt"><b>${nm}</b>${s.rec&&g.state==="pre"?`<small class="rec">${s.rec}</small>`:""}<small class="ha">${side==="home"?ICON.home+'<span class="ha-t">Ev sahibi</span>':ICON.plane+'<span class="ha-t">Deplasman</span>'}</small></span>${g.state==="pre"?oddsTag(g,s.abbr):""}
       ${g.state!=="pre"?`<span class="sc ${flash?"flash":""}">${s.score??""}</span>`:""}</button>`;
   };
   let body = `<div class="teams">${t("away")}<span class="vs-mini">VS</span>${t("home")}</div>`;

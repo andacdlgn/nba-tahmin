@@ -2323,3 +2323,42 @@ body.bars-hidden .chat-fab{transform:none}
 .pl-r.me .pl-l b::after{content:" ✓";color:var(--amber)}
 .pl-b{height:9px;border-radius:6px;background:var(--panel-2);overflow:hidden}.pl-b i{display:block;height:100%;background:var(--amber);border-radius:6px}
 .poll small{font-size:12px}
+
+/* 1.30.6: telefonda Sıralama sayfası daha derli toplu; canlı/biten maç kartında skor yazılarla çakışmasın */
+@media (max-width:560px){
+  .podium{gap:6px;margin:8px 0 12px}
+  .podium .av{width:40px;height:40px;font-size:18px}
+  .podium .av.lg{width:50px;height:50px;font-size:22px}
+  .pd .pd-club{font-size:12.5px}
+  .pd-name{font-size:10.5px}
+  .pd-pts{font-size:18px}
+  .pd1 .pd-pts{font-size:22px}
+  .pd-step{font-size:18px;border-radius:10px 10px 3px 3px;margin-top:2px}
+  .pd1 .pd-step{height:52px} .pd2 .pd-step{height:38px} .pd3 .pd-step{height:28px}
+  .pv-seg{margin:10px 0 2px;padding:3px;border-radius:12px}
+  .pv-seg button{height:32px;font-size:13px;border-radius:9px}
+  .wk-strip{padding:8px 12px;gap:2px 10px;margin-top:8px}
+  .wk-s-h{flex-basis:100%;font-size:13px}
+  .wk-s-l{font-size:12.5px}
+  .wk-s-go{font-size:12.5px}
+  .wk-ban{padding:11px 12px}
+  .wk-ban-h{font-size:16px}
+  .wk-ban-p b{font-size:19px}
+  .sec-title h2{font-size:22px}
+  .st{min-width:600px;font-size:12.5px}
+  .st th{padding:7px 5px;font-size:10px}
+  .st td{padding:6px 5px}
+  .st .st-tot{font-size:17px}
+  .st .st-rk{width:22px}
+  .st th.st-pl,.st td.st-pl{left:22px}
+  .st .st-pl{min-width:108px;max-width:128px}
+  .st .pn-club{max-width:112px;font-size:13px}
+  .st .pn small{font-size:10.5px}
+  /* maç kartı: skor varken "Ev sahibi / Deplasman" yalnızca simgeyle, yazılar küçük */
+  .tbtn.has-sc{gap:6px;padding:8px 7px}
+  .tbtn.has-sc .tlogo{width:32px;height:32px}
+  .tbtn.has-sc .tlogo img{width:24px;height:24px}
+  .tbtn.has-sc .ha-t{display:none}
+  .tbtn.has-sc .sc{font-size:27px}
+  .tbtn.has-sc .tt b{font-size:15px}
+}
