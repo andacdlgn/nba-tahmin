@@ -45,12 +45,13 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.30.3";
+const VERSION = "1.30.4";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.30.4", d:"8 Kasım 2026", items:["Düzeltme: site gece boyunca açık kaldığında biten maçların \"En skorer\" bilgisi maçın ortasındaki sayılarla ya da boş kalıyordu; artık maç bitince yenileniyor. Puanlar etkilenmedi."]},
   {v:"1.30.3", d:"8 Kasım 2026", items:["Güvenlik: sohbet ve özel mesajlarda mesaj kimliğine kod gizlenemez; site başka bir sitenin içinde çerçeve olarak açılamaz."]},
   {v:"1.30.2", d:"8 Kasım 2026", items:["Güvenlik: kolay tahmin edilen şifreler sıfırlamada da kabul edilmiyor; davet kodu olmadan açılıp ligde kaydı oluşmayan giriş hesapları 1 saat sonra siliniyor; haftalık yedek artık şifreli."]},
   {v:"1.30.1", d:"8 Kasım 2026", items:["Güvenlik iyileştirmeleri: site yalnızca kendi adreslerinden kod ve veri yükler, tahmin alanları daha sıkı denetlenir, şifre sıfırlama kötüye kullanıma karşı sınırlandı."]},
@@ -428,9 +429,12 @@ async function loadRoster(team){
   return list;
 }
 function ppg(id){ const p=S.pstats[id]; return p && p.gp ? p.pts/p.gp : null; }
+// 1.30.4: maç bitmeden (maç önü ya da canlıyken) alınmış özet, maç bitince yenilenir. Eskiden "bitti" maçların özeti
+// hiç yenilenmiyordu; bu yüzden en skorer yarıda kalmış sayılarla (ör. Jokic 10) ya da boş görünüyordu.
+const sumDone = d => !!d?.header?.competitions?.[0]?.status?.type?.completed;
 async function loadSummary(g, force=false){
   const c = S.sums[g.id];
-  const ttl = g.state==="post" ? Infinity : g.state==="in" ? 25e3 : 10*60e3;
+  const ttl = g.state==="post" ? (sumDone(c?.data) ? Infinity : 20e3) : g.state==="in" ? 25e3 : 10*60e3;
   if(c && !force && Date.now()-c.at < ttl) return c.data;
   const data = await espn(`/summary?event=${g.id}`);
   S.sums[g.id] = {at:Date.now(), data};
@@ -630,8 +634,10 @@ async function loadDayNow(day, {force=false}={}){
   // biten / süren maçların özetleri (en skorer ve canlı takip için). Sayfayı bekletmez:
   // arka planda yüklenir, gelince ekran yeniden çizilir.
   const need = games.filter(g => g.state==="in" || (g.state==="post" && !S.arch.games[g.id]?.top));
-  const fresh = need.filter(g => { const c=S.sums[g.id]; return !c || (g.state!=="post" && Date.now()-c.at>=25e3); });
+  const fresh = need.filter(g => { const c=S.sums[g.id]; return !c || (g.state!=="post" ? Date.now()-c.at>=25e3 : !sumDone(c.data)); });
   if(fresh.length) Promise.all(fresh.map(g => loadSummary(g).catch(()=>null))).then(()=>{ if(S.uid && S.days[day]===D) render(); });
+  // biten maç arşivde yoksa (sayfa gece boyunca açık kaldıysa) arşivi arada bir tazele: kesin skorer ve puanlar oradan gelir
+  if(games.some(g => g.state==="post" && !S.arch.games[g.id]?.top)) refreshArch().then(ch=>{ if(ch && S.uid && S.days[day]===D) render(); });
   return D;
 }
 
@@ -2263,7 +2269,7 @@ async function renderResults(){
       ${tm("away")}${tm("home")}${lineScore(g)}${lead?`<div class="rg-l">${lead}</div>`:""}</button>`;
   }).join("")}</div>`;
   // biten maçların oyuncu istatistiklerini arka planda getir
-  const need = games.filter(g=>g.state==="post" && !S.sums[g.id]);
+  const need = games.filter(g=>g.state==="post" && !sumDone(S.sums[g.id]?.data));
   if(need.length) Promise.all(need.slice(0,15).map(g=>loadSummary(g).catch(()=>null))).then(()=>{ if(S.tab==="sonuclar" && (resDay())===day) renderResults(); });
 }
 $("#results").addEventListener("click", e => {
@@ -4171,6 +4177,15 @@ async function showDay(){
 $("#dayPrev").onclick=()=>{ S.day=shiftDay(S.day,-1); showDay(); };
 $("#dayNext").onclick=()=>{ S.day=shiftDay(S.day,1); showDay(); };
 
+// 1.30.4: arşiv dosyalarını (games/scores/players.json) en fazla 5 dakikada bir yeniden indirir; Firebase okuması yok
+async function refreshArch(){
+  if(Date.now()-(S.archAt||0) < 5*60e3) return false; S.archAt=Date.now();
+  const get = n => getJSON("data/"+n+"?t="+Date.now(), 6000).catch(()=>null);
+  const [g,p,s] = await Promise.all([get("games.json"), get("players.json"), get("scores.json")]);
+  if(g) S.arch.games=g; if(p) S.pstats=p.p||{};
+  if(s){ S.archRaw={days:{},games:{},totals:{},weeks:{},...s}; S.arch.scores=S.archRaw; applyLeague(); }
+  return !!(g||s);
+}
 async function loadArchive(){
   // Önce sitenin kendi kopyası (aynı sunucu, telefonda ek bağlantı kurulmaz); gelmezse GitHub'daki ham dosya
   const raw = (() => { const h=location.hostname; if(!h.endsWith(".github.io")) return "";
@@ -4179,7 +4194,7 @@ async function loadArchive(){
   const get = async n => { try{ return await getJSON("data/"+n+"?t="+Date.now(), 6000); }catch(e){ return raw ? getJSON(raw+n+"?t="+Date.now(), 6000).catch(()=>null) : null; } };
   const [g,p,s] = await Promise.all([get("games.json"), get("players.json"), get("scores.json")]);
   if(g) S.arch.games=g; if(p) S.pstats=p.p||{}; if(s) S.arch.scores={days:{},games:{},totals:{},weeks:{},...s};
-  S.archRaw = S.arch.scores;
+  S.archRaw = S.arch.scores; S.archAt = Date.now();
   await loadLeague();
 }
 // Lig: yönetim panelinden sıfırlanınca yalnızca başlangıç gecesinden sonraki geceler sayılır.
