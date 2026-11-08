@@ -373,11 +373,12 @@ service cloud.firestore {
     }
     match /chat/{id} {
       allow read: if isPlayer();
-      allow create: if isPlayer()
+      // Güvenlik (1.30.3): mesaj kimliği yalnızca Firebase'in verdiği 20 harf-rakam biçiminde olabilir (kimliğe kod gizlenemez)
+      allow create: if isPlayer() && id.matches('^[A-Za-z0-9]{20}$')
         && request.resource.data.keys().hasOnly(['uid', 't', 'at', 're', 'rp', 'mn']) && request.resource.data.keys().hasAll(['uid', 't', 'at', 're'])
         // rp: yanıtlanan mesaj (id, gönderen, kısa alıntı); mn: etiketlenen oyuncular
         && (!('rp' in request.resource.data) || (request.resource.data.rp is map && request.resource.data.rp.keys().hasOnly(['id', 'uid', 't'])
-            && str(request.resource.data.rp.id, 40) && str(request.resource.data.rp.uid, 128) && str(request.resource.data.rp.t, 120) && cleanChat(request.resource.data.rp.t)))
+            && request.resource.data.rp.id is string && request.resource.data.rp.id.matches('^[A-Za-z0-9]{20}$') && str(request.resource.data.rp.uid, 128) && str(request.resource.data.rp.t, 120) && cleanChat(request.resource.data.rp.t)))
         && (!('mn' in request.resource.data) || (request.resource.data.mn is list && request.resource.data.mn.size() <= 10))
         && request.resource.data.uid == request.auth.uid
         && str(request.resource.data.t, 500)
@@ -437,7 +438,7 @@ service cloud.firestore {
       allow delete: if false;
       match /m/{mid} {
         allow read: if signedIn() && request.auth.uid in get(dmPath(pid)).data.u;
-        allow create: if isPlayer()
+        allow create: if isPlayer() && mid.matches('^[A-Za-z0-9]{20}$')
           && request.auth.uid in getAfter(dmPath(pid)).data.u
           && getAfter(dmPath(pid)).data.bl.size() == 0
           && request.resource.data.keys().hasOnly(['uid', 't', 'at'])

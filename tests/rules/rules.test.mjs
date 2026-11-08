@@ -39,5 +39,12 @@ t("talk read stranger", ()=>assertFails(getDoc(doc(X,"talk/1_alice"))));
 t("players read public (unchanged)", ()=>assertSucceeds(getDoc(doc(U,"players/alice"))));
 t("reset unauth still ok", ()=>assertSucceeds(setDoc(doc(U,"resets/abcdef0123456789ab"),{name:"Alice",team:"LAL",playerId:"123",pin:"123456",at:serverTimestamp()})));
 t("mailReset unauth ok", ()=>assertSucceeds(setDoc(doc(U,"mailReset/abcdef0123456789ab"),{name:"Alice",at:serverTimestamp()})));
+// 1.30.3: sohbet ve özel mesaj kimlikleri
+t("chat ok", ()=>assertSucceeds(setDoc(doc(A,"chat/AbCdEfGhIjKlMnOpQrSt"),{uid:"alice",t:"selam",at:serverTimestamp(),re:{}})));
+t("chat reply ok", ()=>assertSucceeds(setDoc(doc(A,"chat/AbCdEfGhIjKlMnOpQrSu"),{uid:"alice",t:"evet",at:serverTimestamp(),re:{},rp:{id:"AbCdEfGhIjKlMnOpQrSt",uid:"alice",t:"selam"}})));
+t("chat bad id", ()=>assertFails(setDoc(doc(A,'chat/"><img src=x onerror=1>'),{uid:"alice",t:"x",at:serverTimestamp(),re:{}})));
+t("chat bad rp id", ()=>assertFails(setDoc(doc(A,"chat/AbCdEfGhIjKlMnOpQrSv"),{uid:"alice",t:"x",at:serverTimestamp(),re:{},rp:{id:'"><b>',uid:"alice",t:"selam"}})));
+t("dm msg ok", async()=>{ const b=writeBatch(A); b.set(doc(A,"dm/alice_bob"),{u:["alice","bob"],at:serverTimestamp(),last:{uid:"alice",t:"hey"},rd:{alice:serverTimestamp()},bl:{}}); b.set(doc(A,"dm/alice_bob/m/AbCdEfGhIjKlMnOpQrSt"),{uid:"alice",t:"hey",at:serverTimestamp()}); return assertSucceeds(b.commit()); });
+t("dm msg bad id", async()=>{ const b=writeBatch(A); b.update(doc(A,"dm/alice_bob"),{at:serverTimestamp(),last:{uid:"alice",t:"x"},rd:{alice:serverTimestamp()}}); b.set(doc(A,'dm/alice_bob/m/"><img src=x>'),{uid:"alice",t:"x",at:serverTimestamp()}); return assertFails(b.commit()); });
 let fail=0; for(const [n,p] of T){ try{ await p(); console.log("OK  ",n); }catch(e){ fail++; console.log("FAIL",n, String(e.message||e).slice(0,160)); } }
 await env.cleanup(); console.log(fail?fail+" failed":"all passed"); process.exit(fail?1:0);

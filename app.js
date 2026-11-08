@@ -45,12 +45,13 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.30.2";
+const VERSION = "1.30.3";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.30.3", d:"8 Kasım 2026", items:["Güvenlik: sohbet ve özel mesajlarda mesaj kimliğine kod gizlenemez; site başka bir sitenin içinde çerçeve olarak açılamaz."]},
   {v:"1.30.2", d:"8 Kasım 2026", items:["Güvenlik: kolay tahmin edilen şifreler sıfırlamada da kabul edilmiyor; davet kodu olmadan açılıp ligde kaydı oluşmayan giriş hesapları 1 saat sonra siliniyor; haftalık yedek artık şifreli."]},
   {v:"1.30.1", d:"8 Kasım 2026", items:["Güvenlik iyileştirmeleri: site yalnızca kendi adreslerinden kod ve veri yükler, tahmin alanları daha sıkı denetlenir, şifre sıfırlama kötüye kullanıma karşı sınırlandı."]},
   {v:"1.30.0", d:"7 Kasım 2026", items:["Anket: \"Lig pazartesi başlasın mı?\" Açılışta bir kez sorulur; oylar anonim, sonuçlar pazar 22:00'ye kadar Bu Gece ekranında görünür."]},
@@ -4788,24 +4789,24 @@ function chatRich(t){
 function chatMsgHTML(m, prev){
   const mine=m.uid===S.uid, same=prev && prev.uid===m.uid && chatTs(m)-chatTs(prev)<5*60e3 && !m.rp;
   const re=m.re||{}, cnt={}; for(const [u,e] of Object.entries(re)) if(CHAT_EMOJI.includes(e)) (cnt[e]=cnt[e]||[]).push(u);
-  const chips=Object.entries(cnt).map(([e,us])=>`<button class="ch-re ${us.includes(S.uid)?"on":""}" data-re="${e}" data-m="${m.id}" type="button" title="${esc(us.map(pname).join(", "))}">${e}<b>${us.length}</b></button>`).join("");
+  const chips=Object.entries(cnt).map(([e,us])=>`<button class="ch-re ${us.includes(S.uid)?"on":""}" data-re="${e}" data-m="${esc(m.id)}" type="button" title="${esc(us.map(pname).join(", "))}">${e}<b>${us.length}</b></button>`).join("");
   const forMe = !mine && ((m.mn||[]).includes(S.uid) || m.rp?.uid===S.uid);
   const canEdit = mine && Date.now()-chatTs(m) < CHAT_EDIT - 5000;
   const pinned = S.chatPin?.id===m.id;
-  return `<div class="ch-msg ${mine?"me":""} ${same?"cont":""} ${forMe?"forme":""}" data-id="${m.id}">
+  return `<div class="ch-msg ${mine?"me":""} ${same?"cont":""} ${forMe?"forme":""}" data-id="${esc(m.id)}">
     <span class="ch-av">${same ? "" : avatar(m.uid)}</span>
     <div class="ch-b">
       ${same ? "" : `<b class="ch-n" style="color:${col(m.uid)}">${esc(pname(m.uid))}${mine?` <small>(sen)</small>`:""}</b>`}
       ${m.rp?`<button class="ch-q" data-goto="${esc(m.rp.id)}" type="button"><b style="color:${col(m.rp.uid)}">${esc(pname(m.rp.uid))}</b><span>${esc(m.rp.t)}</span></button>`:""}
       <div class="ch-t">${chatRich(m.t)}</div>
       <div class="ch-meta"><span class="ch-tm">${timeTR(new Date(chatTs(m)))}${m.ed?" · düzenlendi":""}${pinned?" · 📌":""}</span>
-        <button class="ch-act" data-pick="${m.id}" type="button" aria-label="Tepki ver">☺︎+</button>
-        <button class="ch-act" data-rep="${m.id}" type="button">Yanıtla</button>
-        ${canEdit?`<button class="ch-act" data-edit="${m.id}" type="button">Düzenle</button>`:""}
-        ${S.isAdmin?`<button class="ch-act" data-pin="${m.id}" type="button">${pinned?"Sabitlemeyi kaldır":"Sabitle"}</button>`:""}
-        ${mine||S.isAdmin?`<button class="ch-act" data-del="${m.id}" type="button" aria-label="Mesajı sil">Sil</button>`:""}</div>
+        <button class="ch-act" data-pick="${esc(m.id)}" type="button" aria-label="Tepki ver">☺︎+</button>
+        <button class="ch-act" data-rep="${esc(m.id)}" type="button">Yanıtla</button>
+        ${canEdit?`<button class="ch-act" data-edit="${esc(m.id)}" type="button">Düzenle</button>`:""}
+        ${S.isAdmin?`<button class="ch-act" data-pin="${esc(m.id)}" type="button">${pinned?"Sabitlemeyi kaldır":"Sabitle"}</button>`:""}
+        ${mine||S.isAdmin?`<button class="ch-act" data-del="${esc(m.id)}" type="button" aria-label="Mesajı sil">Sil</button>`:""}</div>
       ${chips?`<div class="ch-res">${chips}</div>`:""}
-      ${S.chatPick===m.id?`<div class="ch-pick">${CHAT_EMOJI.map(e=>`<button data-re="${e}" data-m="${m.id}" type="button" aria-pressed="${re[S.uid]===e}">${e}</button>`).join("")}</div>`:""}
+      ${S.chatPick===m.id?`<div class="ch-pick">${CHAT_EMOJI.map(e=>`<button data-re="${e}" data-m="${esc(m.id)}" type="button" aria-pressed="${re[S.uid]===e}">${e}</button>`).join("")}</div>`:""}
     </div></div>`;
 }
 function paintChatList(keep){
@@ -5056,7 +5057,7 @@ function paintThread(){
   if(!S.dmMsgs.length) html+=`<p class="ch-empty">Bu konuşmayı yalnızca sen ve ${esc(pname(S.dmWith))} görebilirsiniz.<br>İlk mesajı yaz.</p>`;
   S.dmMsgs.forEach((m,i)=>{ const dd=chatDay(chatTs(m)); if(dd!==day){ day=dd; html+=`<div class="ch-day"><span>${dd}</span></div>`; }
     const prev=S.dmMsgs[i-1], mine=m.uid===S.uid, same=prev && prev.uid===m.uid && chatTs(m)-chatTs(prev)<5*60e3 && chatDay(chatTs(prev))===dd;
-    html+=`<div class="ch-msg ${mine?"me":""} ${same?"cont":""}" data-id="${m.id}"><span class="ch-av">${same||mine?"":avatar(m.uid)}</span><div class="ch-b"><div class="ch-t">${chatRich(m.t)}</div><div class="ch-meta"><span class="ch-tm">${timeTR(new Date(chatTs(m)))}</span>${mine?`<button class="ch-act" data-dmdel="${m.id}" type="button">Sil</button>`:""}</div></div></div>`; });
+    html+=`<div class="ch-msg ${mine?"me":""} ${same?"cont":""}" data-id="${esc(m.id)}"><span class="ch-av">${same||mine?"":avatar(m.uid)}</span><div class="ch-b"><div class="ch-t">${chatRich(m.t)}</div><div class="ch-meta"><span class="ch-tm">${timeTR(new Date(chatTs(m)))}</span>${mine?`<button class="ch-act" data-dmdel="${esc(m.id)}" type="button">Sil</button>`:""}</div></div></div>`; });
   if(bl[S.uid]) html+=`<p class="ch-block">Bu kişiyi engelledin. Engeli kaldırana kadar ikiniz de mesaj gönderemezsiniz.</p>`;
   else if(Object.keys(bl).length) html+=`<p class="ch-block">Bu konuşmaya artık mesaj gönderilemiyor.</p>`;
   box.innerHTML=html;
@@ -5352,7 +5353,7 @@ async function openAdmin(){
           <span class="${c?.verified?"ok":"bad"}">${c?.verified?"mail onaylı":c?.email?"mail onaysız":"mail yok"}</span>
           <span class="muted">${(()=>{ const nights=Object.values(S.arch.scores.days||{}).filter(r=>r[u]?.n).length, sn=S.players[u]?.seen; const ago=sn?Math.round((Date.now()-sn)/36e5):null;
             return `${nights} gece oynadı · son giriş ${ago==null?"bilinmiyor":ago<1?"az önce":ago<24?ago+" sa önce":Math.round(ago/24)+" gün önce"}${S.players[u]?.autoPick?" · otomatik tahmin açık":""}`; })()}</span></div>`; }).join("")}</div></div>
-    <div class="pf-sec"><h4>İstekler ve sorunlar ${reports.length?`<span class="pill-n">${reports.length}</span>`:""}</h4>${reports.length?reports.map(r=>`<div class="adm-rep"><div><b style="color:${col(r.uid)}">${esc(pname(r.uid))}</b> <span class="pill-k">${esc((REP_KINDS.find(x=>x[0]===r.kind)||REP_KINDS[0])[1])}</span> <small class="muted">${r.at?.toDate?r.at.toDate().toLocaleString(LOC,{timeZone:TZ,day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}):""} · ${esc(r.v||"")} · ${esc(r.tab||"")}</small></div><p>${esc(r.text||"")}</p><small class="muted">${esc(r.ua||"")}</small><button class="btn sm danger" data-repdel="${r.id}" type="button">Çözüldü, sil</button></div>`).join(""):'<small class="muted">Bildirim yok.</small>'}</div>`;
+    <div class="pf-sec"><h4>İstekler ve sorunlar ${reports.length?`<span class="pill-n">${reports.length}</span>`:""}</h4>${reports.length?reports.map(r=>`<div class="adm-rep"><div><b style="color:${col(r.uid)}">${esc(pname(r.uid))}</b> <span class="pill-k">${esc((REP_KINDS.find(x=>x[0]===r.kind)||REP_KINDS[0])[1])}</span> <small class="muted">${r.at?.toDate?r.at.toDate().toLocaleString(LOC,{timeZone:TZ,day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}):""} · ${esc(r.v||"")} · ${esc(r.tab||"")}</small></div><p>${esc(r.text||"")}</p><small class="muted">${esc(r.ua||"")}</small><button class="btn sm danger" data-repdel="${esc(r.id)}" type="button">Çözüldü, sil</button></div>`).join(""):'<small class="muted">Bildirim yok.</small>'}</div>`;
   $("#adm").innerHTML = summary + `
     <div class="pf-sec"><h4>Lig</h4>
       <p class="muted" style="margin:0 0 8px">Şu anki lig <b>${dayNice(st,{day:"numeric",month:"long"})}</b> gecesinden beri sayılıyor${hist.length?`, ${hist.length} geçmiş lig var`:""}.</p>
