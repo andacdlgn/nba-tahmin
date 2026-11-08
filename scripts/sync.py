@@ -821,6 +821,19 @@ def main(full=False):
             except Exception as exc:
                 print(f"Kutu skoru alınamadı {g['id']}: {exc}", file=sys.stderr)
                 continue
+            # Güvenlik ağı (1.30.4): kutu skoru eksik/eski ise (ESPN özeti henüz "bitti" demiyor ya da oyuncu sayıları
+            # takım skoruna eşit değil) en skorer kaydedilmez; bir sonraki çalışmada yeniden denenir. Böylece yarım
+            # veriyle puanlama yapılıp kalıcı olarak kilitlenmez.
+            hdr = (getattr(box, "last", {}) or {}).get("header", {}).get("competitions", [{}])[0]
+            if not hdr.get("status", {}).get("type", {}).get("completed"):
+                print(f"Kutu skoru henüz kesin değil {g['id']}; sonra denenecek", file=sys.stderr)
+                continue
+            sums = {}
+            for p in bx:
+                sums[p["team"]] = sums.get(p["team"], 0) + p["pts"]
+            if any(sums.get(g[side]["abbr"], 0) != int(g[side].get("score") or 0) for side in ("home", "away")):
+                print(f"Kutu skoru takım skoruyla tutmuyor {g['id']}: {sums}; sonra denenecek", file=sys.stderr)
+                continue
             top = max((p["pts"] for p in bx), default=0)
             g["fav"] = espn_fav(getattr(box, "last", {}) or {})
             hp = espn_hp(getattr(box, "last", {}) or {})

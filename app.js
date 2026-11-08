@@ -45,13 +45,14 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.30.4";
+const VERSION = "1.30.5";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
-  {v:"1.30.4", d:"8 Kasım 2026", items:["Düzeltme: site gece boyunca açık kaldığında biten maçların \"En skorer\" bilgisi maçın ortasındaki sayılarla ya da boş kalıyordu; artık maç bitince yenileniyor. Puanlar etkilenmedi."]},
+  {v:"1.30.5", d:"8 Kasım 2026", items:["En skorer düzeltmesinin ikinci adımı: biten maçta ESPN \"bitti\" demeden alınmış veri hiç gösterilmiyor; puan hesaplayan iş de kutu skoru takım skoruyla tutmadan en skoreri kaydetmiyor."]},
+  {v:"1.30.4", d:"8 Kasım 2026", items:["Düzeltme: site gece boyunca açık kaldığında biten maçların \"En skorer\" bilgisi maçın ortasındaki sayılarla ya da boş kalıyordu; artık maç bitince yenileniyor Puanlar etkilenmedi."]},
   {v:"1.30.3", d:"8 Kasım 2026", items:["Güvenlik: sohbet ve özel mesajlarda mesaj kimliğine kod gizlenemez; site başka bir sitenin içinde çerçeve olarak açılamaz."]},
   {v:"1.30.2", d:"8 Kasım 2026", items:["Güvenlik: kolay tahmin edilen şifreler sıfırlamada da kabul edilmiyor; davet kodu olmadan açılıp ligde kaydı oluşmayan giriş hesapları 1 saat sonra siliniyor; haftalık yedek artık şifreli."]},
   {v:"1.30.1", d:"8 Kasım 2026", items:["Güvenlik iyileştirmeleri: site yalnızca kendi adreslerinden kod ve veri yükler, tahmin alanları daha sıkı denetlenir, şifre sıfırlama kötüye kullanıma karşı sınırlandı."]},
@@ -460,7 +461,8 @@ function boxPlayers(sum){
 function topsOf(g){
   const a = S.arch.games[g.id];
   if(a?.top?.length) return a.top;
-  const s = S.sums[g.id]?.data; if(!s) return null;
+  // 1.30.4: biten maçta yalnızca ESPN'in "bitti" dediği özet kullanılır; yarım veri gösterilmez, gelene kadar boş kalır
+  const s = S.sums[g.id]?.data; if(!s || !sumDone(s)) return null;
   const bp = boxPlayers(s); if(!bp.length) return null;
   const m = Math.max(...bp.map(p=>p.pts));
   return bp.filter(p=>p.pts===m).map(p=>({id:p.id,name:p.name,team:p.team,pts:p.pts}));
@@ -2258,7 +2260,7 @@ async function renderResults(){
     const tm = side => { const t=g[side], o=side==="home"?g.away:g.home; const lose=g.state==="post" && (t.score??0)<(o.score??0);
       return `<div class="rg-t ${lose?"lose":""}"><img src="${t.logo||""}" alt=""><span class="n">${esc(t.name)}<small>${t.rec}</small></span><span class="sc">${g.state==="pre"?"":t.score??""}</span></div>`; };
     const tops = g.state==="post" ? topsOf(g) : g.state==="in" ? liveTops(g) : null;
-    const s = S.sums[g.id]?.data;
+    const s0 = S.sums[g.id]?.data, s = g.state==="post" && !sumDone(s0) ? null : s0;
     let lead = "";
     if(s && g.state!=="pre"){
       const bp = boxPlayers(s);
