@@ -2362,3 +2362,11 @@ body.bars-hidden .chat-fab{transform:none}
   .tbtn.has-sc .sc{font-size:27px}
   .tbtn.has-sc .tt b{font-size:15px}
 }
+
+/* 1.30.7: Günün tahminleri — oyuncular arasında ‹ › ile gezinme */
+.dv-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin:10px 2px 8px}
+.dv-top .dv-head{margin:0;min-width:0}
+.dv-nav{display:flex;align-items:center;gap:6px;flex:none}
+.dv-nav button{width:36px;height:36px;border-radius:12px;border:1px solid var(--line);background:var(--panel);color:var(--ink);font:700 20px/1 Barlow,system-ui,sans-serif;cursor:pointer;display:grid;place-items:center}
+.dv-nav button:active{transform:scale(.94)}
+.dv-nav small{color:var(--muted);font-size:12px;min-width:34px;text-align:center;font-variant-numeric:tabular-nums}

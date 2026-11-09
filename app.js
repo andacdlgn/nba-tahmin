@@ -45,12 +45,13 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.30.6";
+const VERSION = "1.30.7";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.30.7", d:"9 Kasım 2026", items:["Günün tahminleri: birinin adına dokununca isim şeridi artık en başa dönmüyor, seçilen kişi ortaya kayıyor. ‹ › düğmeleriyle ya da listeyi sağa-sola kaydırarak sıradaki oyuncuya geçebilirsin."]},
   {v:"1.30.6", d:"8 Kasım 2026", items:["Telefonda: canlı ve biten maç kartında skor artık \"Ev sahibi / Deplasman\" yazısıyla çakışmıyor; Sıralama sayfası (kürsü, hafta şeridi, puan tablosu) daha küçük ve derli toplu."]},
   {v:"1.30.5", d:"8 Kasım 2026", items:["En skorer düzeltmesinin ikinci adımı: biten maçta ESPN \"bitti\" demeden alınmış veri hiç gösterilmiyor; puan hesaplayan iş de kutu skoru takım skoruyla tutmadan en skoreri kaydetmiyor."]},
   {v:"1.30.4", d:"8 Kasım 2026", items:["Düzeltme: site gece boyunca açık kaldığında biten maçların \"En skorer\" bilgisi maçın ortasındaki sayılarla ya da boş kalıyordu; artık maç bitince yenileniyor Puanlar etkilenmedi."]},
@@ -1752,7 +1753,8 @@ function renderDayView(){
   if(u===S.uid || firstLocked) dp = daily?.dayPlayerName ? `Günün oyuncusu: <b>${esc(daily.dayPlayerName)}</b>` : "Günün oyuncusu seçilmedi";
   else dp = "Günün oyuncusu ilk maçla birlikte görünecek";
   let html = `<div class="chips" id="dvSel">${S.order.map(x=>`<button class="chip" data-v="${x}" aria-pressed="${x===u}">${esc(pname(x))}</button>`).join("")}</div>
-    <div class="dv-head"><span><b style="color:${col(u)}">${esc(pname(u))}</b> · ${count}/${D.games.length} maç girildi</span><span class="muted">${dp}</span></div><div class="dv-list">`;
+    <div class="dv-top"><div class="dv-head"><span><b style="color:${col(u)}">${esc(pname(u))}</b> · ${count}/${D.games.length} maç girildi</span><span class="muted">${dp}</span></div>
+    <div class="dv-nav"><button type="button" data-dvn="-1" aria-label="Önceki oyuncu">‹</button><small>${S.order.indexOf(u)+1}/${S.order.length}</small><button type="button" data-dvn="1" aria-label="Sonraki oyuncu">›</button></div></div><div class="dv-list">`;
   for(const g of D.games){
     const p = D.picks[g.id]?.[u];
     const conf = daily?.confGame===g.id;
@@ -1770,8 +1772,23 @@ function renderDayView(){
     }
     html += `<div class="dv" style="--pc:${col(u)}"><div class="dv-top"><img src="${g.away.logo||""}" alt="">${esc(g.away.name)} @ <img src="${g.home.logo||""}" alt="">${esc(g.home.name)}<span class="t">${st}</span></div>${body}</div>`;
   }
+  // 1.30.7: isim şeridi yeniden çizilince en başa dönmesin; seçilen kişi görünür alana (ortaya) kaysın
+  const prevSL = $("#dvSel")?.scrollLeft || 0;
   box.innerHTML = html + `</div>`;
-  $("#dvSel").onclick = e => { const c=e.target.closest(".chip"); if(!c) return; S.viewFor=c.dataset.v; renderDayView(); };
+  const sel = $("#dvSel"); sel.scrollLeft = prevSL;
+  const on = sel.querySelector('[aria-pressed="true"]');
+  if(on && S.dvJump){ S.dvJump=false;
+    const l = on.getBoundingClientRect().left - sel.getBoundingClientRect().left + sel.scrollLeft, w = on.offsetWidth;
+    if(l < sel.scrollLeft+8 || l+w > sel.scrollLeft+sel.clientWidth-8) sel.scrollTo({left: Math.max(0, l-(sel.clientWidth-w)/2), behavior:"smooth"}); }
+  const go = v => { S.viewFor=v; S.dvJump=true; renderDayView(); };
+  sel.onclick = e => { const c=e.target.closest(".chip"); if(!c) return; go(c.dataset.v); };
+  box.querySelectorAll("[data-dvn]").forEach(b => b.onclick = () => { const i=S.order.indexOf(u), n=S.order.length; go(S.order[(i + +b.dataset.dvn + n) % n]); });
+  // listede sağa/sola kaydırınca önceki/sonraki oyuncu
+  const lst = box.querySelector(".dv-list");
+  if(lst){ let x0=null, y0=0;
+    lst.addEventListener("touchstart", e => { x0=e.touches[0].clientX; y0=e.touches[0].clientY; }, {passive:true});
+    lst.addEventListener("touchend", e => { if(x0==null) return; const dx=e.changedTouches[0].clientX-x0, dy=e.changedTouches[0].clientY-y0; x0=null;
+      if(Math.abs(dx)>70 && Math.abs(dy)<40){ const i=S.order.indexOf(u), n=S.order.length; go(S.order[(i + (dx<0?1:-1) + n) % n]); } }, {passive:true}); }
 }
 $("#subSel").addEventListener("click", e => {
   const b=e.target.closest("button"); if(!b) return; S.sub=b.dataset.v;
