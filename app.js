@@ -46,12 +46,13 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.40.7";
+const VERSION = "1.40.8";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.40.8", d:"10 Kasım 2026", quiet:true, items:["Yönetici denemesi için hazırlık; oyunculara görünen bir değişiklik yok."]},
   {v:"1.40.7", d:"10 Kasım 2026", quiet:true, items:["Yönetici denemesi için hazırlık; oyunculara görünen bir değişiklik yok."]},
   {v:"1.40.6", d:"10 Kasım 2026", quiet:true, items:["Siteye 20 dakikadan uzun aradan sonra girilince hep ana sayfa açılıyor."]},
   {v:"1.40.5", d:"10 Kasım 2026", quiet:true, items:["Yönetici denemesi için hazırlık; oyunculara görünen bir değişiklik yok."]},
@@ -5652,7 +5653,7 @@ if("serviceWorker" in navigator){ navigator.serviceWorker.getRegistrations?.().t
     loadLT(); setTimeout(installBanner, 6000); later(markSeen, 3000);
     // bilgilendirme pencereleri sıraya girer; açılıştan ~3 sn sonra en önemlisi (varsa) bir tane açılır
     setTimeout(()=>{ maybeNews(); maybeCeremony(); markVisit(); maybePoll(); maybeLeaguePop(); maybeWeekPop(); maybeSelfPlay(); maybeScoringGuide(); maybeInvitePop(); maybeInstallPop(); maybeAskAuto(); maybeRealName(); }, 600);
-    later(()=>{ getDoc(doc(S.db,"config","admin")).then(()=>{ S.isAdmin=true; maybeArchiveTrial(); }).catch(e=>{ S.isAdmin=false; if(BETA.on && e?.code==="permission-denied") betaRevoke(); });
+    later(()=>{ getDoc(doc(S.db,"config","admin")).then(()=>{ S.isAdmin=true; maybeArchiveTrial(); }).catch(e=>{ S.isAdmin=false; if(BETA.on && e?.code==="permission-denied" && !BETA_TESTERS.includes(S.uid)) betaRevoke(); });
       getDoc(doc(S.db,"config","secret")).then(r=>{ S.invite=r.data()?.invite||""; }).catch(()=>{});
       allPlayers().catch(()=>{}); }, 2000);
     getDoc(doc(S.db,"contacts",S.uid)).then(r=>{ S.contact = r.exists() ? r.data() : {email:"",remind:false}; }).catch(()=>{}).finally(()=>{ S.contactLoaded=true; renderBanners(); maybeAskMail(); });
