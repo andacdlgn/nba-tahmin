@@ -32,6 +32,7 @@ const S = {
   draft:{}, statFor:null, timer:null, seen:new Set(), sub:"maclar", viewFor:null
 };
 try{ S.seen = new Set(JSON.parse(localStorage.getItem("seenReveal")||"[]")); }catch(e){}
+const BETA = {on:false};   // yeni görünüm (kapalı beta), aşağıda "YENİ GÖRÜNÜM" bölümü
 
 /* ====================================================== yardımcılar */
 const pad = n => String(n).padStart(2, "0");
@@ -45,12 +46,13 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.30.8";
+const VERSION = "1.31.0";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.31.0", d:"10 Kasım 2026", quiet:true, items:["Arka planda hazırlık: yönetici için deneme altyapısı. Oyunculara görünen bir değişiklik yok."]},
   {v:"1.30.8", d:"10 Kasım 2026", items:["Uzun vade oyuncu seçimi: telefonda sayı, ribaund ve asist sütunları artık üst üste binmiyor."]},
   {v:"1.30.7", d:"9 Kasım 2026", items:["Günün tahminleri: birinin adına dokununca isim şeridi artık en başa dönmüyor, seçilen kişi ortaya kayıyor. ‹ › düğmeleriyle ya da listeyi sağa-sola kaydırarak sıradaki oyuncuya geçebilirsin."]},
   {v:"1.30.6", d:"8 Kasım 2026", items:["Telefonda: canlı ve biten maç kartında skor artık \"Ev sahibi / Deplasman\" yazısıyla çakışmıyor; Sıralama sayfası (kürsü, hafta şeridi, puan tablosu) daha küçük ve derli toplu."]},
@@ -189,6 +191,7 @@ function maybeNews(){
   const seen=lsGet("newsSeen");
   if(!seen){ lsSet("newsSeen", VERSION); return; }   // ilk kez gelen için gösterme
   if(seen===VERSION) return;
+  if(CHANGELOG[0]?.v===VERSION && CHANGELOG[0].quiet){ lsSet("newsSeen", VERSION); return; }   // sessiz sürüm: pencere açılmaz, Yenilikler listesinde durur
   autoPop(5, ()=>lsGet("newsSeen")!==VERSION, ()=>{ lsSet("newsSeen", VERSION); openNews(); });
 }
 // 1.30.1 güvenlik: kullanıcıdan gelen takım kısaltması / oyuncu numarası adrese girmeden temizlenir
@@ -1961,7 +1964,8 @@ function closeSheet(fromPop){ if(S.sheetLocked){ if(fromPop) try{ history.pushSt
   if($("#sheet").classList.contains("hide")) return;
   $("#sheet").classList.add("hide"); document.body.style.overflow="";
   if(!fromPop && history.state?.sheet){ S.popSkip=true; history.back(); }
-  if(S.nudgePending) setTimeout(nudgeDaily, 500); }
+  if(S.nudgePending) setTimeout(nudgeDaily, 500);
+  if(BETA.on) setTimeout(()=>{ if(S.tab==="bugece") betaTonight(); betaHead(); betaStrip(); }, 0); }
 addEventListener("popstate", ()=>{ if(S.popSkip){ S.popSkip=false; return; } if(history.state?.sheet || history.state?.chat) return; if(!$("#sheet").classList.contains("hide")) closeSheet(true); });
 $("#shClose").onclick = ()=>closeSheet();
 $("#sheet").addEventListener("click", e => { if(e.target.id==="sheet") closeSheet(); });
@@ -4146,11 +4150,12 @@ function render(){
   if(S.tab==="takim" && !render.tkAt) { render.tkAt=1; renderTakim(); }
   navTeamIcon();
   if(S.tab==="istatistik") renderStats();
+  if(BETA.on) betaRender();
 }
 function route(){
   const t=(location.hash||"#tahmin").slice(1);
   if(t==="istatistik"){ history.replaceState(null,"","#tahmin"); setTimeout(()=>S.uid && openProf(S.statFor||S.uid,"ist"),50); }
-  S.tab=["tahmin","sonuclar","ayrisma","puan","uzun","takim","nba"].includes(t)?t:"tahmin";
+  S.tab=[...(BETA.on?["bugece"]:[]),"tahmin","sonuclar","ayrisma","puan","uzun","takim","nba"].includes(t)?t:(BETA.on?"bugece":"tahmin");
   render.nbaAt=0; render.tkAt=0; S.boardOpen=null;
   $$("[data-view]").forEach(v=>v.classList.toggle("hide", v.id!=="view-"+S.tab));
   $$(".nav a").forEach(a=>a.dataset.tab===S.tab?a.setAttribute("aria-current","page"):a.removeAttribute("aria-current"));
@@ -5367,7 +5372,8 @@ function confirmBtn(btn, label, fn){
 }
 async function openAdmin(){
   S.sheetLocked=false;
-  openSheet(`<h3 id="shTitle">Yönetim paneli</h3><p class="muted">Bu bölümü yalnızca sen görüyorsun.</p><div id="adm"><p class="muted">Yükleniyor…</p></div>`);
+  openSheet(`<h3 id="shTitle">Yönetim paneli</h3><p class="muted">Bu bölümü yalnızca sen görüyorsun.</p><button class="btn" id="admBeta" type="button" style="width:100%;margin:4px 0 10px">Yeni görünüm (kapalı beta): <b>${betaAllowed()?"Açık":"Kapalı"}</b> · ${betaAllowed()?"kapat":"aç"}</button><div id="adm"><p class="muted">Yükleniyor…</p></div>`);
+  $("#admBeta").onclick=()=>{ lsSet("beta", betaAllowed()?"0":"1"); location.hash = betaAllowed() ? "#bugece" : "#tahmin"; location.reload(); };
   let banned=[];
   try{ const snap=await getDocs(collection(S.db,"banned")); snap.forEach(x=>banned.push({uid:x.id,...x.data()})); }catch(e){}
   await loadLeague();
@@ -5564,15 +5570,254 @@ if("serviceWorker" in navigator){ navigator.serviceWorker.getRegistrations?.().t
     S.statFor=S.uid;
     $("#foot").innerHTML=`Kazanan +1 (sürprizde +2 / +3) · Fark ±3 +1 (tam fark +2) · En skorer +1 · Banko 2 kat / -1 · Günün oyuncusu +3 · Gecenin sorusu +1 · Haftada 4 gece +2<br><button class="linkish ver" id="pgFoot" type="button">📖 Puanlama rehberi</button><br>Veriler ESPN'den alınır. Maç varken 30 saniyede bir yenilenir.<br><button class="linkish ver" id="verBtn" type="button">Sürüm ${VERSION} · Yenilikler</button> · <button class="linkish ver" id="repBtn" type="button">Sorun bildir</button> · <button class="linkish ver" id="langBtn" type="button">${LANG==="en"?"Türkçe":"English"}</button>`;
     $("#verBtn").onclick=()=>openNews(true); $("#repBtn").onclick=()=>openReport(); $("#langBtn").onclick=()=>setLang(LANG==="en"?"tr":"en");
+    if(betaAllowed()) betaBoot();
     route(); showDay(); Promise.resolve(refresh()).catch(()=>{}).finally(()=>dispatchEvent(new Event("app-ready")));
     if(S.onboard){ if(S.joinP) await S.joinP.catch(()=>{}); await loadPlayers().catch(()=>{}); allPlayers().catch(()=>{}).finally(()=>openOnboard(4)); }
     else checkRecovery();
     loadLT(); setTimeout(installBanner, 6000); later(markSeen, 3000);
     // bilgilendirme pencereleri sıraya girer; açılıştan ~3 sn sonra en önemlisi (varsa) bir tane açılır
     setTimeout(()=>{ maybeNews(); maybeCeremony(); markVisit(); maybePoll(); maybeLeaguePop(); maybeWeekPop(); maybeSelfPlay(); maybeScoringGuide(); maybeInvitePop(); maybeInstallPop(); maybeAskAuto(); maybeRealName(); }, 600);
-    later(()=>{ getDoc(doc(S.db,"config","admin")).then(()=>{ S.isAdmin=true; maybeArchiveTrial(); }).catch(()=>{ S.isAdmin=false; });
+    later(()=>{ getDoc(doc(S.db,"config","admin")).then(()=>{ S.isAdmin=true; maybeArchiveTrial(); }).catch(e=>{ S.isAdmin=false; if(BETA.on && e?.code==="permission-denied") betaRevoke(); });
       getDoc(doc(S.db,"config","secret")).then(r=>{ S.invite=r.data()?.invite||""; }).catch(()=>{});
       allPlayers().catch(()=>{}); }, 2000);
     getDoc(doc(S.db,"contacts",S.uid)).then(r=>{ S.contact = r.exists() ? r.data() : {email:"",remind:false}; }).catch(()=>{}).finally(()=>{ S.contactLoaded=true; renderBanners(); maybeAskMail(); });
   });
 })();
+
+/* ====================================================== YENİ GÖRÜNÜM (kapalı beta) */
+// 1.31.0: Yalnızca yönetici açabilir (Yönetim paneli › Yeni görünüm). Açıkken üst çubuk, eski alt menü ve sohbet düğmesi gizlenir;
+// yeni başlık, yeni alt menü (Bu gece · Maçlar · + · Sıralama · NBA), + menüsü ve her sayfada eksik şeridi gelir.
+// Veri, kayıt ve puan hesabı eskisiyle aynıdır (aynı fonksiyonlar). Henüz yeniden çizilmeyen sayfalar eski hâliyle açılır,
+// böylece hiçbir içerik kaybolmaz. Kapatınca site eski görünüme döner.
+const BIC={
+  gece:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3v18M5.6 5.6c3 2.6 3 10.2 0 12.8M18.4 5.6c-3 2.6-3 10.2 0 12.8"/>',
+  mac:'<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M12 4v12M7 9v2M17 9v2M8 20h8"/>',
+  sira:'<path d="M8 21h8M12 17v4M7 4h10v4a5 5 0 0 1-10 0z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/>',
+  nba:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M12 5v14"/><circle cx="12" cy="12" r="2.6"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>', x:'<path d="M6 6l12 12M18 6L6 18"/>', next:'<path d="M5 12h14M13 6l6 6-6 6"/>',
+  srch:'<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>', chat:'<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/>',
+  hour:'<path d="M6 3h12M6 21h12M7 3c0 5 5 6 5 9s-5 4-5 9M17 3c0 5-5 6-5 9s5 4 5 9"/>', badge:'<circle cx="12" cy="9" r="6"/><path d="M8.5 14l-1.5 7 5-3 5 3-1.5-7"/>',
+  book:'<path d="M5 4h11l3 3v13H5z"/><path d="M8 10h8M8 14h6"/>', inv:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.6 3.2-5.5 6.5-5.5s5.9 1.9 6.5 5.5"/><path d="M19 8v6M16 11h6"/>',
+  rules:'<path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M9 8h7M9 11.5h5"/>',
+  calc:'<rect x="5" y="2.5" width="14" height="19" rx="2.5"/><path d="M8.5 6.5h7M8.5 11h.01M12 11h.01M15.5 11h.01M8.5 14.5h.01M12 14.5h.01M15.5 14.5h.01M8.5 18h.01M12 18h.01M15.5 18h.01"/>',
+  req:'<path d="M4 5h16v11H8l-4 4z"/><path d="M8 9h8M8 12.5h5"/>', news:'<path d="M4 5h13v14H6a2 2 0 0 1-2-2z"/><path d="M17 9h3v8a2 2 0 0 1-2 2M8 9h5M8 13h5"/>',
+  moon:'<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>', sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+  gear:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
+  old:'<path d="M9 14l-4-4 4-4"/><path d="M5 10h9a5 5 0 0 1 0 10h-2"/>'};
+const bic=(k,s=22,w=2)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${BIC[k]}</svg>`;
+const BTABS={bugece:"bugece", tahmin:"bugece", sonuclar:"maclar", ayrisma:"maclar", puan:"sira", nba:"nba", takim:"nba", uzun:""};
+const bSur = n => { const p=String(n||"").split(" ").filter(x=>!/^(jr\.?|sr\.?|ii|iii|iv)$/i.test(x)); return p.length>1 ? p.slice(1).join(" ") : (p[0]||""); };
+const bLogo = (t, s=22) => `<img class="b-logo" src="${t.logo||LOGO_SMALL(t.abbr)}" alt="" width="${s}" height="${s}" loading="lazy">`;
+const bPts = v => `<b class="b-pts ${v>0?"pos":v<0?"neg":""}">${v>0?"+":""}${v}</b>`;
+const BX2 = items => `<div class="b-bx">${items.map(([l,v,s,warn,act])=>`<${act?"button":"div"} ${act?`data-bx="${act}"`:""} class="${warn?"warn":""}"><small>${l}</small><b>${v}</b>${s?`<i>${s}</i>`:""}</${act?"button":"div"}>`).join("")}</div>`;
+
+function betaAllowed(){ return lsGet("beta")==="1"; }
+function betaBoot(){
+  if(BETA.on) return; BETA.on=true;
+  const l=document.createElement("link"); l.rel="stylesheet"; l.href=`beta.css?v=${VERSION}`; document.head.appendChild(l);
+  document.body.classList.add("beta");
+  $("#app .wrap").insertAdjacentHTML("afterbegin", `<header class="b-head" id="bHead"></header>`);
+  $("#view-tahmin").insertAdjacentHTML("beforebegin", `<section id="view-bugece" data-view class="hide"><div id="bg"></div></section>`);
+  document.body.insertAdjacentHTML("beforeend", `<button class="b-strip hide" id="bStrip" type="button"></button><nav class="b-nav" id="bNav" aria-label="Sekmeler"></nav><div class="b-plus hide" id="bPlus" role="dialog" aria-modal="true" aria-label="Daha fazla"></div>`);
+  document.addEventListener("click", betaClick);
+  document.addEventListener("keydown", e=>{ if(e.key==="Escape" && BETA.plus){ betaPlus(false); } if(BETA.ft?.on && !BETA.ft.done && S.tab==="bugece" && (e.key===" "||e.key==="Enter") && document.activeElement?.dataset?.ft==="shoot"){ e.preventDefault(); ftShoot(); } });
+  addEventListener("popstate", ()=>{ if(BETA.plus){ BETA.plusHist=false; betaPlus(false, true); } });
+  if(!location.hash || location.hash==="#tahmin") history.replaceState(null, "", "#bugece");
+}
+function betaRevoke(){ lsSet("beta","0"); if(BETA.on) location.reload(); }
+function betaRender(){
+  if(!BETA.on || !S.uid) return;
+  const tab=BTABS[S.tab] ?? "";
+  if(S.tab==="bugece") betaTonight();
+  betaHead(); betaNav(tab); betaStrip();
+}
+function betaHead(){
+  const T={bugece:["Bu gece",""], tahmin:["Bu gece","Klasik maç kartları"], sonuclar:["Maçlar","Skorlar"], ayrisma:["Maçlar","Kim ne tahmin etti"], puan:["Sıralama",""], nba:["NBA",""], takim:["NBA","Takımım"], uzun:["Uzun vade",""]}[S.tab]||["NBA Tahmin",""];
+  const seg = (opts) => `<div class="b-seg" style="grid-template-columns:repeat(${opts.length},1fr)">${opts.map(([h,l])=>`<a href="#${h}" aria-pressed="${S.tab===h}">${l}</a>`).join("")}</div>`;
+  let sub=T[1], extra="";
+  if(S.tab==="bugece") sub=BETA.sub||"";
+  if(S.tab==="sonuclar"||S.tab==="ayrisma") extra=seg([["sonuclar","Skorlar"],["ayrisma","Tahminler"]]);
+  if(S.tab==="nba"||S.tab==="takim") extra=seg([["nba","NBA"],["takim","Takımım"]]);
+  if(S.tab==="tahmin") extra=`<a class="b-back" href="#bugece">‹ Yeni Bu gece görünümüne dön</a>`;
+  $("#bHead").innerHTML = `<div class="b-h1"><span class="t"><b>${T[0]} <span class="b-beta">BETA</span></b>${sub?`<small>${sub}</small>`:""}</span>
+    <button class="b-ib" data-b="search" type="button" aria-label="Ara">${bic("srch",19)}</button>
+    <button class="b-ib b-me" data-b="me" type="button" aria-label="Profilim">${avatar(S.uid,"")}</button></div>${extra}`;
+}
+function betaNav(cur){
+  const n=$("#chatN"), chatN = n && !n.classList.contains("hide") ? n.textContent : "";
+  const it=(k,h,t,icn)=>`<a href="#${h}" ${cur===k?'aria-current="page"':""}>${bic(icn)}<span>${t}</span></a>`;
+  const nLive=[S.today, shiftDay(S.today,-1)].reduce((x,d)=>x+(S.days[d]?.games.filter(g=>g.state==="in").length||0),0);
+  $("#bNav").innerHTML = `<div class="in">${it("bugece","bugece","Bu gece","gece")}${it("maclar","sonuclar","Maçlar","mac").replace("</a>", nLive?`<i class="b-live">${nLive}</i></a>`:"</a>")}
+    <button type="button" data-b="plus" aria-label="Daha fazla" aria-expanded="${!!BETA.plus}"><span class="pl">${bic("plus",26,2.6)}</span>${chatN?'<i class="b-dot"></i>':""}<span>Daha fazla</span></button>
+    ${it("sira","puan","Sıralama","sira")}${it("nba","nba","NBA","nba")}</div>`;
+}
+// eksik şeridi: bu gecenin açık maçlarında eksik tahmin ya da eksik banko / günün oyuncusu / soru varsa her sayfada görünür
+function betaMissing(){
+  const D=S.days[S.today]; if(!D?.games.length) return null;
+  const open=D.games.filter(g=>!started(g)); if(!open.length) return null;
+  const games=open.filter(g=>!D.picks[g.id]?.[S.uid]);
+  const nightOpen=Date.now()<D.games[0].nightLock.getTime(), d=D.daily[S.uid]||{};
+  const extras = nightOpen ? [!d.confGame&&["banko","Banko"], !d.dayPlayerId&&["dp","Günün oyuncusu"], !d.q&&["q","Gecenin sorusu"]].filter(Boolean) : [];
+  if(!games.length && !extras.length) return null;
+  const lockAt = games.length ? new Date(Math.min(...games.map(g=>g.lock.getTime()))) : D.games[0].nightLock;
+  return {games, extras, lockAt};
+}
+function betaLeft(t){ const ms=t.getTime()-Date.now(); if(ms<=0) return "kilitlendi"; const h=Math.floor(ms/36e5), m=Math.floor(ms%36e5/6e4); return `${h?h+" sa ":""}${m} dk`; }
+function betaStrip(){
+  const el=$("#bStrip"); const M = $("#sheet").classList.contains("hide") ? betaMissing() : null;
+  document.body.classList.toggle("b-hasstrip", !!M); el.classList.toggle("hide", !M); if(!M) return;
+  const n=M.games.length, ex=M.extras.map(x=>x[1]);
+  const line2 = (n&&ex.length ? "+ "+ex.join(" · ")+" · " : !n ? ex.join(" · ")+" · " : "") + `Kilide ${betaLeft(M.lockAt)} · ${timeTR(M.lockAt)}`;
+  el.innerHTML = `<span class="n">${n||ex.length}</span><span class="tx"><b>${n?"Maç eksik · Tahmin et":"Ekstra eksik · Tamamla"}</b><small>${line2}</small></span>${bic("next",22,2.6)}`;
+}
+function betaFillMissing(){
+  const M=betaMissing(); if(!M) return;
+  S.day=S.today;
+  if(M.games.length){ openSwipe(); return; }
+  betaExtra(M.extras[0][0]);
+}
+function betaExtra(k){
+  S.day=S.today; const D=S.days[S.today]; if(!D?.games.length) return;
+  if(k==="banko") return openBankoPicker();
+  if(k==="dp"){ if(D.games.some(started)) return toast("Günün oyuncusu kilitlendi."); return openPlayerPicker({mode:"day"}); }
+  if(k==="q"){
+    if(D.games.some(started)) return toast("Soru kilitlendi.");
+    const q=questionOf(S.today), mine=D.daily[S.uid]?.q;
+    openSheet(`<h3 id="shTitle">Gecenin sorusu</h3><p style="font-size:17px;font-weight:700;margin:6px 0 14px">${q.t}</p>
+      <div class="seg2"><button type="button" data-bq="y" aria-pressed="${mine==="y"}">Evet</button><button type="button" data-bq="n" aria-pressed="${mine==="n"}">Hayır</button></div>
+      <p class="muted" style="font-size:13px">Doğru cevap +1. Gecenin ilk maçından 10 dk önce kilitlenir.</p>`);
+    $$("[data-bq]").forEach(b=>b.onclick=()=>{ closeSheet(); saveDaily({q:b.dataset.bq}); });
+  }
+}
+// Bu gece
+function betaRow(g, D){
+  const my=D.picks[g.id]?.[S.uid], conf=D.daily[S.uid]?.confGame===g.id, st=started(g), live=g.state!=="pre";
+  const sc = t => live && t.score!=null ? `<b class="sc tnum">${t.score}</b>` : "";
+  const lead = live ? (g.home.score??0)-(g.away.score??0) : 0;
+  const teams = `<span class="teams">${[g.away,g.home].map((t,i)=>`<span class="t ${g.state==="post"&&((i===0&&lead>0)||(i===1&&lead<0))?"lose":""}">${bLogo(t)}<b>${esc(t.name)}</b>${sc(t)}</span>`).join("")}</span>`;
+  const x2 = multOf(g)>1 ? `<small class="amb">${g.cup?"KUPA ":""}×2</small>` : "";
+  const mid = g.state==="in" ? `<span class="mid"><b class="live">● ${g.period>4?"UZ":g.period+". Ç"}</b><small class="muted">${esc(g.clock||"")}</small>${x2}</span>`
+    : g.state==="post" ? `<span class="mid"><b class="muted">Bitti</b>${x2}</span>`
+    : `<span class="mid"><b class="cond tm">${timeTR(g.start)}</b>${x2}</span>`;
+  let right;
+  if(!my && !st) right=`<b class="amb">Tahmin et ›</b>`;
+  else if(!my) right=`<small class="muted">Tahmin yok</small>`;
+  else if(live){ const r=scorePick(g, my, conf); right=`${bPts(r.pts)}<small class="muted">${g.state==="in"?(r.w>0?"Tutuyor":"Tutmuyor"):`${r.w>0?"✓":"✗"} ${r.m?"✓":"✗"} ${r.s?"✓":"✗"}`}</small>`; }
+  else { const w = my.winner===g.home.abbr ? g.home : g.away;
+    right=`<span class="pk">${bLogo(w,20)}<small class="muted ell">${esc(my.margin)} · ${esc(bSur(my.scorerName))}</small><b class="amb">${conf?"★":""}</b><b class="ok">✓</b></span>${st?'<small class="muted">Kilitli</small>':""}`; }
+  const act = !st ? `data-bdeck="${g.id}"` : live ? `data-bbox="${g.id}"` : `data-binfo="${g.id}"`;
+  return `<button class="b-row" type="button" ${act}>${teams}${mid}<span class="right">${right}</span></button>`;
+}
+function betaTonight(){
+  const box=$("#bg"); if(!box) return;
+  if($("#sheet").classList.contains("hide")) S.day=S.today;
+  const D=S.days[S.today];
+  if(!D){ box.innerHTML=skeletonCards(3); return; }
+  if(!D.games.length){ BETA.sub=dayNice(S.today,{day:"numeric",month:"long"})+" · maç yok"; box.innerHTML=betaOffNight(); return; }
+  const daily=D.daily[S.uid]||{}, n=D.games.length, done=D.games.filter(g=>D.picks[g.id]?.[S.uid]).length;
+  const anyLive=D.games.some(g=>g.state!=="pre"), locked=D.games.some(started);
+  const pts=dayPoints(S.today), mine=pts[S.uid]?.pts||0;
+  const rank = S.order.filter(u=>(pts[u]?.pts||0)>mine).length+1;
+  const nIn=D.games.filter(g=>g.state==="in").length, nPost=D.games.filter(g=>g.state==="post").length;
+  BETA.sub = anyLive ? `Senin puanın ${mine>0?"+":""}${mine} · gecede ${rank}. · ${nIn} canlı · ${nPost} bitti`
+    : `${n} maç · ilk kilit ${timeTR(D.games[0].lock)} · ${done}/${n} tamam`;
+  const bg = daily.confGame ? D.games.find(g=>g.id===daily.confGame) : null;
+  const bTeam = bg ? (D.picks[bg.id]?.[S.uid]?.winner || bg.home.abbr) : "";
+  const q = questionOf(S.today);
+  let extras;
+  if(!locked) extras = BX2([["Banko", bg?`${esc(bTeam)} ★`:"Seç", bg?`${esc(bg.away.abbr)} @ ${esc(bg.home.abbr)}`:"2 kat / -1", !bg, "banko"],
+    ["Günün oyuncusu", daily.dayPlayerName?esc(bSur(daily.dayPlayerName)):"Seç", `bilirsen +${dpValue(S.today)}`, !daily.dayPlayerId, "dp"],
+    ["Gecenin sorusu", daily.q?(daily.q==="y"?"Evet":"Hayır"):"Cevapla", "doğruysa +1", !daily.q, "q"]]);
+  else { const dpr=dayPlayerResult(S.today,S.uid), qr=questionResult(S.today);
+    const br = bg ? scorePick(bg, D.picks[bg.id]?.[S.uid], true) : null;
+    extras = BX2([["Banko", bg?`${esc(bTeam)} ${bg.state==="post"?(br.w>0?"✓":"✗"):"★"}`:"Yok", bg?(bg.state==="post"?(br.w>0?"2 kat aldı":"-1"):bg.state==="in"?"sürüyor":"bekliyor"):""],
+      ["Günün oyuncusu", dpr?esc(bSur(dpr.name)):"Yok", dpr?(dpr.final?(dpr.hit?`+${dpValue(S.today)}`:"tutmadı"):dpr.leading?"şu an önde":"bekliyor"):""],
+      ["Gecenin sorusu", daily.q?(daily.q==="y"?"Evet":"Hayır"):"Yok", qr?.final?(qr.ans===daily.q?"+1":`cevap ${qr.ans==="y"?"evet":"hayır"}`):"bekliyor"]]); }
+  const prog = anyLive ? "" : `<div class="b-prog"><i style="width:${done/n*100}%"></i></div>`;
+  box.innerHTML = `<div class="b-wrap">${prog}${extras}
+    ${!locked?`<p class="b-q"><b>Soru:</b> ${q.t}</p>`:""}
+    <div class="b-gr">${D.games.map(g=>betaRow(g,D)).join("")}</div>
+    <p class="b-note">${anyLive?"Satıra dokun: kutu skoru, akış ve herkesin seçimi.":"Satıra dokununca o maçın kartı açılır: kazanan, fark ve skorer."}</p>
+    <div class="b-two"><a class="btn" href="#ayrisma">Kim ne tahmin etti ›</a><a class="btn" href="#tahmin">Klasik maç kartları ›</a></div></div>`;
+}
+// maç olmayan gece: yarının maçları ve Serbest atış (puanı etkilemez)
+BETA.ft={on:false,done:false,shots:0,score:0,streak:0,hist:[],zone:[38,30],pos:0,dir:1,speed:.9,last:"",lastOk:false,raf:0,best:+(lsGet("ftBest")||0)};
+function ftZone(w){ return [6+Math.random()*(88-w), w]; }
+function ftStart(){ Object.assign(BETA.ft,{on:true,done:false,shots:0,score:0,streak:0,hist:[],zone:ftZone(30),pos:0,dir:1,speed:.9,last:"",lastOk:false,newBest:false}); betaTonight(); ftLoop(); }
+function ftLoop(){ const F=BETA.ft; cancelAnimationFrame(F.raf); let prev=performance.now();
+  const step=t=>{ if(!F.on||F.done||S.tab!=="bugece") return; const dt=Math.min(40,t-prev); prev=t; F.pos+=F.dir*F.speed*dt/16;
+    if(F.pos>=100){F.pos=100;F.dir=-1;} if(F.pos<=0){F.pos=0;F.dir=1;} const m=$("#ftm"); if(m) m.style.left=F.pos+"%"; F.raf=requestAnimationFrame(step); };
+  F.raf=requestAnimationFrame(step); }
+function ftShoot(){ const F=BETA.ft; if(!F.on||F.done) return; const [l,w]=F.zone, p=F.pos, c=l+w/2; let pts=0, msg;
+  if(p>=l && p<=l+w){ const sw=Math.abs(p-c)<=w/6; F.streak++; pts=(sw?3:2)+(F.streak>=3?1:0); msg=(sw?"Filesiz! +":"Girdi +")+pts+(F.streak>=3?" · seri bonusu":""); F.speed=Math.min(2.4,F.speed+.13); F.zone=ftZone(Math.max(9,w-3)); }
+  else { F.streak=0; msg=Math.abs(p-c)<w/2+7?"Çemberden döndü":"Hava topu"; F.zone=ftZone(w); }
+  F.score+=pts; F.shots++; F.hist.push(pts); F.last=msg; F.lastOk=pts>0;
+  if(F.shots>=10){ F.done=true; F.newBest=F.score>F.best; if(F.newBest){ F.best=F.score; lsSet("ftBest",String(F.score)); } }
+  betaTonight(); setTimeout(()=>$('[data-ft="shoot"]')?.focus({preventScroll:true}),0); }
+function ftCard(){
+  const F=BETA.ft, head=`<div class="ft-h"><span class="ft-ic">🏀</span><span><b>Serbest atış</b><small>İşaret yeşildeyken at · ortası filesiz sayılır</small></span></div>`;
+  const dots=`<div class="ft-dots">${Array.from({length:10},(_,k)=>`<i class="${F.hist[k]==null?"":F.hist[k]?"ok":"no"}"></i>`).join("")}</div>`;
+  if(!F.on) return `<div class="b-gr ft">${head}${BX2([["En iyin",F.best?String(F.best):"–","40 üzerinden"],["Atış","10","seri bonusu var"],["Puan","Etkilemez","sadece eğlence"]])}<button class="btn primary ft-go" type="button" data-ft="start">Oyna · 10 atış</button></div>`;
+  if(F.done) return `<div class="b-gr ft">${head}${dots}<div class="ft-res"><b class="cond tnum">${F.score}</b><small class="${F.newBest?"amb":"muted"}">${F.newBest?"Yeni rekorun!":"En iyin "+F.best}</small></div><button class="btn primary ft-go" type="button" data-ft="start">Tekrar oyna</button></div>`;
+  const [l,w]=F.zone, c=l+w/2;
+  return `<div class="b-gr ft">${head}<div class="ft-st"><span>Atış <b>${F.shots+1}/10</b></span><span>Skor <b class="tnum">${F.score}</b></span><span>Seri <b>${F.streak?F.streak+" 🔥":"0"}</b></span></div>${dots}
+    <div class="ft-bar" aria-hidden="true"><i class="z" style="left:${l}%;width:${w}%"></i><i class="c" style="left:${c-w/6}%;width:${w/3}%"></i><i id="ftm" class="m" style="left:${F.pos}%"></i></div>
+    <b class="ft-msg ${F.last?(F.lastOk?"ok":"no"):""}" role="status">${F.last||"Hazır olunca at"}</b><button class="btn primary ft-go big" type="button" data-ft="shoot">At</button></div>`;
+}
+function betaOffNight(){
+  const tm=shiftDay(S.today,1), T=S.days[tm];
+  if(!T && !BETA.tmLoad){ BETA.tmLoad=1; loadDay(tm).then(()=>{ if(S.tab==="bugece") render(); }).catch(()=>{}); }
+  const first=T?.games[0];
+  const list = T ? (T.games.length ? `<div class="b-gr">${T.games.map(g=>`<button class="b-row" type="button" data-binfo="${g.id}" data-bday="${tm}"><span class="teams">${[g.away,g.home].map(t=>`<span class="t">${bLogo(t)}<b>${esc(t.name)}</b></span>`).join("")}</span><span class="mid"><b class="cond tm">${timeTR(g.start)}</b></span><span class="right"><b class="amb">Maç önü ›</b></span></button>`).join("")}</div>` : `<p class="b-note">Yarın da maç yok.</p>`) : skeletonCards(2);
+  return `<div class="b-wrap"><div class="b-gr b-empty"><span class="ico">🌙</span><span><b>Bu gece NBA'de maç yok</b><small>${first?`Yarının ilk maçı ${timeTR(first.start)} · tahminler yarın sabah açılır`:"Sıradaki maçlar yükleniyor"}</small></span></div>
+    ${ftCard()}<div class="b-lb"><span>YARIN · ${esc(dayNice(tm,{day:"numeric",month:"long"}).toLocaleUpperCase("tr"))}</span><span>${T?.games.length?T.games.length+" maç":""}</span></div>${list}
+    <div class="b-two"><a class="btn" href="#sonuclar">Dünün maçları ›</a><a class="btn" href="#uzun">Uzun vade ›</a></div></div>`;
+}
+// + menüsü
+function betaPlus(open, fromPop){
+  BETA.plus=open; const el=$("#bPlus");
+  if(open){
+    const n=$("#chatN"), chatN = n && !n.classList.contains("hide") ? n.textContent : "";
+    const tb=(k,t,icn)=>`<button type="button" data-p="${k}">${bic(icn,19)}<span>${t}</span></button>`;
+    const ball=(k,t,icn,cls,tag="")=>`<button type="button" class="ball" data-p="${k}"><span class="c ${cls}">${bic(icn,26)}${tag}</span><span>${t}</span></button>`;
+    el.innerHTML = `<div class="b-plus-in"><h3 class="cond">Daha fazla</h3>
+      <div class="ptop">${tb("rules","Kurallar","rules")}${tb("score","Puanlama","calc")}${tb("news","Yenilikler","news")}${tb("req","İstek / sorun","req")}${tb("inv","Davet et","inv")}</div>
+      <div class="balls">${ball("night","Gece özeti","moon","c1")}${ball("lt","Uzun vade","hour","c2")}${ball("badges","Rozetler","badge","c3")}
+        ${ball("chat","Sohbet","chat","c4", chatN?`<i class="tag">${esc(chatN)}</i>`:"")}${ball("lb","LetterBasket","book","c5",'<i class="tag new">YAKINDA</i>')}${ball("set","Ayarlar","gear","c6")}</div>
+      <div class="pfoot"><button type="button" data-p="theme">${bic(isDark()?"sun":"moon",16)} ${isDark()?"Açık tema":"Koyu tema"}</button><button type="button" data-p="old">${bic("old",16)} Eski görünüm</button></div>
+      <button class="closeplus" type="button" data-b="plus" aria-label="Kapat">${bic("x",24,2.8)}</button></div>`;
+    el.classList.remove("hide"); document.body.classList.add("b-noscroll");
+    if(!BETA.plusHist){ try{ history.pushState({bplus:1},""); BETA.plusHist=true; }catch(e){} }
+    setTimeout(()=>el.querySelector(".closeplus")?.focus({preventScroll:true}),0);
+  } else {
+    el.classList.add("hide"); document.body.classList.remove("b-noscroll");
+    if(BETA.plusHist && !fromPop){ BETA.plusHist=false; history.back(); }
+  }
+  betaNav(BTABS[S.tab] ?? "");
+}
+function betaPlusGo(k){
+  betaPlus(false);
+  const go = h => setTimeout(()=>{ location.hash=h; }, BETA.plusHist?60:0);
+  setTimeout(()=>{
+    if(k==="rules") openRules(); else if(k==="score") openScoringGuide(); else if(k==="news") openNews(true); else if(k==="req") openReport(); else if(k==="inv") openInvite();
+    else if(k==="night"){ S.day=S.days[S.today]?.games.some(started)?S.today:shiftDay(S.today,-1); nightSummary(); }
+    else if(k==="lt") go("#uzun"); else if(k==="badges") openProf(S.uid,"roz"); else if(k==="chat") openChat();
+    else if(k==="lb") toast("LetterBasket bir sonraki beta paketinde geliyor.");
+    else if(k==="set") openProf(S.uid,"ayar");
+    else if(k==="theme") $("#theme").click();
+    else if(k==="old"){ lsSet("beta","0"); location.reload(); }
+  }, 80);
+}
+function betaClick(e){
+  const t=e.target.closest("[data-b],[data-p],[data-bx],[data-bdeck],[data-bbox],[data-binfo],[data-ft],#bStrip"); if(!t) return;
+  const d=t.dataset;
+  if(t.id==="bStrip") return betaFillMissing();
+  if(d.b==="plus") return betaPlus(!BETA.plus);
+  if(d.b==="me") return openProfile();
+  if(d.b==="search") return openSearch();
+  if(d.p) return betaPlusGo(d.p);
+  if(d.bx) return betaExtra(d.bx);
+  if(d.ft){ return d.ft==="start" ? ftStart() : ftShoot(); }
+  if(d.bdeck){ S.day=S.today; const D=S.days[S.today]; const gs=D.games.filter(g=>!started(g)); const i=gs.findIndex(g=>g.id===d.bdeck); if(i<0) return; openSwipe(); S.swipeIdx=i; paintSwipe(); return; }
+  if(d.bbox||d.binfo){ const day=d.bday||S.today, g=S.days[day]?.games.find(x=>x.id===(d.bbox||d.binfo)); if(!g) return; return d.bbox ? openBox(g) : openInfo(g); }
+}
