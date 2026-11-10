@@ -47,12 +47,13 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.42.5";
+const VERSION = "1.43.0";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.43.0", d:"11 Kasım 2026", items:["Avatar listesine kupalarıyla Efes formalı Vasilije Mićić eklendi."]},
   {v:"1.42.5", d:"10 Kasım 2026", quiet:true, items:["Okunurluk: küçük yazılar büyütüldü, dokunma alanları genişletildi, tahmin farkı \"+12\" olarak gösteriliyor.","Kutu skorunda oyuncuya dokununca oyuncu kartı açılıyor; berabere gecelerde gece lideri \"2 kişi\" yazıyor; uzun vadede kimse puan almadıysa sıra gösterilmiyor; küçük yazım düzeltmeleri.","Takas makinesi maaşları artık her gün Basketball-Reference sözleşme listesiyle tamamlanıyor: ESPN'de görünmeyen yeni imzalar ve ölü maaş toplama giriyor, takım başına \"gelen / en fazla\" özeti var."]},
   {v:"1.42.4", d:"10 Kasım 2026", quiet:true, items:["Takas makinesinde daha açık uyarılar ve takası paylaşma."]},
   {v:"1.42.3", d:"10 Kasım 2026", quiet:true, items:["Takas makinesi yenilendi: takım sekmeleri, maaş çubuğu, dokun-gönder. Eski ve yeni görünüm arasında geçiş telefonda daha sağlam."]},
@@ -800,7 +801,10 @@ const WSTARS = [["3149391","A'ja Wilson"],["3142191","Kelsey Mitchell"],["443340
   ["3904576","Marina Mabrey"],["2998928","Breanna Stewart"],["4433791","Olivia Miles"],["3058901","Allisha Gray"],["4065870","Jackie Young"],
   ["4398674","Rhyne Howard"],["2529205","Kayla McBride"],["1068","Nneka Ogwumike"],["5220150","Dominique Malonga"],["4398911","Shakira Austin"]];
 const WHEADSHOT = id => `https://a.espncdn.com/combiner/i?img=/i/headshots/wnba/players/full/${id}.png&w=160&h=117&scale=crop&cquality=70`;
-const avImg = av => { const m=/^([pw]):(\w+)$/.exec(av||""); return m ? `<img class="av-img" src="${m[1]==="w"?WHEADSHOT(m[2]):HEADSHOT(m[2])}" alt="" loading="lazy">` : ""; };
+// 1.42.6: ESPN dışı özel avatar fotoğrafları (ESPN kimliğiyle eşleşir, kurallar değişmez)
+const AV_LOCAL = {"3102532":"icons/players/micic-efes.webp"}, AV_EXTRA = [["3102532","Vasilije Mićić"]];
+const avHead = id => AV_LOCAL[id] || HEADSHOT(id);
+const avImg = av => { const m=/^([pw]):(\w+)$/.exec(av||""); return m ? `<img class="av-img${AV_LOCAL[m[2]]?" av-loc":""}" src="${m[1]==="w"?WHEADSHOT(m[2]):avHead(m[2])}" alt="" loading="lazy">` : ""; };
 const wnbaAvs = (attr, cur) => WSTARS.map(([id,n])=>`<button class="pf-av" ${attr}="w:${id}" aria-pressed="${cur===`w:${id}`}" title="${esc(n)} (WNBA)"><img src="${WHEADSHOT(id)}" alt="" loading="lazy"><small>${esc(surname(n))}</small></button>`).join("");
 const avatar = (u, cls="") => { const p=S.players[u]||{}; const h=honors(); const img=avImg(p.av);
   const crown = h.week===u ? `<span class="av-crown" title="Geçen haftanın şampiyonu">👑</span>` : "";
@@ -4675,7 +4679,7 @@ function openOnboard(step){
       <h3 style="margin-top:18px">Favori takımın</h3><p class="muted">Alt menüde bu takıma özel <b>Takımım</b> sekmesi açılır: maçlarını, oyuncularını, sakatlıklarını ve sıralamasını oradan takip edersin. Uygulamanın renkleri de bu takıma göre olur. Sonra Ayarlar'dan değiştirebilirsin.</p>
       <div class="tm-grid ob-teams">${teams.map(t=>`<button class="tg" data-obt="${t.a}" aria-pressed="${S.ob.team===t.a}" style="--tc:${tcol(t.a)}"><span class="tg-l"><img src="${LOGO_SMALL(t.a)}" alt=""></span><b>${esc(t.n.split(" ").slice(-1)[0])}</b></button>`).join("") || `<p class="muted">Takımlar yükleniyor…</p>`}</div>
       <h3 style="margin-top:18px">Avatarın</h3><p class="muted">Bir basketbolcu seç; sıralamada ve tahtada adının yanında fotoğrafı görünür. Sonra profilinden değiştirebilir, listede olmayan bir oyuncuyu da arayabilirsin.</p>
-      <div class="pf-avs ob-avs">${STARS.map(([id,n])=>`<button class="pf-av" data-oba="p:${id}" aria-pressed="${S.ob.av===`p:${id}`}"><img src="${HEADSHOT(id)}" alt="" loading="lazy"><small>${esc(surname(n))}</small></button>`).join("")}</div><small class="muted" style="display:block;margin:10px 0 6px;font-weight:700">WNBA · 2026 sezonunun en skorerleri</small><div class="pf-avs ob-avs ob-avs-w">${wnbaAvs("data-oba", S.ob.av)}</div>
+      <div class="pf-avs ob-avs">${[...AV_EXTRA,...STARS].map(([id,n])=>`<button class="pf-av" data-oba="p:${id}" aria-pressed="${S.ob.av===`p:${id}`}"><img src="${avHead(id)}" alt="" loading="lazy"><small>${esc(surname(n))}</small></button>`).join("")}</div><small class="muted" style="display:block;margin:10px 0 6px;font-weight:700">WNBA · 2026 sezonunun en skorerleri</small><div class="pf-avs ob-avs ob-avs-w">${wnbaAvs("data-oba", S.ob.av)}</div>
       <h3 style="margin-top:18px">Otomatik tahmin <small class="req">zorunlu seçim</small></h3><p class="muted">Bir gece hiç tahmin yapmayı unutursan senin yerine her maçta ESPN'in favorisi seçilsin mi? Doğru çıkan <b>her 2 kazanan 1 puan</b> getirir; fark, skorer ve banko yoktur. Sonra Profil → Ayarlar'dan değiştirebilirsin.</p>
       <div class="seg2 ob-auto"><button type="button" data-oap="1" aria-pressed="${S.ob.auto===true}">Açık</button><button type="button" data-oap="0" aria-pressed="${S.ob.auto===false}">Kapalı</button></div>
       <p class="err" id="obErr"></p><button class="btn-primary" id="obNext" type="button">Devam</button>`);
@@ -5317,8 +5321,8 @@ function paintProfile(){
     <div class="pf-sec"><h4>Avatar</h4>
       <small class="muted" style="margin:0 0 8px;display:block">Avatarın bir basketbolcunun fotoğrafı olur.</small>
       <input class="search pf-avq" id="pfAvQ" placeholder="Oyuncu ara (ör. Curry)" autocomplete="off">
-      <div class="pf-avs" id="pfAvs">${(()=>{ const cur=(/^p:(\w+)$/.exec(me.av||"")||[])[1]; const list=[...(cur && !STARS.some(x=>x[0]===cur) ? [[cur,(ALLP?.players||[]).find(x=>x.id===cur)?.n||""]] : []), ...STARS];
-        return list.map(([id,n])=>`<button class="pf-av" data-av="p:${id}" aria-pressed="${me.av===`p:${id}`}" title="${esc(n)}"><img src="${HEADSHOT(id)}" alt="" loading="lazy"><small>${esc(surname(n))}</small></button>`).join(""); })()}</div>
+      <div class="pf-avs" id="pfAvs">${(()=>{ const cur=(/^p:(\w+)$/.exec(me.av||"")||[])[1]; const list=[...(cur && !STARS.some(x=>x[0]===cur) && !AV_EXTRA.some(x=>x[0]===cur) ? [[cur,(ALLP?.players||[]).find(x=>x.id===cur)?.n||""]] : []), ...AV_EXTRA, ...STARS];
+        return list.map(([id,n])=>`<button class="pf-av" data-av="p:${id}" aria-pressed="${me.av===`p:${id}`}" title="${esc(n)}"><img src="${avHead(id)}" alt="" loading="lazy"><small>${esc(surname(n))}</small></button>`).join(""); })()}</div>
         <small class="muted">Liste: CBS Sports'un 2026-27 sezonu ilk 50 oyuncusu. Başka bir oyuncu için yukarıdan ara.</small>
       <h4 style="margin-top:14px;font-size:15px">WNBA <small class="muted" style="font-weight:600">2026 sezonunun en skorer 15 oyuncusu</small></h4>
       <div class="pf-avs" id="pfAvsW">${wnbaAvs("data-av", me.av)}</div>
@@ -5354,7 +5358,7 @@ function paintProfile(){
   };
   $("#pfAvQ")?.addEventListener("input", e=>{ const q=slug(e.target.value||""); const box2=$("#pfAvs"); if(!box2) return;
     const list = q.length<2 ? STARS : (ALLP?.players||[]).filter(x=>slug(x.n).includes(q)).slice(0,30).map(x=>[x.id,x.n]);
-    box2.innerHTML = list.map(([id,n])=>`<button class="pf-av" data-av="p:${id}" title="${esc(n)}"><img src="${HEADSHOT(id)}" alt="" loading="lazy"><small>${esc(surname(n))}</small></button>`).join("") || '<p class="muted">Oyuncu bulunamadı.</p>'; });
+    box2.innerHTML = list.map(([id,n])=>`<button class="pf-av" data-av="p:${id}" title="${esc(n)}"><img src="${avHead(id)}" alt="" loading="lazy"><small>${esc(surname(n))}</small></button>`).join("") || '<p class="muted">Oyuncu bulunamadı.</p>'; });
   $("#pfNewUI")?.addEventListener("click", ()=>switchUI(true));
   $("#secChange").onclick=()=>openRecoverySheet(false);
   $("#adminBtn")?.addEventListener("click", openAdmin);
