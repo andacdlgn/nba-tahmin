@@ -46,12 +46,13 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.36.0";
+const VERSION = "1.37.0";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.37.0", d:"10 Kasım 2026", quiet:true, items:["Yönetici denemesi için hazırlık; oyunculara görünen bir değişiklik yok."]},
   {v:"1.36.0", d:"10 Kasım 2026", quiet:true, items:["Yönetici denemesi için hazırlık; oyunculara görünen bir değişiklik yok."]},
   {v:"1.35.0", d:"10 Kasım 2026", quiet:true, items:["Uzun vade: ligin başlangıcından önceki deneme haftası turu artık \"sıralamaya sayılmaz\" diye açıkça yazıyor."]},
   {v:"1.34.0", d:"10 Kasım 2026", quiet:true, items:["Yönetici denemesi için hazırlık; oyunculara görünen bir değişiklik yok."]},
@@ -1959,6 +1960,7 @@ async function openInfo(g){
   $("#shBody").innerHTML = `<h3 id="shTitle">${esc(g.away.name)} @ ${esc(g.home.name)}</h3><p class="muted" style="margin-top:-6px">${dayNice(S.day,{day:"numeric",month:"long"})} · ${timeTR(g.start)}${g.cup?" · NBA Kupası (2× puan)":""}</p>${pred}${series}${comp}${teamSec("away")}${teamSec("home")}`;
 }
 async function openBox(g){
+  if(BETA.on) return betaBox(g);
   openSheet(`<h3 id="shTitle">${esc(g.away.name)} ${g.away.score??""} – ${g.home.score??""} ${esc(g.home.name)}</h3><p class="muted">Yükleniyor…</p>`);
   let s; try{ s = await loadSummary(g, g.state==="in"); }catch(e){ $("#shBody").innerHTML += `<div class="note">İstatistiklere şu an ulaşılamıyor.</div>`; return; }
   const bp = boxPlayers(s);
@@ -3544,13 +3546,13 @@ async function renderTakim(){
   await allPlayers().catch(()=>{});
   const fav=S.players[S.uid]?.favTeam;
   if(!fav){ box.innerHTML=`${emptyBox("shield","Favori takımını seçersen bu sekmede o takımın maçları, takvimi, kadrosu ve istatistikleri görünür.","Takımını seç")}<button class="btn-primary" id="tkPick" type="button" style="margin-top:12px">Favori takımını seç</button>`;
-    $("#tkPick").onclick=()=>openProfile("ayar"); return; }
+    $("#tkPick").onclick=()=>openProfile(BETA.on?"duz":"ayar"); return; }
   box.innerHTML='<div id="tkRoot"></div>';
   await teamPage(fav, $("#tkRoot"), {view:true, head:`<button class="linkish tk-ch" id="tkChange" type="button">Takımı değiştir</button>`,
     after: async el=>{ if(!el) return;
       el.innerHTML = teamLeadersHTML(fav) + `<div class="sec-title"><h2 style="font-size:20px">Takvim</h2></div><div id="tkCal">${skeletonCards(1)}</div>`;
       try{ $("#tkCal").innerHTML=await calendarHTML(); bindCalendar(); }catch(e){ $("#tkCal").innerHTML='<div class="note">Takvime şu an ulaşılamıyor.</div>'; } } });
-  $("#tkChange")?.addEventListener("click", ()=>openProfile("ayar"));
+  $("#tkChange")?.addEventListener("click", ()=>openProfile(BETA.on?"duz":"ayar"));
 }
 function renderNBA(){
   const box=$("#nba"); if(!box) return;
@@ -5661,7 +5663,7 @@ function betaHead(){
   if(S.tab==="bugece") sub=BETA.sub||"";
   if(S.tab==="maclar") sub=BETA.msub||"";
   if(S.tab==="sonuclar"||S.tab==="ayrisma") extra=`<a class="b-back" href="#maclar">‹ Yeni Maçlar görünümüne dön</a>`+seg([["sonuclar","Skorlar"],["ayrisma","Tahminler"]]);
-  if(S.tab==="nba"||S.tab==="takim") extra=seg([["nba","NBA"],["takim","Takımım"]]);
+  if(S.tab==="nba"||S.tab==="takim") extra=`<div class="b-chips b-nbachips"><a class="chip" href="#takim" aria-pressed="${S.tab==="takim"}">Takımım</a>${[["puan","Puan durumu"],["kupa","NBA Kupası"],["lider","Liderler"],["takim","Takımlar"],["oyuncu","Oyuncular"]].map(([k,l])=>`<a class="chip" href="#nba" data-bnsub="${k}" aria-pressed="${S.tab==="nba"&&S.nba?.sub===k}">${l}</a>`).join("")}</div>`;
   if(S.tab==="tahmin") extra=`<a class="b-back" href="#bugece">‹ Yeni Bu gece görünümüne dön</a>`;
   if(S.tab==="profil"){ const u=betaProfU(); sub = u===S.uid ? "Senin profilin" : esc(pname(u)); }
   if(S.tab==="rozetler"){ const u=betaProfU(); sub = u===S.uid ? "Senin rozetlerin" : esc(pname(u))+" · rozetler"; }
@@ -5844,9 +5846,10 @@ function betaPlusGo(k){
   }, 80);
 }
 function betaClick(e){
-  const t=e.target.closest("[data-bintro],[data-blt],[data-bmd],[data-bms],[data-bmp],[data-bgece],[data-brk],[data-bnd],[data-bshare],[data-bptab],[data-brival],[data-bpu],[data-bhist],[data-bwr],[data-bth],[data-blang],[data-b],[data-p],[data-bx],[data-bdeck],[data-bbox],[data-binfo],[data-ft],#bStrip"); if(!t) return;
+  const t=e.target.closest("[data-bnsub],[data-bintro],[data-blt],[data-bmd],[data-bms],[data-bmp],[data-bgece],[data-brk],[data-bnd],[data-bshare],[data-bptab],[data-brival],[data-bpu],[data-bhist],[data-bwr],[data-bth],[data-blang],[data-b],[data-p],[data-bx],[data-bdeck],[data-bbox],[data-binfo],[data-ft],#bStrip"); if(!t) return;
   const d=t.dataset;
   if(t.id==="bStrip") return betaFillMissing();
+  if(d.bnsub){ S.nba.sub=d.bnsub; if(S.tab==="nba"){ e.preventDefault(); renderNBA(); betaHead(); } return; }
   if(d.bintro!=null){ BETA.intro=0; location.hash="#bugece"; scrollTo({top:0}); setTimeout(betaIntro,300); return; }
   if(d.blt){ BETA.ltOpen = BETA.ltOpen===d.blt ? null : d.blt; renderUzun(); betaUzun(); return; }
   if(d.bmd!=null && d.bgo){ BETA.mday=shiftDay(S.today,+d.bmd); location.hash="#"+d.bgo; return; }
@@ -6280,7 +6283,7 @@ function betaDeckPaint(dir=0){
       ${betaSwInfo(g).replace('data-sw="info"','data-bd="info"')}
       ${marginUI}
       <button class="b-gr bd-sc" type="button" data-bd="scorer" ${st?"disabled":""}>${d.scorerId?faceImg(d.scorerId,"bd-face"):`<span class="bd-face ph">?</span>`}<span><small>Maçın en skoreri · bilirsen +1</small><b>${d.scorerName?esc(d.scorerName):"Oyuncu seç"}</b></span><b class="amb">›</b></button>
-      <button class="b-gr bd-bank ${conf?"on":""}" type="button" data-bd="banko" data-g="${g.id}" ${!nightOpen||st?"disabled":""}><span class="st">${conf?"★":"☆"}</span><span><b>${conf?"Bu maç bankon":"Bankom yap"}</b><small>Kazanırsan 2 kat, bilemezsen -1 · gecede bir maç</small></span></button>
+      <button class="b-gr bd-bank ${conf?"on":""}" type="button" data-bd="banko" data-g="${g.id}" ${!nightOpen||st?"disabled":""}><span class="bd-star">${conf?"★":"☆"}</span><span><b>${conf?"Bu maç bankon":"Bankom yap"}</b><small>Kazanırsan 2 kat, bilemezsen -1 · gecede bir maç</small></span></button>
     </div>
     <footer class="bd-f"><small class="bd-st">${status}</small><div class="b-two"><button class="btn" type="button" data-bd="prev" ${k.i?"":"disabled"}>‹ Önceki</button>
       <button class="btn primary-ish" type="button" data-bd="next" ${BETA.deck.saving?"disabled":""}>${BETA.deck.saving?"Kaydediliyor…":ready&&!same?(last?"Kaydet · ekstralar ›":"Kaydet · sonraki ›"):(last?"Ekstralar ›":"Sonraki ›")}</button></div></footer>`;
@@ -6308,7 +6311,9 @@ const BINTRO=[
   {sel:"#bHead .b-me", t:"Profilin sağ üstte", d:"Her sayfada sağ üstteki yuvarlak senin profilin: istatistiklerin, rozetlerin ve profil düzenleme orada."}];
 function betaIntro(){
   if(!BETA.on || BETA.intro==null || S.tab!=="bugece" || BETA.deck || BETA.plus || !$("#sheet").classList.contains("hide")){ $("#bCoach")?.remove(); return; }
-  let i=BETA.intro, el=null; while(i<BINTRO.length && !(el=document.querySelector(BINTRO[i].sel))) i++;
+  let i=BETA.intro, el=document.querySelector(BINTRO[i]?.sel||"#none");
+  if(!el && i===0 && !(S.days[S.today]?.games)){ $("#bCoach")?.remove(); return; }   // maçlar yüklenince başlar
+  while(i<BINTRO.length && !(el=document.querySelector(BINTRO[i].sel))) i++;
   if(!el){ $("#bCoach")?.remove(); return; }
   BETA.intro=i; const R=el.getBoundingClientRect(), pad=6, H=innerHeight, below=R.top+R.height/2<H/2, st=BINTRO[i], last=i===BINTRO.length-1;
   let c=$("#bCoach"); if(!c){ document.body.insertAdjacentHTML("beforeend", `<div class="b-coach" id="bCoach" role="dialog" aria-label="Tanıtım"></div>`); c=$("#bCoach"); }
@@ -6318,3 +6323,58 @@ function betaIntro(){
 }
 document.addEventListener("click", e=>{ const b=e.target.closest("[data-bi]"); if(!b) return; if(b.dataset.bi==="skip" || BETA.intro>=BINTRO.length-1){ BETA.intro=null; lsSet("bIntroSeen","1"); } else BETA.intro++; betaIntro(); });
 addEventListener("resize", ()=>{ if(BETA.intro!=null) betaIntro(); });
+
+// 1.37.0 (beta): Maç sayfası. Skor, üç kutu, KUTU SKORU (takım seçimi, ilk beş + yedekler, takım toplamı), takım istatistikleri,
+// çeyrekler, ligde kim ne dedi ve maç yorumları. Kutu skoru en üstte.
+const BX_STATS=[["fieldGoalPct","Saha içi %",1],["threePointFieldGoalPct","Üçlük %",1],["freeThrowPct","Serbest atış %",1],["totalRebounds","Ribaund",1],["offensiveRebounds","Hücum ribaundu",1],
+  ["assists","Asist",1],["steals","Top çalma",1],["blocks","Blok",1],["turnovers","Top kaybı",0],["turnoverPoints","Top kaybından sayı",1],["pointsInPaint","Boyalı alanda sayı",1],
+  ["fastBreakPoints","Hızlı hücum sayısı",1],["largestLead","En büyük fark",1],["fouls","Faul",0]];
+function betaDayOf(g){ return Object.keys(S.days).find(k=>S.days[k]?.games?.some(x=>x.id===g.id)) || S.today; }
+async function betaBox(g){
+  BETA.box={g, side:BETA.box?.g?.id===g.id?BETA.box.side:"away", all:false, s:null};
+  openSheet(`<h3 id="shTitle">${esc(g.away.name)} – ${esc(g.home.name)}</h3><p class="muted">Yükleniyor…</p>`);
+  try{ BETA.box.s = await loadSummary(g, g.state==="in"); }catch(e){ $("#shBody").innerHTML += `<div class="note">İstatistiklere şu an ulaşılamıyor.</div>`; return; }
+  betaBoxPaint();
+}
+function betaBoxPaint(){
+  const B=BETA.box; if(!B || $("#sheet").classList.contains("hide")) return; const g=B.g, s=B.s, day=betaDayOf(g), D=S.days[day];
+  const bp=boxPlayers(s), top=Math.max(0,...bp.map(p=>p.pts));
+  const lead=(g.home.score??0)-(g.away.score??0), w=lead>0?g.home:lead<0?g.away:null;
+  const ps=S.order.map(u=>[u,D?.picks?.[g.id]?.[u]]).filter(x=>x[1]), na=ps.filter(([,p])=>p.winner===g.away.abbr).length;
+  const tp=bp.filter(p=>p.pts===top&&top>0);
+  const head=`<div class="bb-score">${[g.away,g.home].map((t,i)=>`<span class="bb-t ${g.state==="post"&&w&&w!==t?"lose":""}">${bLogo(t,40)}<b>${esc(t.name)}</b><small>${t.rec||""}</small></span>${i===0?`<span class="bb-n"><b class="tnum">${g.away.score??"–"} – ${g.home.score??"–"}</b><small class="${g.state==="in"?"live":""}">${esc(gameStatusTR(g))}</small></span>`:""}`).join("")}</div>
+    <div class="b-bx"><div><small>Ligin seçimi</small><b>${escA(g.away.abbr)} ${na}–${ps.length-na} ${escA(g.home.abbr)}</b><i>${ps.length} tahmin</i></div><div><small>Fark</small><b>${w?escA(w.abbr)+" +"+Math.abs(lead):"Eşit"}</b><i>${g.state==="post"?"maç sonu":"şu an"}</i></div><div><small>En skorer</small><b>${tp.length?esc(tp.map(p=>bSur(p.name)).join(", "))+" "+top:"–"}</b><i>${tp.length?escA(tp[0].team):""}</i></div></div>`;
+  const t=g[B.side], rows=bp.filter(p=>p.team===t.abbr).sort((a,b)=>(b.starter-a.starter)||(b.pts-a.pts)), st=rows.filter(p=>p.starter), bn=rows.filter(p=>!p.starter);
+  const tr=p=>`<tr class="${p.pts===top&&top>0?"top":""}"><td>${esc(bSur(p.name)===p.name?p.name:p.name.split(" ")[0][0]+". "+bSur(p.name))}</td><td>${esc(p.min)}</td><td><b>${p.pts}</b></td><td>${p.reb}</td><td>${p.ast}</td><td>${esc(p.fg)}</td><td>${esc(p.tp)}</td><td>${esc(p.ft)}</td><td>${esc(p.pm)}</td></tr>`;
+  const sum=k=>rows.reduce((a,p)=>a+(+p[k]||0),0), frac=k=>{ let m=0,a=0; for(const p of rows){ const [x,y]=String(p[k]||"0-0").split("-").map(Number); m+=x||0; a+=y||0; } return `${m}-${a}`; };
+  const box=`<div class="b-lb"><span>KUTU SKORU</span><span>Tablo yana kayar</span></div>
+    <div class="b-seg" style="grid-template-columns:1fr 1fr"><button type="button" data-bxs="away" aria-pressed="${B.side==="away"}">${esc(g.away.name)}</button><button type="button" data-bxs="home" aria-pressed="${B.side==="home"}">${esc(g.home.name)}</button></div>
+    <div class="b-gr bb-tbl"><div class="sc"><table><thead><tr><th>Oyuncu</th><th>DK</th><th>SAY</th><th>RİB</th><th>AST</th><th>SA</th><th>3S</th><th>SB</th><th>+/-</th></tr></thead><tbody>
+      ${rows.length?`<tr class="grp"><td colspan="9">İlk beş</td></tr>${st.map(tr).join("")}
+      ${bn.length?(B.all?`<tr class="grp"><td colspan="9">Yedekler</td></tr>${bn.map(tr).join("")}<tr class="more"><td colspan="9"><button type="button" data-bxall>Yedekleri gizle ⌃</button></td></tr>`:`<tr class="more"><td colspan="9"><button type="button" data-bxall>Yedekler (${bn.length} oyuncu) ⌄</button></td></tr>`):""}
+      <tr class="tot"><td>Takım</td><td></td><td><b>${sum("pts")}</b></td><td>${sum("reb")}</td><td>${sum("ast")}</td><td>${frac("fg")}</td><td>${frac("tp")}</td><td>${frac("ft")}</td><td></td></tr>`:`<tr><td colspan="9" class="muted">Maç başlayınca istatistikler burada görünür</td></tr>`}
+    </tbody></table></div></div><p class="b-note" style="text-align:left">SA: saha içi isabet-deneme · 3S: üçlük · SB: serbest atış · +/-: sahadayken sayı farkı</p>`;
+  const BS=Object.fromEntries((s.boxscore?.teams||[]).map(x=>[x.team?.abbreviation, Object.fromEntries((x.statistics||[]).map(y=>[y.name, y.displayValue]))]));
+  const A=BS[g.away.abbr]||{}, H=BS[g.home.abbr]||{};
+  const cmp=BX_STATS.filter(([k])=>A[k]!=null||H[k]!=null).map(([k,l,hi])=>{ const x=parseFloat(A[k]), y=parseFloat(H[k]), mx=Math.max(Math.abs(x)||0,Math.abs(y)||0)||1, better=isNaN(x)||isNaN(y)||x===y?0:((hi?x>y:x<y)?-1:1);
+    return `<div class="bb-c"><b class="${better<0?"win":""}">${esc(A[k]??"–")}</b><span><small>${l}</small><span class="bars"><i class="l" style="width:${(Math.abs(x)||0)/mx*100}%"></i><i class="r" style="width:${(Math.abs(y)||0)/mx*100}%"></i></span></span><b class="${better>0?"win":""}">${esc(H[k]??"–")}</b></div>`; }).join("");
+  const stats = cmp ? `<div class="b-lb"><span>TAKIM İSTATİSTİKLERİ</span><span>${escA(g.away.abbr)} · ${escA(g.home.abbr)}</span></div><div class="b-gr bb-cmp">${cmp}</div>` : "";
+  const nq=Math.max(g.away.ls?.length||0, g.home.ls?.length||0);
+  const qs = nq ? `<div class="b-lb"><span>ÇEYREKLER</span><span></span></div><div class="b-gr bb-tbl"><div class="sc"><table><thead><tr><th></th>${Array.from({length:nq},(_,i)=>`<th>${i<4?i+1+".":"UZ"+(i>4?i-3:"")}</th>`).join("")}<th>T</th></tr></thead><tbody>
+    ${[g.away,g.home].map(t=>`<tr><td>${escA(t.abbr)}</td>${Array.from({length:nq},(_,i)=>`<td>${esc(t.ls?.[i]??"")}</td>`).join("")}<td><b>${t.score??""}</b></td></tr>`).join("")}</tbody></table></div></div>` : "";
+  const who = ps.length ? `<div class="b-lb"><span>LİGDE KİM NE DEDİ</span><span>${ps.length} kişi</span></div><div class="b-gr">${ps.map(([u,p])=>{ const conf=D?.daily?.[u]?.confGame===g.id, r=scorePick(g,p,conf), pw=p.winner===g.home.abbr?g.home:g.away;
+      return `<button class="b-row bq-row" type="button" data-bpu="${u}"><span class="teams"><span class="t">${avatar(u,"sm")}<b style="color:${col(u)}">${esc(S.players[u]?.club||pname(u))}</b></span></span><span class="right" style="width:150px"><span class="pk">${bLogo(pw,20)}<small class="muted ell">${esc(p.margin)} · ${esc(bSur(p.scorerName))}</small><b class="amb">${conf?"★":""}</b><span>${bPts(r.pts)}</span></span></span></button>`; }).join("")}</div>` : "";
+  const T=D?.talk?.[g.id]||{}, tl=S.order.filter(u=>T[u]&&(T[u].e||T[u].t)), me=T[S.uid]||{};
+  const talk = started(g) ? `<div class="b-lb"><span>YORUMLAR</span><span>${tl.length}</span></div><div class="b-gr bb-talk">${tl.map(u=>`<div class="tk">${avatar(u,"sm")}<span><b style="color:${col(u)}">${esc(pname(u))}</b>${T[u].e?` <span class="tk-e">${T[u].e}</span>`:""}${T[u].t?` ${esc(T[u].t)}`:""}</span></div>`).join("")||`<p class="b-note" style="text-align:left;margin:0">Henüz yorum yok.</p>`}
+      <div class="b-chips">${TALK_EMOJI.map(e=>`<button class="chip" type="button" data-btk="${e}" aria-pressed="${me.e===e}">${e}</button>`).join("")}<button class="chip" type="button" data-btkw>${me.t?"Yorumunu değiştir":"✍ Yorum yaz"}</button></div></div>` : "";
+  $("#shBody").innerHTML = `<div class="bb">${head}${box}${stats}${qs}${who}${talk}</div>`;
+}
+document.addEventListener("click", e=>{
+  if(!BETA.on || !BETA.box) return;
+  const b=e.target.closest("[data-bxs],[data-bxall],[data-btk],[data-btkw]"); if(!b || !$("#shBody").contains(b)) return;
+  const B=BETA.box, g=B.g;
+  if(b.dataset.bxs){ B.side=b.dataset.bxs; B.all=false; return betaBoxPaint(); }
+  if(b.hasAttribute("data-bxall")){ B.all=!B.all; return betaBoxPaint(); }
+  if(b.dataset.btk){ S.day=betaDayOf(g); const cur=S.days[S.day]?.talk?.[g.id]?.[S.uid]?.e; saveTalk(g,{e: cur===b.dataset.btk?"":b.dataset.btk}).then(betaBoxPaint); setTimeout(betaBoxPaint,50); return; }
+  if(b.hasAttribute("data-btkw")){ S.day=betaDayOf(g); openTalk(g); }
+});

@@ -309,12 +309,12 @@ body.beta .b-old .adm-in{border-radius:12px;min-height:44px}
 #bdM{width:100%;accent-color:var(--amber);height:30px}
 #bdM.none{opacity:.55}
 .bd-sc,.bd-dp,.bd-bank{display:flex;align-items:center;gap:12px;padding:10px 14px;width:100%;text-align:left;color:var(--ink);font:inherit;cursor:pointer}
-.bd-sc span,.bd-dp span,.bd-bank span:not(.st){flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.25}
+.bd-sc>span:not(.bd-face),.bd-dp>span:not(.bd-face),.bd-bank>span:not(.bd-star){flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.25}
 .bd-sc small,.bd-dp small,.bd-bank small{color:var(--muted);font-size:12px}
 .bd-sc b,.bd-dp b{font-size:15px}
 .bd-face{width:44px;height:44px;border-radius:50%;object-fit:cover;object-position:50% 12%;background:var(--panel-2);flex:none}
 .bd-face.ph{display:grid;place-items:center;color:var(--muted);font-weight:800}
-.bd-bank .st{font-size:24px;color:var(--amber-ink);width:30px;text-align:center}
+.bd-bank .bd-star{font-size:24px;color:var(--amber-ink);width:30px;flex:none;text-align:center}
 .bd-bank.on{border-color:var(--amber);background:var(--amber-soft)}
 .bd-bk.on{background:var(--amber-soft)}
 .bd-f{padding:8px 0 calc(12px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--line);background:var(--bg)}
@@ -334,3 +334,44 @@ body.beta .b-old .adm-in{border-radius:12px;min-height:44px}
 .b-coach .row i{width:7px;height:7px;border-radius:4px;background:var(--line)}
 .b-coach .row i.on{width:18px;background:var(--amber)}
 .b-coach .btn{min-height:42px;border-radius:12px;font-weight:800;padding:0 16px}
+
+/* 1.37.0: maç sayfası */
+.bb{display:flex;flex-direction:column;gap:12px}
+.bb-score{display:flex;align-items:center;gap:6px;padding:4px 0}
+.bb-t{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:3px;text-align:center}
+.bb-t b{font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.bb-t small{font-size:11.5px;color:var(--muted)}
+.bb-t.lose{opacity:.55}
+.bb-n{display:flex;flex-direction:column;align-items:center;flex:none}
+.bb-n b{font-family:"Barlow Condensed";font-weight:800;font-size:38px;line-height:1}
+.bb-n small{font-size:12px;color:var(--muted);font-weight:700}.bb-n small.live{color:var(--live)}
+.bb .b-seg button{height:36px;border-radius:10px;font-size:14px;font-weight:700;color:var(--muted);border:0;background:none;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bb .b-seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.bb-tbl .sc{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.bb-tbl table{width:max-content;min-width:100%;border-collapse:collapse;font-size:13px}
+.bb-tbl th{font-size:11px;letter-spacing:.05em;color:var(--muted);font-weight:800;padding:9px 8px;text-align:center;white-space:nowrap}
+.bb-tbl td{padding:9px 8px;border-top:1px solid var(--line);text-align:center;white-space:nowrap}
+.bb-tbl th:first-child,.bb-tbl td:first-child{text-align:left;position:sticky;left:0;background:var(--panel);z-index:1;padding-left:12px}
+.bb-tbl tr.top td{background:var(--amber-soft)}
+.bb-tbl tr.grp td{font-size:11px;letter-spacing:.06em;font-weight:800;color:var(--muted);text-transform:uppercase;padding:7px 12px;background:var(--panel-2)}
+.bb-tbl tr.more td{padding:0}
+.bb-tbl tr.more button{width:100%;min-height:42px;background:none;border:0;color:var(--amber-ink);font:inherit;font-weight:800;cursor:pointer;text-align:left;padding:0 12px}
+.bb-tbl tr.tot td{font-weight:800;background:var(--panel-2)}
+.bb-cmp{padding:6px 12px}
+.bb-c{display:grid;grid-template-columns:58px 1fr 58px;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--line)}
+.bb-c:last-child{border-bottom:0}
+.bb-c>b{font-size:14px;color:var(--muted)}.bb-c>b:last-child{text-align:right}.bb-c>b.win{color:var(--ink)}
+.bb-c>span{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0}
+.bb-c small{font-size:11.5px;color:var(--muted);font-weight:700}
+.bb-c .bars{display:grid;grid-template-columns:1fr 1fr;gap:3px;width:100%}
+.bb-c .bars i{height:5px;border-radius:3px;background:var(--p0);justify-self:end}
+.bb-c .bars i.r{background:var(--p1);justify-self:start}
+.bb-talk{padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.bb-talk .tk{display:flex;gap:8px;align-items:center;font-size:13.5px}
+.bb-talk .tk .av{width:26px;height:26px;font-size:11px}
+/* NBA: Takımım dahil tek çip sırası; eski alt sekmeler gizli */
+.b-nbachips{margin-top:10px;padding-bottom:0}
+.b-nbachips .chip{text-decoration:none;color:var(--ink)}
+.b-nbachips .chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+body.beta #nba .nba-subs{display:none}
+body.beta #nba .box,body.beta #takim .box{border-radius:18px}
