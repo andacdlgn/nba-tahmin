@@ -46,12 +46,13 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.40.1";
+const VERSION = "1.40.2";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.40.2", d:"10 Kasım 2026", quiet:true, items:["Yönetici denemesi için hazırlık; oyunculara görünen bir değişiklik yok."]},
   {v:"1.40.1", d:"10 Kasım 2026", quiet:true, items:["Yönetici denemesi için hazırlık; oyunculara görünen bir değişiklik yok."]},
   {v:"1.40.0", d:"10 Kasım 2026", quiet:true, items:["Yönetici denemesi için hazırlık; oyunculara görünen bir değişiklik yok."]},
   {v:"1.39.0", d:"10 Kasım 2026", quiet:true, items:["Yönetici denemesi için hazırlık; oyunculara görünen bir değişiklik yok."]},
@@ -3017,7 +3018,7 @@ function statsBody(u, {badges=false}={}){
   for(const x of recs) for(const t of [x.home.abbr,x.away.abbr]){ tm[t] ||= {n:0,ok:0}; tm[t].n++; if(x.r.w>0) tm[t].ok++; }
   const tl=Object.entries(tm).map(([k,v])=>({k,...v,p:v.ok/v.n})).sort((a,b)=>b.p-a.p||b.n-a.n);
   if(tl.length){
-    const heat=p=>`color-mix(in srgb, ${p>=.5?"var(--win)":"var(--lose)"} ${Math.round(Math.abs(p-.5)*2*60+12)}%, var(--panel))`;
+    const heat=p=>`color-mix(in srgb, ${p>=.5?"var(--win)":"var(--lose)"} ${Math.round(Math.abs(p-.5)*2*(BETA.on?26:60)+(BETA.on?8:12))}%, var(--panel))`;
     html += `<div class="sec-title"><h2>Takım karnesi</h2><span class="aside">hangi takımın maçlarında ne kadar bildin</span></div>
       <div class="tgrid">${tl.map(x=>`<div class="tcell" data-tp="${x.k}" style="background:${heat(x.p)}" title="${x.ok}/${x.n} maç"><img src="${LOGO_SMALL(x.k)}" alt=""><b>%${Math.round(x.p*100)}</b><small>${x.ok}/${x.n}</small></div>`).join("")}</div>`;
   }
@@ -5676,6 +5677,8 @@ function betaBoot(){
   document.addEventListener("keydown", e=>{ if(e.key==="Escape" && BETA.plus){ betaPlus(false); } if(BETA.ft?.on && !BETA.ft.done && S.tab==="bugece" && (e.key===" "||e.key==="Enter") && document.activeElement?.dataset?.ft==="shoot"){ e.preventDefault(); ftShoot(); } });
   addEventListener("popstate", ()=>{ if(BETA.plus){ BETA.plusHist=false; betaPlus(false, true); } });
   if(!location.hash || location.hash==="#tahmin") history.replaceState(null, "", "#bugece");
+  // beta açılmadan önce çizilmiş yazılar (sabit pencereler, gizli sayfalar) da bir kere taranır
+  setTimeout(()=>betaCap(document.body), 0); setTimeout(()=>betaCap(document.body), 2500);
 }
 function betaRevoke(){ lsSet("beta","0"); if(BETA.on) location.reload(); }
 function betaRender(){
@@ -6077,20 +6080,30 @@ function betaSwInfo(g){
 }
 document.addEventListener("click", e=>{ if(!e.target.closest("[data-swback]")) return; const i=BETA.swBack||0; openSwipe(); S.swipeIdx=i; paintSwipe(); });
 // Yeni görünümde her yazı büyük harfle başlar; ondalıklar virgülle yazılır. Kullanıcı yazıları (sohbet, yorum, profil yazıları) olduğu gibi kalır.
-const CAP_SKIP_SEL = "input,textarea,script,style,svg,code,.chat,#chat,.talk,.tk-list,.pf-bio,.bq-id i,[data-nocap],.ch-list";
+const CAP_SKIP_SEL = "input,textarea,script,style,svg,code,.chat,#chat,.talk,.tk-list,.pf-bio,.bq-id i,[data-nocap],.ch-list,.lbc .tx,.bio,.pf-bio,.ch-q,.ch-t";
+const CAP_LOW = /^(vs|ve|veya|ya da|de|da|ile)\b/, CAP_LOW2 = /^(vs|ve|veya|ya da|de|da|ile|dk|sa|sn|ort)\b/;
+const capTR = c => c.toLocaleUpperCase("tr");
+// 1.40.2: metin kendi kutusunun ilk yazısıysa (önünde yalnızca boşluk ya da satır sonu varsa) büyük harfle başlar; " · " ayracından sonraki parça da öyle
+function capStart(t){ for(let p=t.previousSibling; p; p=p.previousSibling){ if(p.nodeType===3 ? p.nodeValue.trim() : p.nodeName!=="BR") return false; } return true; }
 function betaCap(root){
   if(!BETA.on || !root) return;
+  if(root.nodeType===1 && !root.closest?.(CAP_SKIP_SEL)){
+    for(const el of [root, ...root.querySelectorAll?.("input[placeholder],textarea[placeholder]")||[]]){ if(el.type==="email") continue; const ph=el.getAttribute?.("placeholder"); if(ph && /^[a-zçğıöşü]/.test(ph)) el.setAttribute("placeholder", capTR(ph[0])+ph.slice(1)); }
+  }
   const w=document.createTreeWalker(root, NodeFilter.SHOW_TEXT); const list=[]; let n; while((n=w.nextNode())) list.push(n);
   for(const t of list){ let v=t.nodeValue; if(!v || !/[a-zçğıöşü.]/.test(v)) continue;
     const par=t.parentElement; if(!par || par.closest(CAP_SKIP_SEL)) continue;
     let nv=v.replace(/(?<![\d.,])(\d+)\.(\d)(?![\d.])/g, "$1,$2");
-    if(/^[a-zçğıöşü]/.test(nv) && !/^(vs\b|ve\b|veya\b|ya da\b|de\b|da\b|ile\b)/.test(nv) && !t.previousSibling) nv=nv.charAt(0).toLocaleUpperCase("tr")+nv.slice(1);
+    const m=nv.match(/^(\s*)([a-zçğıöşü])/);
+    if(m && capStart(t) && !CAP_LOW.test(nv.slice(m[1].length))) nv=m[1]+capTR(m[2])+nv.slice(m[0].length);
+    nv=nv.replace(/(·\s+)([a-zçğıöşü])(?=[a-zçğıöşü])/g, (all,a,b,off)=>CAP_LOW2.test(nv.slice(off+a.length)) ? all : a+capTR(b));
     if(nv!==v) t.nodeValue=nv; }
 }
 (()=>{ let q=new Set(), tm=0;
   const flush=()=>{ tm=0; for(const r of q) if(r.isConnected) betaCap(r); q.clear(); };
-  new MutationObserver(ms=>{ if(!BETA.on) return; for(const m of ms) for(const a of m.addedNodes){ if(a.nodeType===1) q.add(a); else if(a.nodeType===3 && a.parentElement) q.add(a.parentElement); } if(!tm) tm=setTimeout(flush, 30); })
-    .observe(document.body, {childList:true, subtree:true});
+  new MutationObserver(ms=>{ if(!BETA.on) return; for(const m of ms){ if(m.type==="characterData"){ if(m.target.parentElement) q.add(m.target.parentElement); continue; } if(m.type==="attributes"){ q.add(m.target); continue; }
+      for(const a of m.addedNodes){ if(a.nodeType===1) q.add(a); else if(a.nodeType===3 && a.parentElement) q.add(a.parentElement); } } if(!tm) tm=setTimeout(flush, 30); })
+    .observe(document.body, {childList:true, subtree:true, characterData:true, attributes:true, attributeFilter:["placeholder"]});
 })();
 
 // 1.33.0 (beta): Sıralama yeni liste (dokununca açılır), Gece özeti ayrı sayfa (paylaşma isteğe bağlı), Rozetler'de "Sahip olduğun rozetler" en üstte.
