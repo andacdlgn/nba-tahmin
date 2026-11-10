@@ -718,3 +718,4 @@ body.beta .wk-ban-btn .wk-s-go{font-size:13px;white-space:nowrap}
 .lbfv b{font-family:"Barlow Condensed";font-size:15px}.lbfv small{font-size:10.5px;opacity:.85}
 .lbfv.empty{background:var(--panel);border-style:dashed;color:var(--muted);font-size:22px}
 .lbfv.empty small{font-size:11px}
+body.beta .ell{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}

@@ -10,7 +10,8 @@ import { getFirestore, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, colle
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
 const TZ = "Europe/Istanbul";
-const UI_EN = (()=>{ try{ return localStorage.getItem("lang")==="en"; }catch(e){ return false; } })();
+// 1.41.1: İngilizce kaldırıldı; daha önce İngilizce seçmiş olan da Türkçeye döner
+const UI_EN = (()=>{ try{ if(localStorage.getItem("lang")==="en") localStorage.setItem("lang","tr"); }catch(e){} return false; })();
 const LOC = UI_EN ? "en-US" : "tr-TR";
 const Q = new URLSearchParams(location.search);
 // 1.30.1 güvenlik: veri kaynağı adresten (?espn=) değiştirilemez; yalnızca ESPN'in iki sunucusu
@@ -46,12 +47,13 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.41.0";
+const VERSION = "1.41.1";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.41.1", d:"10 Kasım 2026", quiet:true, items:["İngilizce dil seçeneği kaldırıldı; site yalnızca Türkçe."]},
   {v:"1.41.0", d:"10 Kasım 2026", items:["✨ Site yenilendi: Bu gece, Maçlar, Sıralama ve NBA sekmeleri; ortadaki + ile Gece özeti, Uzun vade, Rozetler, Sohbet, LetterBasket ve Ayarlar.","Tahmin yapmak artık maç maç ilerleyen bir deste: kazanan, fark ve skorer tek ekranda, maç önü bilgileri hemen üstte.","Tahminlerin, puanların ve profilin aynı kaldı. Eski görünüme Daha fazla › Eski görünüm ile dönebilir, Profil › Ayarlar'dan yeniye geri geçebilirsin."]},
   {v:"1.40.9", d:"10 Kasım 2026", quiet:true, items:["Sakat oyuncu listelerinde oyuncunun bu sezon maç başına kaç dakika oynadığı ve son maçındaki dakikası da yazıyor."]},
   {v:"1.40.8", d:"10 Kasım 2026", quiet:true, items:["Yönetici denemesi için hazırlık; oyunculara görünen bir değişiklik yok."]},
@@ -6087,7 +6089,7 @@ function betaSettingsPage(){
     <div class="b-lb"><span>GÖRÜNÜM</span><span></span></div>
     <div class="b-gr bs-sec"><b>Tema</b><small>Sistem: telefonun açık / koyu ayarını izler</small>
       <div class="b-seg" style="grid-template-columns:repeat(3,1fr)"><button type="button" data-bth="light" aria-pressed="${t==="light"}">☀ Açık</button><button type="button" data-bth="dark" aria-pressed="${t==="dark"}">☾ Koyu</button><button type="button" data-bth="system" aria-pressed="${t==="system"}">Sistem</button></div>
-      <b style="margin-top:12px">Dil</b><div class="b-seg" style="grid-template-columns:repeat(2,1fr)"><button type="button" data-blang="tr" aria-pressed="${LANG!=="en"}">Türkçe</button><button type="button" data-blang="en" aria-pressed="${LANG==="en"}">English</button></div></div>
+</div>
     <div class="b-old"><div id="prof"></div></div>
     <div class="b-lb"><span>UYGULAMA</span><span>Sürüm ${VERSION}</span></div>
     <div class="b-two"><button class="btn" type="button" data-p="news">Yenilikler</button><button class="btn" type="button" data-p="req">İstek / sorun</button></div>
@@ -6636,9 +6638,13 @@ async function betaLbSave(){
   try{ await setDoc(doc(S.db,"lb",`${D.gid}_${S.uid}`), data); BETA.lb.all[`${D.gid}_${S.uid}`]={...data, at:{seconds:Date.now()/1e3}}; closeSheet(); toast("Günlüğüne eklendi"); BETA.lbSeg="gunluk"; if(S.tab==="lb") betaLb(); }
   catch(e){ $("#lbErr").textContent="Kaydedilemedi. Tekrar dene."; }
 }
-async function betaLbDelete(){
+async function betaLbDelete(btn){
   const D=BETA.lbD; if(!D) return;
-  try{ await deleteDoc(doc(S.db,"lb",`${D.gid}_${S.uid}`)); delete BETA.lb.all[`${D.gid}_${S.uid}`]; closeSheet(); toast("Log silindi"); if(S.tab==="lb") betaLb(); }catch(e){ toast("Silinemedi."); }
+  // 1.41.1: iki adımlı silme (ilk dokunuşta "Emin misin?")
+  if(btn && btn.dataset.sure!=="1"){ btn.dataset.sure="1"; btn.textContent="Emin misin?"; setTimeout(()=>{ if(btn.isConnected){ btn.dataset.sure=""; btn.textContent="Sil"; } }, 3000); return; }
+  if(BETA.lbDeleting) return; BETA.lbDeleting=true; if(btn) btn.disabled=true;
+  try{ await deleteDoc(doc(S.db,"lb",`${D.gid}_${S.uid}`)); delete BETA.lb.all[`${D.gid}_${S.uid}`]; closeSheet(); toast("Log silindi"); if(S.tab==="lb") betaLb(); }catch(e){ toast("Silinemedi."); if(btn) btn.disabled=false; }
+  BETA.lbDeleting=false;
 }
 // bir maçın LetterBasket sayfası
 async function betaLbGame(gid){
@@ -6685,7 +6691,7 @@ document.addEventListener("click", e=>{
   if(d.lbtag){ keep(); const i=D.tags.indexOf(d.lbtag); if(i>=0) D.tags.splice(i,1); else if(D.tags.length<5) D.tags.push(d.lbtag); else toast("En fazla 5 etiket"); return betaLbLogPaint(); }
   if(b.hasAttribute("data-lbsp")){ keep(); D.sp=!D.sp; return betaLbLogPaint(); }
   if(b.hasAttribute("data-lbsave")) return betaLbSave();
-  if(b.hasAttribute("data-lbdel")) return betaLbDelete();
+  if(b.hasAttribute("data-lbdel")) return betaLbDelete(b);
 });
 
 // 1.38.1: Skorlar'ın başında gece özeti kartı (eski zengin kartlar yeni dilde kalır)
