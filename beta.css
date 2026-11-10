@@ -699,3 +699,22 @@ body.beta .aw-m{border-radius:18px}
 body.beta .wk-ban-btn{display:block;width:100%;text-align:left;font:inherit;color:var(--ink);cursor:pointer;margin:10px 0 0}
 body.beta .wk-ban-btn .wk-ban-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
 body.beta .wk-ban-btn .wk-s-go{font-size:13px;white-space:nowrap}
+
+/* 1.40.7: LetterBasket beğeni, yorum, favori 4 maç */
+.lbs{display:flex;gap:6px;margin-top:8px;padding-top:8px;border-top:1px solid var(--line)}
+.lbs-b{display:inline-flex;align-items:center;gap:4px;min-height:32px;padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:var(--panel-2);color:var(--ink);font:inherit;font-size:13px;cursor:pointer}
+.lbs-b b{font-weight:800}
+.lbs-b.on{border-color:color-mix(in srgb,var(--lose) 55%,var(--line));color:var(--lose);background:color-mix(in srgb,var(--lose) 12%,var(--panel-2))}
+.lbs-b:disabled{cursor:default;opacity:.8}
+.lbcm{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.lbcm-r{display:flex;align-items:flex-start;gap:8px;font-size:13.5px;line-height:1.4}
+.lbcm-r .av{width:26px;height:26px;flex:none}
+.lbcm-r>span{flex:1;min-width:0;overflow-wrap:anywhere}
+.lbcm-in{display:flex;gap:6px}
+.lbcm-in input{flex:1;min-width:0;border:1px solid var(--line);background:var(--panel-2);color:var(--ink);border-radius:12px;padding:9px 12px;font:inherit;font-size:16px}
+.lbfvs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.lbfv{aspect-ratio:3/4;border-radius:16px;border:1px solid var(--line);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:#fff;font:inherit;cursor:pointer;padding:6px 2px;
+  background:linear-gradient(160deg,color-mix(in srgb,var(--ca) 75%,#000),color-mix(in srgb,var(--ch) 75%,#000))}
+.lbfv b{font-family:"Barlow Condensed";font-size:15px}.lbfv small{font-size:10.5px;opacity:.85}
+.lbfv.empty{background:var(--panel);border-style:dashed;color:var(--muted);font-size:22px}
+.lbfv.empty small{font-size:11px}

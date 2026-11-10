@@ -2382,3 +2382,34 @@ body.bars-hidden .chat-fab{transform:none}
 .beta-inv b{font-size:16px}.beta-inv small{color:var(--muted);font-size:13px;line-height:1.45}
 .beta-inv .bi-b{display:flex;gap:8px;margin-top:6px}.beta-inv .bi-b>*{flex:1;margin:0}
 .beta-inv .btn-primary{background:var(--amber);color:#10161e;padding:11px;font-size:15px}
+
+/* ====================================================== 1.40.7: giriş ekranı yeni tasarım (herkes için) */
+body:has(#auth:not(.hide)) .topbar{display:none}
+#auth{background:#0b1118}
+#auth .auth-wrap{max-width:460px;padding:calc(26px + env(safe-area-inset-top)) 16px calc(28px + env(safe-area-inset-bottom))}
+#auth .auth-hero{text-align:left;margin-bottom:16px}
+#auth .auth-logo{width:54px;height:54px;border-radius:16px}
+#auth .auth-hero h1{margin:12px 0 0;font-size:44px}
+#auth .auth-tag{font-size:15px;line-height:1.4;color:#aab6c4;max-width:330px}
+#auth .auth-live{justify-content:flex-start;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:14px}
+#auth .auth-live span{display:flex;flex-direction:column;align-items:flex-start;gap:1px;border-radius:14px;padding:9px 11px;font-size:12px;color:#aab6c4;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1)}
+#auth .auth-live b{font-family:"Barlow Condensed";font-size:20px;line-height:1.05;color:#fff;order:-1}
+#auth .auth-card{max-width:none;border-radius:22px;padding:16px;background:var(--panel)}
+#auth #authMode{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;border-radius:14px;background:var(--panel-2);border:1px solid var(--line);margin:0}
+#auth #authMode .chip{height:38px;border:0;border-radius:10px;background:none;color:var(--muted);font-weight:800;font-size:14px;justify-content:center}
+#auth #authMode .chip[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+#auth .auth-h{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:800;margin:16px 2px 8px}
+#auth .lg-pick{grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+#auth .lg-card{padding:9px 4px 8px;gap:5px;border-radius:14px;background:var(--panel-2)}
+#auth .lg-card .av.lg{width:46px;height:46px}
+#auth .lg-card b{font-size:12.5px}
+#auth .lg-card:hover,#auth .lg-card:focus-visible{border-color:var(--pc);background:color-mix(in srgb,var(--pc) 10%,var(--panel-2))}
+#auth .lg-who{border-radius:16px;background:var(--panel-2)}
+#auth .fld span{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:800}
+#auth .pinb-cells i{height:52px;border-radius:14px}
+#auth .btn-primary{background:var(--amber);color:#10161e;border-radius:14px;min-height:50px;font-weight:800;margin-top:14px}
+#auth .auth-links{flex-wrap:wrap;justify-content:center;gap:6px 16px;margin-top:12px}
+#auth .auth-links .linkish{font-size:13px;color:var(--muted);text-decoration:none}
+#auth .auth-invite{border-radius:16px}
+@media (max-width:360px){ #auth .lg-pick{grid-template-columns:repeat(3,minmax(0,1fr))} }
+#auth .auth-links{align-items:center}#auth .auth-links .linkish{margin:0;padding:6px 2px}

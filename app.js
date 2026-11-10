@@ -46,12 +46,13 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.40.6";
+const VERSION = "1.40.7";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.40.7", d:"10 Kasım 2026", quiet:true, items:["Yönetici denemesi için hazırlık; oyunculara görünen bir değişiklik yok."]},
   {v:"1.40.6", d:"10 Kasım 2026", quiet:true, items:["Siteye 20 dakikadan uzun aradan sonra girilince hep ana sayfa açılıyor."]},
   {v:"1.40.5", d:"10 Kasım 2026", quiet:true, items:["Yönetici denemesi için hazırlık; oyunculara görünen bir değişiklik yok."]},
   {v:"1.40.4", d:"10 Kasım 2026", quiet:true, items:["Yeni sürüm çıkınca site kendiliğinden ve daha güvenilir biçimde güncelleniyor."]},
@@ -187,7 +188,7 @@ function openReport(kind){
   const mailOk = S.contact?.verified && S.contact?.email;
   openSheet(`<h3 id="shTitle">İstekler ve sorunlar</h3><p class="muted">Bir sorun mu var, bir şey mi istiyorsun, aklına bir soru mu takıldı? Yaz, doğrudan lig yöneticisinin mail kutusuna gider. ${mailOk?`Cevap <b>${esc(S.contact.email)}</b> adresine gelebilir.`:`Mail adresini onaylarsan cevap doğrudan mailine gelebilir.`}</p>
     <div class="rep-k">${REP_KINDS.map(([k,l])=>`<button type="button" data-rk="${k}" aria-pressed="${S.repKind===k}">${l}</button>`).join("")}</div>
-    <textarea id="repText" class="adm-in" rows="6" maxlength="1000" placeholder="ör. Uzun vade sekmesinde oyuncu seçince ekran donuyor · ör. Maç sonu skor kartı sohbete düşsün"></textarea>
+    <textarea id="repText" class="adm-in" rows="6" maxlength="1000" placeholder="Ör. Uzun vade sekmesinde oyuncu seçince ekran donuyor · ör. Maç sonu skor kartı sohbete düşsün"></textarea>
     <small class="muted" id="repCnt" style="display:block;text-align:right">0/1000</small>
     <p class="muted" style="font-size:12.5px;margin:4px 0 0">Sürüm, cihaz ve açık sekme bilgisi sorunu bulmak için otomatik eklenir.</p>
     <p class="err" id="repErr"></p><button class="btn-primary" id="repSend" type="button">Gönder</button>`);
@@ -2756,8 +2757,10 @@ function bstats(u){
   C.cache[u]=s; return s;
 }
 function badgesOf(u){
+  // 1.40.7: oyuncunun rozet listesi, lig verisi değişene kadar bir kere hesaplanır (Rozetler ve Sıralama her çizimde herkesinkini baştan kuruyordu)
+  const C=bctx(); C.bo ||= {}; if(C.bo[u]) return C.bo[u];
   const s=bstats(u);
-  return BFAM.flatMap(([id,cat,ico,name,th,desc,m])=>{ const v=m(s)||0;
+  return C.bo[u] = BFAM.flatMap(([id,cat,ico,name,th,desc,m])=>{ const v=m(s)||0;
     return BLIST.filter(b=>b.fam===id).map(b=>({...b, n: v>=b.t ? 1 : 0, val:v, prog: v>=b.t ? "" : `${v}/${b.t}`, first:null})); });
 }
 const badgePts = list => list.reduce((t,b)=>t+(b.n?BTIER[b.tier].p:0),0);
@@ -4583,7 +4586,7 @@ const stepBar = n => `<div class="jw-bar">${JSTEPS.map((t,i)=>`<i class="${i<n?"
 function paintJoin(){
   const box=$("#joinBox"), j=S.jw;
   if(j.step===1){
-    box.innerHTML = stepBar(1) + `<label class="fld"><span>Gerçek adın</span><input id="jwName" maxlength="40" autocomplete="username" autocapitalize="words" placeholder="ör. Andaç" value="${esc(j.name)}"></label>
+    box.innerHTML = stepBar(1) + `<label class="fld"><span>Gerçek adın</span><input id="jwName" maxlength="40" autocomplete="username" autocapitalize="words" placeholder="Ör. Andaç" value="${esc(j.name)}"></label>
       <small class="hint" id="jwNameHint">Arkadaşlarının seni tanıyacağı gerçek adın; giriş yaparken de bunu yazacaksın. Takma ad değil: takımına birazdan ayrı bir isim vereceksin. Aynı adda biri varsa soyadının baş harfini ekle (ör. Ali K.).</small>
       ${j.inv ? "" : `<label class="fld"><span>Davet kodu</span><input id="jwInv" autocomplete="off" maxlength="40" placeholder="Seni davet edenden al" value="${esc(j.inv)}"></label>`}
       <p class="err" id="jwErr"></p><button class="btn-primary" id="jwNext" type="button">İleri</button>`;
@@ -4654,7 +4657,7 @@ function openOnboard(step){
     const me=S.players[S.uid]||{}; S.ob = S.ob || {club:me.club||"", team:me.favTeam||"", av:avImg(me.av)?me.av:"", auto:("autoPick" in me) ? !!me.autoPick : null};
     const teams=(ALLP?.teams||[]).slice().sort((a,b)=>a.n.localeCompare(b.n,"tr"));
     openSheet(`${S.onboard?stepBar(4):""}<h3 id="shTitle">Takım adın</h3><p class="muted">Ligdeki takma adın: gerçek adının altında görünür ve istediğin kadar yaratıcı olabilir (ör. Kyle Korver Sevenler Derneği). Zorunlu; sonra Profil → Ayarlar'dan değiştirebilirsin.</p>
-      <input id="obClub" class="adm-in" style="width:100%" maxlength="40" placeholder="ör. Kyle Korver Sevenler Derneği" value="${esc(S.ob.club||"")}"><small class="hint" id="obClubErr"></small>
+      <input id="obClub" class="adm-in" style="width:100%" maxlength="40" placeholder="Ör. Kyle Korver Sevenler Derneği" value="${esc(S.ob.club||"")}"><small class="hint" id="obClubErr"></small>
       <h3 style="margin-top:18px">Favori takımın</h3><p class="muted">Alt menüde bu takıma özel <b>Takımım</b> sekmesi açılır: maçlarını, oyuncularını, sakatlıklarını ve sıralamasını oradan takip edersin. Uygulamanın renkleri de bu takıma göre olur. Sonra Ayarlar'dan değiştirebilirsin.</p>
       <div class="tm-grid ob-teams">${teams.map(t=>`<button class="tg" data-obt="${t.a}" aria-pressed="${S.ob.team===t.a}" style="--tc:${tcol(t.a)}"><span class="tg-l"><img src="${LOGO_SMALL(t.a)}" alt=""></span><b>${esc(t.n.split(" ").slice(-1)[0])}</b></button>`).join("") || `<p class="muted">Takımlar yükleniyor…</p>`}</div>
       <h3 style="margin-top:18px">Avatarın</h3><p class="muted">Bir basketbolcu seç; sıralamada ve tahtada adının yanında fotoğrafı görünür. Sonra profilinden değiştirebilir, listede olmayan bir oyuncuyu da arayabilirsin.</p>
@@ -5289,10 +5292,10 @@ function paintProfile(){
       <div class="adm-row" style="margin-top:6px"><input id="pfName" class="adm-in" maxlength="40" autocapitalize="words" value="${esc(me.name||"")}"><button class="btn" id="pfNameSave" type="button">Değiştir</button></div>
       <small class="err" id="pfNameErr"></small></div>
     <div class="pf-sec"><h4>Takım adın</h4><small class="muted">Ligdeki takma adın: sıralamada ve profilinde gerçek adının altında görünür (ör. Kyle Korver Sevenler Derneği). En fazla 40 karakter; küfür, argo ve hakaret yazılamaz.</small>
-      <div class="adm-row" style="margin-top:6px"><input id="pfClub" class="adm-in" maxlength="40" placeholder="ör. Kyle Korver Sevenler Derneği" value="${esc(me.club||"")}"><button class="btn" id="pfClubSave" type="button">Kaydet</button></div>
+      <div class="adm-row" style="margin-top:6px"><input id="pfClub" class="adm-in" maxlength="40" placeholder="Ör. Kyle Korver Sevenler Derneği" value="${esc(me.club||"")}"><button class="btn" id="pfClubSave" type="button">Kaydet</button></div>
       <small class="err" id="pfClubErr"></small></div>
     <div class="pf-sec"><h4>Hakkında</h4><small class="muted">Profilinde adının altında görünür. En fazla 60 karakter; küfür, argo ve hakaret yazılamaz.</small>
-      <div class="adm-row" style="margin-top:6px"><input id="pfBio" class="adm-in" maxlength="60" placeholder="ör. Lakers'tan ölürüm" value="${esc(me.bio||"")}"><button class="btn" id="pfBioSave" type="button">Kaydet</button></div>
+      <div class="adm-row" style="margin-top:6px"><input id="pfBio" class="adm-in" maxlength="60" placeholder="Ör. Lakers'tan ölürüm" value="${esc(me.bio||"")}"><button class="btn" id="pfBioSave" type="button">Kaydet</button></div>
       <small class="err" id="pfBioErr"></small></div>
     <div class="pf-sec"><h4>Rengin</h4><div class="pf-colors">${(BETA.on?PKEYS:PKEYS.slice(0,10)).map(c=>{ const u=usedBy(c); return `<button class="pf-col" data-col="${c}" style="--c:var(--${c})" aria-pressed="${col(S.uid)===`var(--${c})`}" title="${u.length?esc(u.join(", "))+" de kullanıyor":""}">${u.length?"<i></i>":""}</button>`; }).join("")}</div>
       <small class="muted">Noktalı renkleri başka oyuncular da kullanıyor.</small></div>
@@ -5491,7 +5494,7 @@ async function openAdmin(){
       <button class="btn" id="admLink" type="button" style="margin-top:8px">${ICON.link}Davet linkini paylaş</button></div>
     <div class="pf-sec"><h4>Uzun vade</h4><button class="btn" id="admLT" type="button">${ICON.medal}Sonuçları gir</button></div>
     <div class="pf-sec"><h4>Duyuru</h4><small class="muted" style="margin:0 0 8px">Sitenin üstünde herkese görünür. Kapatan bir daha görmez; yeni duyuru yine çıkar.</small>
-      <textarea id="admNotice" class="adm-in" rows="2" maxlength="200" placeholder="ör. Yeni oyuncu: Zeki 👋">${esc(S.notice?.text||"")}</textarea>
+      <textarea id="admNotice" class="adm-in" rows="2" maxlength="200" placeholder="Ör. Yeni oyuncu: Zeki 👋">${esc(S.notice?.text||"")}</textarea>
       <div class="adm-row" style="margin-top:8px"><button class="btn" id="admNoticeSave" type="button">Yayınla</button>${S.notice?.text?'<button class="btn danger" id="admNoticeDel" type="button">Kaldır</button>':""}</div>
       <small class="muted" id="admNoticeMsg"></small></div>`;
   $("#admLT")?.addEventListener("click", ()=>allPlayers().catch(()=>{}).then(openLTAdmin));
@@ -6054,6 +6057,8 @@ function betaProfBody(u){
   const tm={}; for(const x of st.recs) for(const t of [x.home.abbr,x.away.abbr]){ tm[t] ||= {n:0,ok:0}; tm[t].n++; if(x.r.w>0) tm[t].ok++; }
   const bestT=Object.entries(tm).filter(([,v])=>v.n>=2).sort((a,b)=>b[1].ok/b[1].n-a[1].ok/a[1].n||b[1].n-a[1].n).slice(0,3);
   if(bestT.length) h += `<div class="b-lb"><span>EN İYİ BİLDİĞİ TAKIMLAR</span><span></span></div><div class="b-bx">${bestT.map(([k,v])=>`<button type="button" data-tp="${k}"><img class="b-logo" src="${LOGO_SMALL(k)}" alt="" width="26" height="26"><b>%${Math.round(v.ok/v.n*100)}</b><i>${v.ok}/${v.n} maç</i></button>`).join("")}</div>`;
+  if(BETA.lbx.at) h += lbFavHTML(u, lbGames()).replace(/data-lbfavpick/g, 'data-lbfavgo');
+  else lbxLoad().then(()=>{ if(S.tab==="profil" && (BETA.prof?.tab||"ozet")==="ozet"){ BETA.pageKey=""; betaPage(); } });
   h += `<button class="btn b-wide" type="button" data-bpu="${u}" data-bput="roz">🏅 Rozetler · ${st.badges} kazanıldı ›</button>`;
   box.innerHTML = `<div class="b-wrap">${h}</div>`;
 }
@@ -6131,7 +6136,9 @@ function betaCap(root){
 }
 (()=>{ let q=new Set(), tm=0;
   const flush=()=>{ tm=0; for(const r of q) if(r.isConnected) betaCap(r); q.clear(); };
-  new MutationObserver(ms=>{ if(!BETA.on) return; for(const m of ms){ if(m.type==="characterData"){ if(m.target.parentElement) q.add(m.target.parentElement); continue; } if(m.type==="attributes"){ q.add(m.target); continue; }
+  // 1.40.7: sohbet, yorumlar ve canlı akan yerler (oyuncuların yazdıkları) hiç taranmaz; yalnızca sitenin sabit yazıları düzeltilir
+  const CAP_LIVE = "#chat,.ch-list,.talk,.tk-list,.lbc .tx,.lbcm";
+  new MutationObserver(ms=>{ if(!BETA.on) return; for(const m of ms){ const tg=m.target.nodeType===1?m.target:m.target.parentElement; if(!tg || tg.closest(CAP_LIVE)) continue; if(m.type==="characterData"){ if(m.target.parentElement) q.add(m.target.parentElement); continue; } if(m.type==="attributes"){ q.add(m.target); continue; }
       for(const a of m.addedNodes){ if(a.nodeType===1) q.add(a); else if(a.nodeType===3 && a.parentElement) q.add(a.parentElement); } } if(!tm) tm=setTimeout(flush, 30); })
     .observe(document.body, {childList:true, subtree:true, characterData:true, attributes:true, attributeFilter:["placeholder"]});
 })();
@@ -6531,6 +6538,7 @@ function lbMine(gid){ return BETA.lb.all[gid+"_"+S.uid]; }
 async function betaLb(){
   const box=$("#blbx"); if(!box) return;
   if(!BETA.lb.at){ box.innerHTML=skeletonCards(2); await lbLoad(); }
+  if(!BETA.lbs?.at) await lbsLoad();
   const seg=BETA.lbSeg||"akis", G=lbGames(), logs=Object.values(BETA.lb.all).filter(x=>G[x.gid]||x.a).sort((a,b)=>(b.at?.seconds||0)-(a.at?.seconds||0));
   const mine=logs.filter(x=>x.uid===S.uid);
   if(!BETA.lbx.at) await lbxLoad();
@@ -6539,7 +6547,7 @@ async function betaLb(){
     return `<div class="b-gr lbc"><div class="h">${avatar(x.uid,"sm")}<span class="nm"><b style="color:${col(x.uid)}">${esc(S.players[x.uid]?.club||pname(x.uid))}</b><small>${esc(dayNice(x.day,{day:"numeric",month:"short"}))} maçı · ${LB_HOW[x.how]||""}${x.re?" · 🔁 tekrar":""}</small></span>${lbBalls(x.r)}</div>
       <button type="button" class="lbgl" data-lbg="${x.gid}">${lbGameLine(g, hide)}<b class="amb">›</b></button>
       ${x.txt?`<p class="tx">${hide?`<i class="muted">Spoiler içeriyor; maçı loglayınca görünür.</i>`:esc(x.txt)}</p>`:""}
-      ${(x.tags?.length||x.mvpN)?`<div class="tg">${x.mvpN?`<span class="chip sm">⭐ MVP: ${esc(bSur(x.mvpN))}</span>`:""}${(x.tags||[]).map(t=>`<span class="chip sm">#${esc(t)}</span>`).join("")}</div>`:""}</div>`; };
+      ${(x.tags?.length||x.mvpN)?`<div class="tg">${x.mvpN?`<span class="chip sm">⭐ MVP: ${esc(bSur(x.mvpN))}</span>`:""}${(x.tags||[]).map(t=>`<span class="chip sm">#${esc(t)}</span>`).join("")}</div>`:""}${lbSocial(x)}</div>`; };
   let body;
   if(seg==="listeler") body=lbListsBody(G);
   else if(seg==="izle") body=lbWatchBody(G);
@@ -6549,6 +6557,7 @@ async function betaLb(){
     const mk=S.today.slice(0,6), mMine=mine.filter(x=>(x.wd||x.day).startsWith(mk)).length;
     const wraps = mine.length ? `<button class="b-gr lbwr" type="button" data-lbwrap="${mk}"><span class="i">🎬</span><span><b>${MONTHS_TR[+mk.slice(4,6)-1]} özetin</b><small>${mMine?mMine+" maç · şimdiye kadar":"Bu ay henüz log yok"}</small></span><b class="amb">Aç ›</b></button><button class="b-gr lbwr" type="button" data-lbwrap="all"><span class="i">🏆</span><span><b>Sezon özetin</b><small>${mine.length} maç · en sevdiğin maç, MVP'lerin</small></span><b class="amb">Aç ›</b></button>` : "";
     body = `${wraps}${BX2([["İzlediğin maç", String(mine.length), "loglanan"],["Ortalama puanın", mine.length?lbFmt(avg.toFixed(1)):"–", "5 üzerinden"],["En çok izlediğin", fav?escA(fav[0]):"–", fav?fav[1]+" maç":""]])}
+      ${lbFavHTML(S.uid, G)}
       ${best?`<div class="b-lb"><span>EN SEVDİĞİN MAÇ</span><span>${lbFmt(best.r)} top</span></div><button class="b-gr lbgl big" type="button" data-lbg="${best.gid}">${lbGameLine(G[best.gid]||best)}<b class="amb">›</b></button>`:""}
       <div class="b-lb"><span>GÜNLÜĞÜN</span><span>${mine.length} kayıt</span></div>
       ${mine.length?`<div class="b-gr">${mine.map(x=>`<button class="b-row" type="button" data-lbl="${x.gid}"><span class="teams">${lbGameLine(G[x.gid]||x)}<small class="muted">${esc(dayNice(x.wd||x.day,{day:"numeric",month:"short"}))} · ${LB_HOW[x.how]||""}${x.re?" · 🔁":""}</small></span><span class="right">${lbBalls(x.r,14)}<small class="muted">Düzenle ›</small></span></button>`).join("")}</div>`:`<div class="b-gr bq-note">Henüz maç loglamadın. "Maç logla" ile başla.</div>`}`;
@@ -6625,16 +6634,18 @@ async function betaLbDelete(){
 }
 // bir maçın LetterBasket sayfası
 async function betaLbGame(gid){
-  await lbLoad(); await lbxLoad(); const G=lbGames()[gid]; const L=Object.values(BETA.lb.all).filter(x=>x.gid===gid);
+  await lbLoad(); await lbxLoad(); await lbsLoad(); const G=lbGames()[gid]; const L=Object.values(BETA.lb.all).filter(x=>x.gid===gid);
   const g=G||L[0]; if(!g) return toast("Maç bulunamadı.");
   const avg=L.length?L.reduce((a,x)=>a+x.r,0)/L.length:0, mine=lbMine(gid), hideAll=!mine;
   const dist=[1,2,3,4,5].map(k=>L.filter(x=>Math.ceil(x.r)===k).length), mx=Math.max(1,...dist);
   openSheet(`<div class="lbf"><h3 id="shTitle">LetterBasket</h3><div class="b-gr lbgl big">${lbGameLine(G||{a:g.a,h:g.h})}</div>
     ${BX2([["Ligin puanı", L.length?lbFmt(avg.toFixed(1)):"–", L.length+" log"],["Senin puanın", mine?lbFmt(mine.r):"–", mine?LB_HOW[mine.how]:"loglamadın"],["Tarih", esc(dayNice(g.day,{day:"numeric",month:"short"})), ""]])}
     ${L.length?`<div class="b-gr lbdist">${dist.map((n,i)=>`<span><i style="height:${n/mx*60+4}px"></i><small>${i+1}🏀</small><b>${n}</b></span>`).join("")}</div>`:""}
-    ${L.map(x=>`<div class="b-gr lbc"><div class="h">${avatar(x.uid,"sm")}<span class="nm"><b style="color:${col(x.uid)}">${esc(S.players[x.uid]?.club||pname(x.uid))}</b><small>${LB_HOW[x.how]||""}${x.re?" · 🔁":""}${x.mvpN?" · MVP "+esc(bSur(x.mvpN)):""}</small></span>${lbBalls(x.r)}</div>${x.txt?`<p class="tx">${x.sp&&hideAll&&x.uid!==S.uid?`<i class="muted">Spoiler; loglayınca görünür.</i>`:esc(x.txt)}</p>`:""}</div>`).join("")}
+    ${L.map(x=>`<div class="b-gr lbc"><div class="h">${avatar(x.uid,"sm")}<span class="nm"><b style="color:${col(x.uid)}">${esc(S.players[x.uid]?.club||pname(x.uid))}</b><small>${LB_HOW[x.how]||""}${x.re?" · 🔁":""}${x.mvpN?" · MVP "+esc(bSur(x.mvpN)):""}</small></span>${lbBalls(x.r)}</div>${x.txt?`<p class="tx">${x.sp&&hideAll&&x.uid!==S.uid?`<i class="muted">Spoiler; loglayınca görünür.</i>`:esc(x.txt)}</p>`:""}${lbSocial(x)}</div>`).join("")}
     <button class="btn b-wide primary-ish" type="button" data-lbl="${gid}">${mine?"Logunu düzenle":"Bu maçı logla"}</button>
-    <div class="b-two"><button class="btn" type="button" data-lbw="${gid}">${(lbxMe().watch||[]).includes(gid)?"✓ İzleyeceklerimde":"👁 İzleyeceğim"}</button><button class="btn" type="button" data-lbli="${gid}">📋 Listeye ekle</button></div></div>`);
+    <div class="b-two"><button class="btn" type="button" data-lbw="${gid}">${(lbxMe().watch||[]).includes(gid)?"✓ İzleyeceklerimde":"👁 İzleyeceğim"}</button><button class="btn" type="button" data-lbli="${gid}">📋 Listeye ekle</button></div>
+    ${mine?`<button class="btn b-wide" type="button" data-lbfav="${gid}">${(lbxMe().fav||[]).includes(gid)?"★ Favori 4 maçında · çıkar":"☆ Favori 4 maçına ekle"}</button>`:""}</div>`);
+  BETA.lbGameOpen=gid;
 }
 document.addEventListener("click", e=>{
   if(!BETA.on) return;
@@ -6646,7 +6657,7 @@ document.addEventListener("click", e=>{
   if(d.lbli) return lbListPick(d.lbli);
   if(d.lbadd){ const L=JSON.parse(JSON.stringify(lbxMe().lists||[])), l=L[+d.lbadd]; if(!l) return; const i=l.g.indexOf(d.g); if(i>=0) l.g.splice(i,1); else l.g.unshift(d.g); return lbxSave({lists:L}).then(ok=>{ if(ok){ toast(i>=0?"Listeden çıkarıldı":"Listeye eklendi"); lbListPick(d.g); } }); }
   if(b.hasAttribute("data-lbnew")){ const n=($("#lbNewL")?.value||"").trim(); if(!n) return toast("Listeye bir ad ver."); if(textProblem(n)) return toast("Küfür ve hakaret yazılamaz."); const L=[...(lbxMe().lists||[]), {n, g:d.g?[d.g]:[]}]; return lbxSave({lists:L}).then(ok=>{ if(ok){ toast("Liste oluşturuldu"); if(d.g) lbListPick(d.g); else { closeSheet(); BETA.lbSeg="listeler"; betaLb(); } } }); }
-  if(b.hasAttribute("data-lbnewl")){ openSheet(`<div class="lbf"><h3 id="shTitle">Yeni liste</h3><div class="adm-row" style="display:flex;gap:8px"><input id="lbNewL" class="adm-in" maxlength="40" placeholder="ör. Sezonun gerilim maçları"><button class="btn primary-ish" type="button" data-lbnew>Oluştur</button></div></div>`); return; }
+  if(b.hasAttribute("data-lbnewl")){ openSheet(`<div class="lbf"><h3 id="shTitle">Yeni liste</h3><div class="adm-row" style="display:flex;gap:8px"><input id="lbNewL" class="adm-in" maxlength="40" placeholder="Ör. Sezonun gerilim maçları"><button class="btn primary-ish" type="button" data-lbnew>Oluştur</button></div></div>`); return; }
   if(d.lbdl!=null){ const L=[...(lbxMe().lists||[])]; L.splice(+d.lbdl,1); return lbxSave({lists:L}).then(ok=>{ if(ok){ toast("Liste silindi"); betaLb(); } }); }
   if(b.hasAttribute("data-lbpick")) return betaLbPick();
   if(d.lbmode){ BETA.lbMode=d.lbmode; return betaLbPick(); }
@@ -6695,7 +6706,7 @@ async function lbxLoad(force=false){
 }
 const lbxMe = () => BETA.lbx.all[S.uid] || {uid:S.uid, watch:[], lists:[]};
 async function lbxSave(patch){
-  const cur=lbxMe(), data={uid:S.uid, watch:(patch.watch??cur.watch??[]).slice(0,100), lists:(patch.lists??cur.lists??[]).slice(0,20).map(l=>({n:String(l.n||"").slice(0,40), g:(l.g||[]).slice(0,50)})), at:serverTimestamp()};
+  const cur=lbxMe(), data={uid:S.uid, watch:(patch.watch??cur.watch??[]).slice(0,100), lists:(patch.lists??cur.lists??[]).slice(0,20).map(l=>({n:String(l.n||"").slice(0,40), g:(l.g||[]).slice(0,50)})), fav:(patch.fav??cur.fav??[]).slice(0,4), at:serverTimestamp()};
   try{ await setDoc(doc(S.db,"lbx",S.uid), data); BETA.lbx.all[S.uid]={...data}; return true; }catch(e){ toast("Kaydedilemedi."); return false; }
 }
 async function lbToggleWatch(gid){ await lbxLoad(); const w=[...(lbxMe().watch||[])], i=w.indexOf(gid); if(i>=0) w.splice(i,1); else w.unshift(gid); if(await lbxSave({watch:w})) toast(i>=0?"İzleyeceklerinden çıkarıldı":"İzleyeceklerine eklendi"); }
@@ -6705,7 +6716,7 @@ async function lbListPick(gid){
   openSheet(`<div class="lbf"><h3 id="shTitle">Listeye ekle</h3>
     ${L.length?`<div class="b-gr">${L.map((l,i)=>`<button class="b-row" type="button" data-lbadd="${i}" data-g="${gid}"><span class="teams"><b>${esc(l.n)}</b><small class="muted">${l.g.length} maç</small></span><span class="right"><b class="amb">${l.g.includes(gid)?"✓ Listede":"Ekle ›"}</b></span></button>`).join("")}</div>`:`<p class="b-note">Henüz listen yok.</p>`}
     <div class="b-lb"><span>YENİ LİSTE</span><span>En fazla 40 karakter</span></div>
-    <div class="adm-row" style="display:flex;gap:8px"><input id="lbNewL" class="adm-in" maxlength="40" placeholder="ör. Sezonun gerilim maçları"><button class="btn primary-ish" type="button" data-lbnew data-g="${gid}">Oluştur</button></div></div>`);
+    <div class="adm-row" style="display:flex;gap:8px"><input id="lbNewL" class="adm-in" maxlength="40" placeholder="Ör. Sezonun gerilim maçları"><button class="btn primary-ish" type="button" data-lbnew data-g="${gid}">Oluştur</button></div></div>`);
 }
 function lbListsBody(G){
   const me=lbxMe(), mine=me.lists||[], others=Object.values(BETA.lbx.all).filter(x=>x.uid!==S.uid && x.lists?.length);
@@ -6938,3 +6949,56 @@ function idleHome(boot){
 setInterval(()=>{ if(!document.hidden) markIdleSeen(); }, 60e3);
 document.addEventListener("visibilitychange", ()=>{ if(document.hidden) markIdleSeen(); else if(S.uid) idleHome(false); });
 addEventListener("pagehide", markIdleSeen);
+
+/* ====================================================== beta: LetterBasket beğeni, yorum, favori 4 maç (1.40.7) */
+// lbk/{log}_{uid}: beğeni · lbm/{id}: {uid, lid, t ≤200, at} yorum · lbx/{uid}.fav: profilde görünen en sevilen 4 maç
+BETA.lbs = {k:{}, m:{}, at:0};
+async function lbsLoad(force=false){
+  if(!force && Date.now()-BETA.lbs.at<60e3) return;
+  try{ const [a,b]=await Promise.all([getDocs(collection(S.db,"lbk")), getDocs(collection(S.db,"lbm"))]); const k={}, m={};
+    a.forEach(x=>{ const d=x.data(); (k[d.lid] ||= []).push(d.uid); });
+    b.forEach(x=>{ const d=x.data(); (m[d.lid] ||= []).push({id:x.id, ...d}); });
+    for(const l of Object.values(m)) l.sort((p,q)=>(p.at?.seconds||0)-(q.at?.seconds||0));
+    BETA.lbs={k, m, at:Date.now()}; }catch(e){ BETA.lbs.at=Date.now(); }
+}
+function lbSocial(x){
+  const lid=x.gid+"_"+x.uid, ks=BETA.lbs.k[lid]||[], ms=BETA.lbs.m[lid]||[], liked=ks.includes(S.uid), own=x.uid===S.uid, open=BETA.lbmOpen===lid;
+  const who=ks.map(u=>pname(u)).join(", ");
+  return `<div class="lbs"><button type="button" class="lbs-b ${liked?"on":""}" data-lbk="${lid}" ${own?"disabled":""} title="${esc(who)}" aria-pressed="${liked}">${liked?"♥":"♡"} <b>${ks.length||""}</b>${own?(ks.length?" beğeni":""):(liked?" Beğendin":" Beğen")}</button>
+    <button type="button" class="lbs-b" data-lbmo="${lid}" aria-expanded="${open}">💬 <b>${ms.length||""}</b> ${ms.length?"yorum":"Yorum yaz"}</button></div>
+    ${open?`<div class="lbcm">${ms.map(c=>`<div class="lbcm-r">${avatar(c.uid,"sm")}<span><b style="color:${col(c.uid)}">${esc(pname(c.uid))}</b> ${esc(c.t)}</span>${c.uid===S.uid||S.isAdmin?`<button type="button" class="ch-act" data-lbmdel="${c.id}">Sil</button>`:""}</div>`).join("")}
+      <div class="lbcm-in"><input id="lbmIn" maxlength="200" placeholder="Yorumun (en fazla 200 karakter)" autocomplete="off"><button type="button" class="btn primary-ish" data-lbmsend="${lid}">Gönder</button></div><small class="err" id="lbmErr"></small></div>`:""}`;
+}
+function lbFavHTML(u, G){
+  const fav=(BETA.lbx.all[u]?.fav||[]).filter(g=>G[g]), me=u===S.uid; if(!me && !fav.length) return "";
+  const slot=gid=>{ const g=G[gid]; return `<button type="button" class="lbfv" data-lbg="${gid}" style="--ca:${tcol(g.a)};--ch:${tcol(g.h)}">${bLogo({abbr:g.a},26)}<b class="tnum">${g.sa??""}–${g.sh??""}</b>${bLogo({abbr:g.h},26)}<small>${esc(dayNice(g.day,{day:"numeric",month:"short"}))}</small></button>`; };
+  const empty=me?Array.from({length:4-fav.length},()=>`<button type="button" class="lbfv empty" data-lbfavpick>＋<small>Maç seç</small></button>`).join(""):"";
+  return `<div class="b-lb"><span>${me?"FAVORİ 4 MAÇIN":"FAVORİ 4 MAÇI"}</span><span>${me?"profilinde görünür":"LetterBasket"}</span></div><div class="lbfvs">${fav.map(slot).join("")}${empty}</div>`;
+}
+function lbFavPick(){
+  const G=lbGames(), mine=Object.values(BETA.lb.all).filter(x=>x.uid===S.uid && G[x.gid]).sort((a,b)=>b.r-a.r), fav=lbxMe().fav||[];
+  openSheet(`<div class="lbf"><h3 id="shTitle">Favori maç seç</h3><p class="muted" style="margin-top:-4px">Logladığın maçlardan en fazla 4 tane. Profilinde görünür.</p>
+    ${mine.length?`<div class="b-gr">${mine.map(x=>`<button class="b-row" type="button" data-lbfav="${x.gid}"><span class="teams">${lbGameLine(G[x.gid])}<small class="muted">${esc(dayNice(x.day,{day:"numeric",month:"short"}))}</small></span><span class="right">${lbBalls(x.r,14)}<b class="amb">${fav.includes(x.gid)?"★ Seçili":"Ekle ›"}</b></span></button>`).join("")}</div>`:`<div class="b-gr bq-note">Önce bir maç logla, sonra favorilerine ekleyebilirsin.</div>`}</div>`);
+}
+async function lbFavToggle(gid){
+  await lbxLoad(); const f=[...(lbxMe().fav||[])], i=f.indexOf(gid);
+  if(i>=0) f.splice(i,1); else { if(f.length>=4) return toast("En fazla 4 favori maç seçebilirsin; önce birini çıkar."); f.push(gid); }
+  if(await lbxSave({fav:f})){ toast(i>=0?"Favorilerinden çıkarıldı":"Favori 4 maçına eklendi"); closeSheet(); if(S.tab==="lb") betaLb(); }
+}
+async function lbRefreshSocial(){ await lbsLoad(true); if(BETA.lbGameOpen && !$("#sheet").classList.contains("hide") && $("#sheet .lbf .lbgl.big")) betaLbGame(BETA.lbGameOpen); else if(S.tab==="lb") betaLb(); }
+document.addEventListener("click", async e=>{
+  if(!BETA.on) return;
+  const k=e.target.closest("[data-lbk]"); if(k){ if(k.disabled) return; const lid=k.dataset.lbk, ref=doc(S.db,"lbk",lid+"_"+S.uid), on=(BETA.lbs.k[lid]||[]).includes(S.uid);
+    try{ if(on) await deleteDoc(ref); else await setDoc(ref,{uid:S.uid, lid, at:serverTimestamp()}); }catch(x){ return toast("Kaydedilemedi."); } return lbRefreshSocial(); }
+  const mo=e.target.closest("[data-lbmo]"); if(mo){ BETA.lbmOpen = BETA.lbmOpen===mo.dataset.lbmo ? null : mo.dataset.lbmo; await lbRefreshSocial(); setTimeout(()=>$("#lbmIn")?.focus(),50); return; }
+  const sd=e.target.closest("[data-lbmsend]"); if(sd){ const t=($("#lbmIn")?.value||"").trim().replace(/\s+/g," ");
+    if(!t) return; if(t.length>200) return $("#lbmErr").textContent="En fazla 200 karakter.";
+    if(chatProblem(t)) return $("#lbmErr").textContent="Küfür ve hakaret yazılamaz.";
+    sd.disabled=true; try{ await setDoc(doc(collection(S.db,"lbm")), {uid:S.uid, lid:sd.dataset.lbmsend, t, at:serverTimestamp()}); }catch(x){ sd.disabled=false; return $("#lbmErr").textContent="Gönderilemedi, tekrar dene."; }
+    return lbRefreshSocial(); }
+  const md=e.target.closest("[data-lbmdel]"); if(md){ try{ await deleteDoc(doc(S.db,"lbm",md.dataset.lbmdel)); }catch(x){ return toast("Silinemedi."); } return lbRefreshSocial(); }
+  if(e.target.closest("[data-lbfavpick]")) return lbFavPick();
+  if(e.target.closest("[data-lbfavgo]")){ BETA.lbSeg="gunluk"; BETA.lbKey=""; location.hash="#lb"; return; }
+  const fv=e.target.closest("[data-lbfav]"); if(fv) return lbFavToggle(fv.dataset.lbfav);
+});
+document.addEventListener("keydown", e=>{ if(e.key==="Enter" && e.target.id==="lbmIn"){ e.preventDefault(); $("[data-lbmsend]")?.click(); } });

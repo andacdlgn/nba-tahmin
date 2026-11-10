@@ -524,12 +524,35 @@ service cloud.firestore {
     match /lbx/{uid} {
       allow read: if isPlayer();
       allow create, update: if isPlayer() && request.auth.uid == uid
-        && request.resource.data.keys().hasOnly(['uid', 'watch', 'lists', 'at'])
+        && request.resource.data.keys().hasOnly(['uid', 'watch', 'lists', 'fav', 'at'])
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.watch is list && request.resource.data.watch.size() <= 100
         && request.resource.data.lists is list && request.resource.data.lists.size() <= 20
+        && (!('fav' in request.resource.data) || (request.resource.data.fav is list && request.resource.data.fav.size() <= 4))
         && request.resource.data.at == request.time;
       allow delete: if signedIn() && request.auth.uid == uid;
+    }
+    // LetterBasket beğeni (1.40.7): lbk/{log}_{uid} = {uid, lid, at}. Herkes görür; herkes yalnızca kendi beğenisini ekler ve kaldırır.
+    match /lbk/{id} {
+      allow read: if isPlayer();
+      allow create: if isPlayer()
+        && request.resource.data.keys().hasOnly(['uid', 'lid', 'at'])
+        && request.resource.data.uid == request.auth.uid
+        && str(request.resource.data.lid, 80)
+        && id == request.resource.data.lid + '_' + request.auth.uid
+        && request.resource.data.at == request.time;
+      allow delete: if signedIn() && resource.data.uid == request.auth.uid;
+    }
+    // LetterBasket yorum (1.40.7): lbm/{id} = {uid, lid, t (≤200), at}. Sahibi ya da yönetici siler; düzenleme yok.
+    match /lbm/{id} {
+      allow read: if isPlayer();
+      allow create: if isPlayer() && id.matches('^[A-Za-z0-9]{20}$')
+        && request.resource.data.keys().hasOnly(['uid', 'lid', 't', 'at'])
+        && request.resource.data.uid == request.auth.uid
+        && str(request.resource.data.lid, 80)
+        && str(request.resource.data.t, 200) && cleanChat(request.resource.data.t)
+        && request.resource.data.at == request.time;
+      allow delete: if signedIn() && (resource.data.uid == request.auth.uid || isAdmin());
     }
     // Serbest atış (1.39.0): ft/{gün}_{uid} = {uid, day, s (0–40), at}. Puan tablosunu etkilemez; ligin günlük sıralaması için.
     match /ft/{id} {
