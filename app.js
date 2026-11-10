@@ -46,12 +46,13 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.32.3";
+const VERSION = "1.32.4";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.32.4", d:"10 Kasım 2026", quiet:true, items:["Küçük düzeltme (yalnızca yönetici denemesi)."]},
   {v:"1.32.3", d:"10 Kasım 2026", quiet:true, items:["Takım kısaltmaları NBA'in resmî hâliyle yazılıyor (SAS, NOP, GSW, NYK, UTA, WAS). Takvimdeki kilit işaretleri kaldırıldı."]},
   {v:"1.32.2", d:"10 Kasım 2026", quiet:true, items:["Küçük düzeltme (yalnızca yönetici denemesi)."]},
   {v:"1.32.1", d:"10 Kasım 2026", quiet:true, items:["Küçük düzeltme (yalnızca yönetici denemesi)."]},
@@ -1386,7 +1387,7 @@ function paintSwipe(dir=0){
   const g=gs[S.swipeIdx], d=draftFor(g), saved=D.picks[g.id]?.[S.uid];
   const same = saved && saved.winner===d.winner && saved.margin===d.margin && saved.scorerId===d.scorerId;
   const ready = d.winner && d.margin && d.scorerId;
-  const team = side => { const t=g[side]; return `<button class="sw-team" style="--tc:${tcol(t.abbr)}" data-sw="win" data-v="${t.abbr}" aria-pressed="${d.winner===t.abbr}"><img src="${t.logo||LOGO_SMALL(t.abbr)}" alt=""><b>${esc(t.name)}</b>${BETA.on?oddsTag(g,t.abbr):""}${t.rec?`<small>${t.rec}</small>`:""}<small class="ha">${side==="home"?ICON.home+"Ev sahibi":ICON.plane+"Deplasman"}</small>${oddsTag(g,t.abbr)}</button>`; };
+  const team = side => { const t=g[side]; return `<button class="sw-team" style="--tc:${tcol(t.abbr)}" data-sw="win" data-v="${t.abbr}" aria-pressed="${d.winner===t.abbr}"><img src="${t.logo||LOGO_SMALL(t.abbr)}" alt=""><b>${esc(t.name)}</b>${t.rec?`<small>${t.rec}</small>`:""}<small class="ha">${side==="home"?ICON.home+"Ev sahibi":ICON.plane+"Deplasman"}</small>${oddsTag(g,t.abbr)}</button>`; };
   const dots = gs.map((x,i)=>`<i class="${i===S.swipeIdx?"on":""} ${D.picks[x.id]?.[S.uid]?"ok":""}"></i>`).join("");
   box.innerHTML = `<div class="sw-top"><b>${S.swipeIdx+1} / ${gs.length}</b><span class="sw-dots">${dots}</span></div>
     <div class="sw-card ${dir>0?"in-r":dir<0?"in-l":""}" style="--ca:${pairCols(g.away.abbr,g.home.abbr)[0]};--ch:${pairCols(g.away.abbr,g.home.abbr)[1]}">
@@ -1946,7 +1947,7 @@ async function openInfo(g){
   const txt=(l,x,y)=>`<div class="cb-r t"><span class="cb-v">${esc(x||"–")}</span><div class="cb-m"><small>${l}</small></div><span class="cb-v r">${esc(y||"–")}</span></div>`;
   const eA=stE(A), eH=stE(H);
   const comp = (eA||BS[A]) ? `<div class="box"><div class="row-lbl" style="margin-top:0">Takımlar yan yana <span class="muted">· bu sezon, maç başına · kalın yazan o istatistikte daha iyi olan · küçük sayı: ligdeki sırası</span></div>
-    <div class="cb-h"><span><img src="${LOGO_SMALL(A)}" alt="">${esc(A)}<i class="cb-dot" style="background:var(--p0)"></i></span><span><i class="cb-dot" style="background:var(--p1)"></i>${esc(H)}<img src="${LOGO_SMALL(H)}" alt=""></span></div>
+    <div class="cb-h"><span><img src="${LOGO_SMALL(A)}" alt="">${escA(A)}<i class="cb-dot" style="background:var(--p0)"></i></span><span><i class="cb-dot" style="background:var(--p1)"></i>${escA(H)}<img src="${LOGO_SMALL(H)}" alt=""></span></div>
     ${txt("Galibiyet-mağlubiyet", eA&&wlOf(eA), eH&&wlOf(eH))}${txt("Bu maçtaki sahada", eA&&("Deplasmanda "+(stOf(eA,"Road")||"–")), eH&&("Evinde "+(stOf(eH,"Home")||"–")))}
     ${txt("Son 10 maç", BS[A]?.["Last Ten Games"]||(eA&&stOf(eA,"Last Ten Games")), BS[H]?.["Last Ten Games"]||(eH&&stOf(eH,"Last Ten Games")))}${txt("Seri", streakTR(BS[A]?.streak||(eA&&stOf(eA,"streak"))), streakTR(BS[H]?.streak||(eH&&stOf(eH,"streak"))))}
     ${ROWS.map(bar).join("")}</div>` : "";
