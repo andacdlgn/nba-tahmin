@@ -122,3 +122,56 @@ body.beta .toast{bottom:calc(180px + env(safe-area-inset-bottom))}
 .ft-go.big{min-height:58px;font-size:18px}
 .ft-res{text-align:center;line-height:1.1} .ft-res b{font-size:56px;display:block}
 body.beta:has(#sheet:not(.hide)) .b-strip, body.beta:has(#chat:not(.hide)) .b-strip{display:none}
+
+/* 1.32.0: Profil, Rozetler, Ayarlar sayfaları */
+body.beta{overflow-x:hidden}
+.b-page{overflow-x:clip;max-width:100%}
+.b-page .b-wrap{padding-top:4px}
+.bp-card{padding:14px;display:flex;flex-direction:column;gap:12px}
+.bp-top{display:flex;gap:14px;align-items:center;min-width:0}
+.bp-top .av{width:64px;height:64px;font-size:22px;flex:none}
+.bp-id{display:flex;flex-direction:column;min-width:0;line-height:1.25}
+.bp-id b{font-family:"Barlow Condensed";font-weight:800;font-size:26px;overflow-wrap:anywhere}
+.bp-id small{color:var(--muted);font-size:13px;font-weight:700;overflow-wrap:anywhere}
+.bp-id i{color:var(--muted);font-size:13px;overflow-wrap:anywhere}
+.bp-meta{margin:0;font-size:13px;color:var(--muted);line-height:1.45}
+.bp-meta .linkish{font-size:13px;padding:0}
+.b-two .btn.on{border-color:var(--amber);color:var(--amber-ink)}
+#view-profil .b-seg button,#view-ayarlar .b-seg button{height:36px;border-radius:10px;font-size:14px;font-weight:700;color:var(--muted);border:0;background:none;cursor:pointer}
+#view-profil .b-seg button[aria-pressed="true"],#view-ayarlar .b-seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+#view-profil>.b-page>#bpHead{display:flex;flex-direction:column;gap:12px;margin-bottom:12px}
+.bp-chart{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:4px;align-items:end;padding:12px 10px 8px;height:120px}
+.bp-chart span{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:3px;min-width:0;height:100%}
+.bp-chart b{font-size:11px;color:var(--muted)}
+.bp-chart i{width:70%;max-width:22px;border-radius:5px 5px 2px 2px;background:var(--track)}
+.bp-chart i.win{background:var(--pc,var(--amber))}
+.bp-chart small{font-size:11px;color:var(--muted)}
+#view-profil .bp-chart i.win{background:var(--amber)}
+.bp-note{padding:12px 14px;font-size:13.5px;color:var(--muted)}
+.bp-row{cursor:default}
+.b-bx>button img{margin-bottom:2px}
+.b-wide{width:100%;min-height:48px;border-radius:14px;font-weight:700;font-size:14px}
+.b-chips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding:2px 0 10px;margin:0}
+.b-chips::-webkit-scrollbar{display:none}
+.b-chips .chip{flex:none}
+.bs-sec{padding:14px;display:flex;flex-direction:column;gap:4px}
+.bs-sec small{color:var(--muted);font-size:12.5px;margin-bottom:6px}
+.bs-sec .b-seg{margin-top:4px}
+/* eski bölümler yeni sayfada: taşma yok, tablolar kendi içinde kayar */
+.b-old{min-width:0;max-width:100%;overflow-x:clip}
+.b-old *{max-width:100%}
+.b-old table{display:block;overflow-x:auto;max-width:100%}
+.b-old .cards2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.b-old .pf-sec{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:14px;margin:0 0 10px}
+.b-old .pf-sec h4{margin:0 0 4px;font-size:15px}
+.b-old .adm-row{display:flex;gap:8px;min-width:0}
+.b-old .adm-row input{flex:1;min-width:0}
+.b-old .pf-teams,.b-old .pf-avs{max-width:100%}
+.b-old .sec-title h2{font-size:18px!important}
+.b-badges .bfams{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+/* gecenin sorusu: iki ayrı büyük düğme */
+.b-yn{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:4px 0 12px}
+.b-yn button{min-height:58px;border-radius:16px;border:2px solid var(--line);background:var(--panel);color:var(--ink);font-size:18px;font-weight:800;cursor:pointer}
+.b-yn button[aria-pressed="true"]{border-color:var(--amber);background:var(--amber-soft);color:var(--amber-ink)}
+/* destedeki maç önü */
+.sw-info{display:block;width:100%;text-align:left;margin:4px 0 6px;cursor:default}
