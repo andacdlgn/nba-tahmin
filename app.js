@@ -46,12 +46,13 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.40.8";
+const VERSION = "1.40.9";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.40.9", d:"10 Kasım 2026", quiet:true, items:["Sakat oyuncu listelerinde oyuncunun bu sezon maç başına kaç dakika oynadığı ve son maçındaki dakikası da yazıyor."]},
   {v:"1.40.8", d:"10 Kasım 2026", quiet:true, items:["Yönetici denemesi için hazırlık; oyunculara görünen bir değişiklik yok."]},
   {v:"1.40.7", d:"10 Kasım 2026", quiet:true, items:["Yönetici denemesi için hazırlık; oyunculara görünen bir değişiklik yok."]},
   {v:"1.40.6", d:"10 Kasım 2026", quiet:true, items:["Siteye 20 dakikadan uzun aradan sonra girilince hep ana sayfa açılıyor."]},
@@ -1932,7 +1933,7 @@ async function openInfo(g){
         return `<div class="l5r ${w?"W":"L"}"><span class="l5b">${w?"G":"M"}</span><span class="l5o">${e.atVs==="@"?"@":"vs"} ${op?`<img src="${LOGO_SMALL(op)}" alt="" width="16" height="16">`:""}${escA(op)}</span><b class="l5s">${esc(sc)}</b>${e.gameDate?`<small>${new Date(e.gameDate).toLocaleDateString(LOC,{day:"numeric",month:"short",timeZone:TZ})}</small>`:""}</div>`; }).join("")}</div>`:'<div class="muted">–</div>'}
       <div class="row-lbl">Öne çıkan oyuncular (bu sezon, maç başına)</div>${top.length?`<div style="overflow-x:auto"><table class="bx tp-t"><thead><tr><th>Oyuncu</th><th>M</th><th>SAY</th><th>RİB</th><th>AST</th><th>SA%</th><th>3S%</th></tr></thead><tbody>${top.map(({id,p})=>`<tr data-ath="${id}"><td>${esc(surname(p.n))}${S.inj?.[id]?` ${injBadge(id)}`:""}</td><td>${p.gp}</td><td><b>${pg(p,"pts")}</b></td><td>${pg(p,"reb")}</td><td>${pg(p,"ast")}</td><td>${pc(p.fgm,p.fga)}</td><td>${pc(p.tpm,p.tpa)}</td></tr>`).join("")}</tbody></table></div>`:'<div class="muted">–</div>'}
       <div class="row-lbl">Sakatlar</div><div style="font-size:14px">${inj.length?inj.map(i=>{ const st=S.pstats?.[i.id]; const f=v=>(v/st.gp).toFixed(1);
-        return `<div class="injr"><div>${esc(i.n)} <span class="inj ${i.o?"":"q"}">${i.s}</span></div><div class="inj-st">${st?.gp?`<b>${f(st.pts)}</b> sayı · <b>${f(st.reb)}</b> rib. · <b>${f(st.ast)}</b> ast. <span class="muted">(${st.gp} maç)</span>`:`<span class="muted">Bu sezon henüz oynamadı</span>`}</div>${i.c?`<small class="inj-c">${esc(i.c)}</small>`:""}</div>`; }).join(""):'<span class="muted">Sakat oyuncu yok</span>'}</div></div>`;
+        return `<div class="injr"><div>${esc(i.n)} <span class="inj ${i.o?"":"q"}">${i.s}</span></div><div class="inj-st">${st?.gp?`<b>${f(st.pts)}</b> sayı · <b>${f(st.reb)}</b> rib. · <b>${f(st.ast)}</b> ast.<span class="inj-mn" data-injmn="${i.id}"></span> <span class="muted">(${st.gp} maç)</span>`:`<span class="muted">Bu sezon henüz oynamadı</span>`}</div>${i.c?`<small class="inj-c">${esc(i.c)}</small>`:""}</div>`; }).join(""):'<span class="muted">Sakat oyuncu yok</span>'}</div></div>`;
   };
   const FAT={}; await Promise.all(["away","home"].map(async sd=>{ try{ await allPlayers().catch(()=>{}); FAT[sd]=fatigueOf(await teamSched(g[sd].abbr, g[sd].id), g[sd].abbr, g); }catch(e){} }));
   const pr = s.predictor; let pred="";
@@ -3489,7 +3490,7 @@ async function teamPage(abbr, root, opts={}){
   root.querySelector(".tmBody").innerHTML=`
     <div class="sec-title"><h2 style="font-size:20px">Fikstür</h2><span class="aside">bütün sezon</span></div><div class="fx-wrap">${fixtureHTML(evs, abbr)}</div>
     <div class="sec-title"><h2 style="font-size:20px">Sakatlar</h2></div>
-    ${inj.length?`<div class="tm-list">${inj.map(p=>`<button class="tm-g tm-inj" data-ath="${p.id}"><span class="tm-r ${p.o?"L":"T"}"></span><span>${esc(p.n)}${p.c?`<small class="inj-c">${esc(p.c)}</small>`:""}</span><small>${UI_EN?({Oynamıyor:"Out",Belirsiz:"Questionable",Cezalı:"Suspended"}[p.s]||p.s):p.s}${p.y?` · ${esc(UI_EN?p.y.toLowerCase():(INJ_PART[p.y]||p.y).toLocaleLowerCase("tr"))}`:""}</small></button>`).join("")}</div>`:emptyBox("heal", "Sakat oyuncu yok.")}
+    ${inj.length?`<div class="tm-list">${inj.map(p=>`<button class="tm-g tm-inj" data-ath="${p.id}"><span class="tm-r ${p.o?"L":"T"}"></span><span>${esc(p.n)}<small class="inj-st"><span class="inj-mn" data-injmn="${p.id}" data-injfull="1"></span></small>${p.c?`<small class="inj-c">${esc(p.c)}</small>`:""}</span><small>${UI_EN?({Oynamıyor:"Out",Belirsiz:"Questionable",Cezalı:"Suspended"}[p.s]||p.s):p.s}${p.y?` · ${esc(UI_EN?p.y.toLowerCase():(INJ_PART[p.y]||p.y).toLocaleLowerCase("tr"))}`:""}</small></button>`).join("")}</div>`:emptyBox("heal", "Sakat oyuncu yok.")}
     <div class="sec-title"><h2 style="font-size:20px">Senin karnen</h2></div>
     ${my.length?`<div class="box"><b style="font-size:20px">%${Math.round(ok/my.length*100)}</b> <span class="muted">bu takımın ${my.length} maçında kazananı bildin</span>
       <div class="pk" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px">${my.slice(-6).reverse().map(x=>`<span class="rc ${x.r.w>0?"ok":"no"}"><i>${x.r.w>0?"✓":"✗"}</i>${escA(x.away.abbr)}–${escA(x.home.abbr)}</span>`).join("")}</div></div>`:emptyBox("cards", "Bu takımın maçlarına tahmin yaptıkça karnen burada oluşacak.")}`;
@@ -7003,3 +7004,21 @@ document.addEventListener("click", async e=>{
   const fv=e.target.closest("[data-lbfav]"); if(fv) return lbFavToggle(fv.dataset.lbfav);
 });
 document.addEventListener("keydown", e=>{ if(e.key==="Enter" && e.target.id==="lbmIn"){ e.preventDefault(); $("[data-lbmsend]")?.click(); } });
+
+/* ====================================================== sakatların dakikası (1.40.9) */
+// Sakat listelerinde oyuncunun bu sezonki maç başına dakikası ve son maçında kaç dakika oynadığı (ESPN maç kaydı, 30 dk önbellek)
+async function fillInjMin(el){
+  el.dataset.done="1"; const id=el.dataset.injmn;
+  try{ const gl=await gamelogOf(id); const nm=gl.names||[], im=nm.indexOf("minutes"), ip=nm.indexOf("points");
+    const sts=gl.seasonTypes||[], st=sts.find(t=>/regular/i.test(t.displayName||""))||sts[0];
+    const evs=(st?.categories||[]).flatMap(c=>c.events||[]); if(!evs.length || im<0){ if(el.dataset.injfull) el.textContent="Bu sezon henüz oynamadı"; return; }
+    const mins=evs.map(e=>+e.stats?.[im]||0), avg=mins.reduce((a,b)=>a+b,0)/mins.length, last=mins[0];
+    const f1=v=>v.toFixed(1).replace(".",",");
+    if(el.dataset.injfull){ const pts=evs.map(e=>+e.stats?.[ip]||0), pa=pts.reduce((a,b)=>a+b,0)/pts.length;
+      el.innerHTML=`<b>${f1(pa)}</b> sayı · <b>${f1(avg)}</b> dk · son maçında ${last} dk <span class="muted">(${evs.length} maç)</span>`; }
+    else el.innerHTML=` · <b>${f1(avg)}</b> dk <span class="muted">(son maçında ${last} dk)</span>`;
+  }catch(e){}
+}
+new MutationObserver(ms=>{ for(const m of ms) for(const a of m.addedNodes){ if(a.nodeType!==1) continue;
+  const els = a.matches?.("[data-injmn]") ? [a] : a.querySelectorAll ? a.querySelectorAll("[data-injmn]:not([data-done])") : [];
+  for(const el of els) if(!el.dataset.done) fillInjMin(el); } }).observe(document.body, {childList:true, subtree:true});

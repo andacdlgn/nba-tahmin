@@ -2413,3 +2413,6 @@ body:has(#auth:not(.hide)) .topbar{display:none}
 #auth .auth-invite{border-radius:16px}
 @media (max-width:360px){ #auth .lg-pick{grid-template-columns:repeat(3,minmax(0,1fr))} }
 #auth .auth-links{align-items:center}#auth .auth-links .linkish{margin:0;padding:6px 2px}
+.inj-mn b{font-weight:800}
+.tm-inj .inj-st{display:block;color:var(--muted);font-size:12px;font-weight:500;margin-top:1px}
+.tm-inj .inj-st:empty,.tm-inj .inj-mn:empty{display:none}
