@@ -47,12 +47,13 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.41.2";
+const VERSION = "1.42.0";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.42.0", d:"10 Kasım 2026", items:["🔁 Takas makinesi: Daha fazla › Takas. İki ya da üç takım seç, oyunculara dokun; 2026-27 maaş kurallarına göre takasın geçerli olup olmadığını ve takımların maaş durumunu gösterir."]},
   {v:"1.41.2", d:"10 Kasım 2026", quiet:true, items:["Düzeltme: bu sezon hiç oynamamış sakat oyuncularda geçen sezonun dakikaları görünüyordu."]},
   {v:"1.41.1", d:"10 Kasım 2026", quiet:true, items:["İngilizce dil seçeneği kaldırıldı; site yalnızca Türkçe."]},
   {v:"1.41.0", d:"10 Kasım 2026", items:["✨ Site yenilendi: Bu gece, Maçlar, Sıralama ve NBA sekmeleri; ortadaki + ile Gece özeti, Uzun vade, Rozetler, Sohbet, LetterBasket ve Ayarlar.","Tahmin yapmak artık maç maç ilerleyen bir deste: kazanan, fark ve skorer tek ekranda, maç önü bilgileri hemen üstte.","Tahminlerin, puanların ve profilin aynı kaldı. Eski görünüme Daha fazla › Eski görünüm ile dönebilir, Profil › Ayarlar'dan yeniye geri geçebilirsin."]},
@@ -4235,7 +4236,7 @@ function render(){
 function route(){
   const t=(location.hash||"#tahmin").slice(1);
   if(t==="istatistik"){ history.replaceState(null,"","#tahmin"); setTimeout(()=>S.uid && openProf(S.statFor||S.uid,"ist"),50); }
-  S.tab=[...(BETA.on?["bugece","profil","rozetler","ayarlar","gece","maclar","lb"]:[]),"tahmin","sonuclar","ayrisma","puan","uzun","takim","nba"].includes(t)?t:(BETA.on?"bugece":"tahmin");
+  S.tab=[...(BETA.on?["bugece","profil","rozetler","ayarlar","gece","maclar","lb","takas"]:[]),"tahmin","sonuclar","ayrisma","puan","uzun","takim","nba"].includes(t)?t:(BETA.on?"bugece":"tahmin");
   render.nbaAt=0; render.tkAt=0; S.boardOpen=null;
   $$("[data-view]").forEach(v=>v.classList.toggle("hide", v.id!=="view-"+S.tab));
   $$(".nav a").forEach(a=>a.dataset.tab===S.tab?a.setAttribute("aria-current","page"):a.removeAttribute("aria-current"));
@@ -5687,7 +5688,7 @@ const BIC={
   req:'<path d="M4 5h16v11H8l-4 4z"/><path d="M8 9h8M8 12.5h5"/>', news:'<path d="M4 5h13v14H6a2 2 0 0 1-2-2z"/><path d="M17 9h3v8a2 2 0 0 1-2 2M8 9h5M8 13h5"/>',
   moon:'<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>', sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
   gear:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
-  old:'<path d="M9 14l-4-4 4-4"/><path d="M5 10h9a5 5 0 0 1 0 10h-2"/>'};
+  old:'<path d="M9 14l-4-4 4-4"/><path d="M5 10h9a5 5 0 0 1 0 10h-2"/>', trade:'<path d="M4 8h14l-4-4M20 16H6l4 4"/>'};
 const bic=(k,s=22,w=2)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${BIC[k]}</svg>`;
 const BTABS={maclar:"maclar", sonuclar:"maclar", ayrisma:"maclar", gece:"", bugece:"bugece", tahmin:"bugece", sonuclar:"maclar", ayrisma:"maclar", puan:"sira", nba:"nba", takim:"nba", uzun:""};
 const bSur = n => { const p=String(n||"").split(" ").filter(x=>!/^(jr\.?|sr\.?|ii|iii|iv)$/i.test(x)); return p.length>1 ? p.slice(1).join(" ") : (p[0]||""); };
@@ -5736,11 +5737,12 @@ function betaRender(){
   if(S.tab==="maclar"){ history.replaceState(null,"","#sonuclar"); route(); return; }
   if(S.tab==="sonuclar") betaResTop();
   if(S.tab==="uzun") betaUzun();
+  if(S.tab==="takas") betaTrade();
   if(S.tab==="lb" && BETA.lbKey!==(BETA.lbSeg||"akis")+BETA.lb.at){ BETA.lbKey=(BETA.lbSeg||"akis")+BETA.lb.at; betaLb(); }
   betaHead(); betaNav(tab); betaStrip(); betaLtStrip(); setTimeout(betaIntro, 0);
 }
 function betaHead(){
-  const T={lb:["LetterBasket","Ligin maç günlüğü"], maclar:["Maçlar",""], gece:["Gece özeti",""], profil:["Profil",""], rozetler:["Rozetler",""], ayarlar:["Ayarlar","Profil bilgilerin Profil › Düzenle’de"], bugece:["Bu gece",""], tahmin:["Bu gece","Klasik maç kartları"], sonuclar:["Maçlar","Skorlar, kutu skoru ve öne çıkanlar"], ayrisma:["Maçlar","Kim ne tahmin etti"], puan:["Sıralama",""], nba:["NBA",""], takim:["NBA","Takımım"], uzun:["Uzun vade",""]}[S.tab]||["NBA Tahmin",""];
+  const T={takas:["Takas makinesi","2026-27 · maaş eşleşmesi kontrolü"], lb:["LetterBasket","Ligin maç günlüğü"], maclar:["Maçlar",""], gece:["Gece özeti",""], profil:["Profil",""], rozetler:["Rozetler",""], ayarlar:["Ayarlar","Profil bilgilerin Profil › Düzenle’de"], bugece:["Bu gece",""], tahmin:["Bu gece","Klasik maç kartları"], sonuclar:["Maçlar","Skorlar, kutu skoru ve öne çıkanlar"], ayrisma:["Maçlar","Kim ne tahmin etti"], puan:["Sıralama",""], nba:["NBA",""], takim:["NBA","Takımım"], uzun:["Uzun vade",""]}[S.tab]||["NBA Tahmin",""];
   const seg = (opts) => `<div class="b-seg" style="grid-template-columns:repeat(${opts.length},1fr)">${opts.map(([h,l])=>`<a href="#${h}" aria-pressed="${S.tab===h}">${l}</a>`).join("")}</div>`;
   let sub=T[1], extra="";
   if(S.tab==="bugece") sub=BETA.sub||"";
@@ -5750,7 +5752,7 @@ function betaHead(){
   if(S.tab==="tahmin") extra=`<a class="b-back" href="#bugece">‹ Yeni Bu gece görünümüne dön</a>`;
   if(S.tab==="profil"){ const u=betaProfU(); sub = u===S.uid ? "Senin profilin" : esc(pname(u)); }
   if(S.tab==="rozetler"){ const u=betaProfU(); sub = u===S.uid ? "Senin rozetlerin" : esc(pname(u))+" · rozetler"; }
-  const sub2 = ["profil","rozetler","ayarlar","gece","lb"].includes(S.tab);
+  const sub2 = ["profil","rozetler","ayarlar","gece","lb","takas"].includes(S.tab);
   $("#bHead").innerHTML = `<div class="b-h1">${sub2?`<button class="b-ib" data-b="back" type="button" aria-label="Geri">${bic("back",20,2.4)}</button>`:""}<span class="t"><b>${T[0]} <span class="b-beta">BETA</span></b>${sub?`<small>${sub}</small>`:""}</span>
     <button class="b-ib" data-b="search" type="button" aria-label="Ara">${bic("srch",19)}</button>
     <button class="b-ib b-me" data-b="me" type="button" aria-label="Profilim">${avatar(S.uid,"")}</button></div>${extra}`;
@@ -5906,7 +5908,7 @@ function betaPlus(open, fromPop){
     el.innerHTML = `<div class="b-plus-in"><h3 class="cond">Daha fazla</h3>
       <div class="ptop">${tb("rules","Kurallar","rules")}${tb("score","Puanlama","calc")}${tb("news","Yenilikler","news")}${tb("req","İstek / sorun","req")}${tb("inv","Davet et","inv")}</div>
       <div class="balls">${ball("night","Gece özeti","moon","c1")}${ball("lt","Uzun vade","hour","c2")}${ball("badges","Rozetler","badge","c3")}
-        ${ball("chat","Sohbet","chat","c4", chatN?`<i class="tag">${esc(chatN)}</i>`:"")}${ball("lb","LetterBasket","book","c5",'<i class="tag new">YENİ</i>')}${ball("set","Ayarlar","gear","c6")}</div>
+        ${ball("chat","Sohbet","chat","c4", chatN?`<i class="tag">${esc(chatN)}</i>`:"")}${ball("lb","LetterBasket","book","c5",'<i class="tag new">YENİ</i>')}${ball("trade","Takas","trade","c7",'<i class="tag new">YENİ</i>')}${ball("set","Ayarlar","gear","c6")}</div>
       <div class="pfoot"><button type="button" data-p="theme">${bic(isDark()?"sun":"moon",16)} ${isDark()?"Açık tema":"Koyu tema"}</button><button type="button" data-p="old">${bic("old",16)} Eski görünüm</button></div>
       <button class="closeplus" type="button" data-b="plus" aria-label="Kapat">${bic("x",24,2.8)}</button></div>`;
     el.classList.remove("hide"); document.body.classList.add("b-noscroll");
@@ -5926,6 +5928,7 @@ function betaPlusGo(k){
     else if(k==="night"){ BETA.nday=null; BETA.navDepth++; location.hash="#gece"; }
     else if(k==="lt") go("#uzun"); else if(k==="badges") betaOpenProf(S.uid,"roz"); else if(k==="chat") openChat();
     else if(k==="lb"){ BETA.navDepth++; location.hash="#lb"; }
+    else if(k==="trade"){ BETA.navDepth++; location.hash="#takas"; }
     else if(k==="set") betaOpenProf(S.uid,"ayar");
     else if(k==="theme") $("#theme").click();
     else if(k==="old"){ betaSet(false); location.hash="#tahmin"; location.reload(); }
@@ -5994,7 +5997,8 @@ function betaEnsurePages(){
     <section id="view-ayarlar" data-view class="hide"><div id="bst" class="b-page"></div></section>
     <section id="view-gece" data-view class="hide"><div id="bnt" class="b-page"></div></section>
     <section id="view-maclar" data-view class="hide"><div id="bmc" class="b-page"></div></section>
-    <section id="view-lb" data-view class="hide"><div id="blbx" class="b-page"></div></section>`);
+    <section id="view-lb" data-view class="hide"><div id="blbx" class="b-page"></div></section>
+    <section id="view-takas" data-view class="hide"><div id="btr" class="b-page"></div></section>`);
 }
 function betaPage(){
   betaEnsurePages(); $("#view-"+S.tab)?.classList.remove("hide");
@@ -7039,3 +7043,80 @@ new MutationObserver(ms=>{ for(const m of ms) for(const a of m.addedNodes){ if(a
 // 1.41.2: ESPN maç kaydında bu sezon yoksa geçen sezonu verir; yalnızca içinde bulunulan sezonun (ör. 2026-27) normal sezonu alınır
 function curSeasonOf(gl){ const y=+S.today.slice(0,4), m=+S.today.slice(4,6), sy=m>=8?y:y-1, lab=`${sy}-${String((sy+1)%100).padStart(2,"0")}`;
   return (gl?.seasonTypes||[]).find(t=>/regular/i.test(t.displayName||"") && (t.displayName||"").includes(lab)) || null; }
+
+/* ====================================================== takas makinesi (1.42.0) */
+// ESPN Trade Machine benzeri: 2 ya da 3 takım, kadrodan oyuncu seç, 2026-27 maaş kurallarına göre geçerli mi bak.
+// Maaşlar ESPN kadro verisinden (contract.salary, gelen/giden takas değeri: takas primi dahil). Ölü maaş ve nakit hesaba girmez.
+const TR_CAP = {cap:164.961e6, tax:200.428e6, a1:209.015e6, a2:221.686e6, t1:9.1e6, t2:35.2e6};
+BETA.tr = {teams:[], sel:{}, ros:{}};   // sel: {oyuncuId: hedef takım}
+const trM = v => (v/1e6).toFixed(1).replace(".",",")+" M$";
+async function trRoster(a){
+  if(BETA.tr.ros[a]) return BETA.tr.ros[a];
+  await allPlayers().catch(()=>{}); const t=ALLP?.teams.find(x=>x.a===a); if(!t) return [];
+  const d=await espn(`/teams/${t.id}/roster`);
+  const list=(d.athletes||[]).map(x=>{ const c=x.contract||{}; const sal=+c.salary||0;
+    return {id:String(x.id), n:x.displayName, pos:x.position?.abbreviation||"", t:a, sal, inV:+c.incomingTradeValue||sal, outV:+c.outgoingTradeValue||sal, yrs:+c.yearsRemaining||0, opt:+c.optionType||0, two:!sal, inj:(x.injuries||[])[0]?.status||""}; })
+    .sort((p,q)=>q.sal-p.sal);
+  return BETA.tr.ros[a]=list;
+}
+function trStatus(pay){ return pay<=TR_CAP.cap?["Cap altı","ok"]:pay<TR_CAP.tax?["Vergi sınırının altı",""]:pay<TR_CAP.a1?["Lüks vergide","warn"]:pay<TR_CAP.a2?["1. apron üstünde","warn"]:["2. apron üstünde","bad"]; }
+function trCheck(){
+  const T=BETA.tr, out={};
+  for(const a of T.teams){ const R=T.ros[a]||[], pay=R.reduce((s,p)=>s+p.sal,0);
+    const go=R.filter(p=>T.sel[p.id]), come=T.teams.filter(b=>b!==a).flatMap(b=>(T.ros[b]||[]).filter(p=>T.sel[p.id]===a));
+    const outS=go.reduce((s,p)=>s+p.outV,0), inS=come.reduce((s,p)=>s+p.inV,0), after=pay-go.reduce((s,p)=>s+p.sal,0)+come.reduce((s,p)=>s+p.sal,0);
+    const nStd=R.filter(p=>!p.two).length-go.filter(p=>!p.two).length+come.filter(p=>!p.two).length;
+    let ok=true, why="", max=null;
+    if(!go.length && !come.length){ ok=false; why="Bu takım takasa katılmıyor"; }
+    else if(after<=TR_CAP.cap+1e5){ why="Takastan sonra cap altında kalıyor; maaş eşleşmesi gerekmez"; }
+    else if(after>=TR_CAP.a2){ max=outS; if(go.length>1 && come.length) { ok=false; why="2. apron üstünde maaş birleştirilemez (her oyuncu yalnızca kendi maaşı kadar getirir)"; } else if(inS>outS){ ok=false; why=`2. apron üstünde gelen maaş gidenden fazla olamaz (en fazla ${trM(outS)})`; } else why="2. apron üstünde %100 eşleşme sağlanıyor"; }
+    else if(after>=TR_CAP.a1){ max=outS; if(inS>outS){ ok=false; why=`1. apron üstünde gelen maaş gidenden fazla olamaz (en fazla ${trM(outS)})`; } else why="1. apron üstünde %100 eşleşme sağlanıyor"; }
+    else { const room=Math.max(0, TR_CAP.cap-pay); max=Math.max(outS<=TR_CAP.t1?outS*2+2.5e5:outS<=TR_CAP.t2?outS+TR_CAP.t1:outS*1.25+2.5e5, room+outS+1e5);
+      if(inS>max){ ok=false; why=`Gelen maaş en fazla ${trM(max)} olabilir (şu an ${trM(inS)})`; } else why=`Gelen maaş sınırın içinde (en fazla ${trM(max)})`; }
+    const roster = nStd>15 ? `Takastan sonra ${nStd} oyuncu: önce birini bırakması gerekir` : nStd<13 ? `Takastan sonra ${nStd} oyuncu: iki hafta içinde kadroyu tamamlamalı` : "";
+    out[a]={pay, after, outS, inS, ok, why, max, go, come, roster};
+  }
+  const parts=T.teams.filter(a=>out[a].go.length||out[a].come.length);
+  const any=Object.keys(T.sel).length>0, valid=any && T.teams.every(a=>out[a].ok) && parts.length===T.teams.length;
+  return {out, valid, any};
+}
+async function betaTrade(){
+  const box=$("#btr"); if(!box) return; const T=BETA.tr;
+  if(!T.teams.length){ const fav=S.players[S.uid]?.favTeam; T.teams = fav ? [fav] : []; }
+  await allPlayers().catch(()=>{});
+  const need=T.teams.filter(a=>!T.ros[a]); if(need.length){ box.innerHTML=`<div class="b-wrap">${skeletonCards(2)}</div>`; await Promise.all(need.map(a=>trRoster(a).catch(()=>[]))); }
+  const nm=a=>ALLP?.teams.find(t=>t.a===a)?.n||a, short=a=>nm(a).split(" ").slice(-1)[0];
+  const C=trCheck();
+  const pts=id=>{ const p=S.pstats?.[id]; return p?.gp ? (p.pts/p.gp) : null; };
+  const teamCard=a=>{ const R=T.ros[a]||[], o=C.out[a], st=trStatus(o.after);
+    return `<div class="b-gr tr-team" style="--tc:${tcol(a)}"><div class="tr-h">${bLogo({abbr:a},34)}<span class="m"><b>${esc(nm(a))}</b><small>Maaş toplamı ${trM(o.pay)}${o.after!==o.pay?` → <b>${trM(o.after)}</b>`:""}</small></span><span class="tr-st ${st[1]}">${st[0]}</span><button type="button" class="b-ib sm" data-trx="${a}" aria-label="Takımı çıkar">${bic("x",16,2.4)}</button></div>
+      <div class="tr-list">${R.map(p=>{ const to=T.sel[p.id], pp=pts(p.id);
+        return `<button type="button" class="tr-p ${to?"on":""}" data-trp="${p.id}" data-tra="${a}" ${p.two?"disabled":""}><span class="m"><b>${esc(p.n)}</b><small>${esc(p.pos)}${pp!=null?` · ${pp.toFixed(1).replace(".",",")} sayı`:""}${p.inj?` · ${esc(p.inj==="Out"?"Oynamıyor":p.inj==="Day-To-Day"?"Belirsiz":p.inj)}`:""}</small></span>
+          <span class="r">${p.two?`<small>İki yönlü sözleşme</small>`:`<b class="tnum">${trM(p.sal)}</b><small>${p.yrs?`${p.yrs} yıl daha`:"Sözleşmesi bitiyor"}${p.opt?" · opsiyon":""}</small>`}</span>${to?`<span class="tr-to">→ ${esc(escA(to))}</span>`:""}</button>`; }).join("")}</div></div>`; };
+  const summary = C.any ? `<div class="b-gr tr-sum ${C.valid?"ok":"bad"}"><div class="tr-v"><b>${C.valid?"✓ Takas geçerli":"✗ Takas geçersiz"}</b><small>${C.valid?"2026-27 maaş eşleşmesi kurallarına uyuyor.":"Aşağıdaki kırmızı satırları düzelt."}</small></div>
+      ${T.teams.map(a=>{ const o=C.out[a], dp=o.come.reduce((s,p)=>s+(pts(p.id)||0),0)-o.go.reduce((s,p)=>s+(pts(p.id)||0),0);
+        return `<div class="tr-row ${o.ok?"":"bad"}">${bLogo({abbr:a},22)}<span class="m"><b>${esc(short(a))}</b><small>${o.go.length?`Gönderir: ${esc(o.go.map(p=>bSur(p.n)).join(", "))}`:"Kimseyi göndermiyor"}${o.come.length?` · Alır: ${esc(o.come.map(p=>bSur(p.n)).join(", "))}`:""}</small><small class="${o.ok?"muted":"err"}">${esc(o.why)}</small>${o.roster?`<small class="warn">${esc(o.roster)}</small>`:""}</span>
+          <span class="r"><small>Giden ${trM(o.outS)}</small><small>Gelen ${trM(o.inS)}</small>${(o.go.length||o.come.length)?`<small class="${dp>=0?"ok":"no"}">${dp>=0?"+":""}${dp.toFixed(1).replace(".",",")} sayı</small>`:""}</span></div>`; }).join("")}
+      <button type="button" class="btn b-wide" data-trreset>Seçimleri temizle</button></div>` : "";
+  box.innerHTML = `<div class="b-wrap">
+    <div class="b-gr tr-intro"><b>Takımları seç, takas edilecek oyunculara dokun.</b><small>${T.teams.length>2?"Üç takımlı takasta oyuncuya tekrar dokunarak hangi takıma gideceğini değiştir.":"İki ya da üç takım ekleyebilirsin."} Kurallar 2026-27 sezonunun maaş eşleşmesi: cap ${trM(TR_CAP.cap)}, lüks vergi ${trM(TR_CAP.tax)}, 1. apron ${trM(TR_CAP.a1)}, 2. apron ${trM(TR_CAP.a2)}.</small></div>
+    ${summary}
+    ${T.teams.map(teamCard).join("")}
+    ${T.teams.length<3?`<button type="button" class="btn b-wide primary-ish" data-tradd>＋ ${T.teams.length?"Takım ekle":"Takım seç"}</button>`:""}
+    <p class="b-note" style="text-align:left">Maaşlar ESPN'den gelir ve yaklaşıktır: ölü maaş, nakit, takas istisnaları ve draft hakları hesaba girmez. Gerçek bir takasın onayı her zaman ligdedir.</p></div>`;
+}
+function trPickTeam(){
+  const T=BETA.tr, teams=(ALLP?.teams||[]).filter(t=>!T.teams.includes(t.a)).sort((a,b)=>a.n.localeCompare(b.n,"tr"));
+  openSheet(`<h3 id="shTitle">Takım seç</h3><div class="tm-grid">${teams.map(t=>`<button class="tg" type="button" data-trt="${t.a}" style="--tc:${tcol(t.a)}"><span class="tg-l"><img src="${LOGO_SMALL(t.a)}" alt=""></span><b>${esc(t.n.split(" ").slice(-1)[0])}</b></button>`).join("")}</div>`);
+}
+document.addEventListener("click", async e=>{
+  if(!BETA.on) return; const T=BETA.tr;
+  if(e.target.closest("[data-tradd]")){ await allPlayers().catch(()=>{}); return trPickTeam(); }
+  const t=e.target.closest("[data-trt]"); if(t){ closeSheet(); T.teams.push(t.dataset.trt); return betaTrade(); }
+  const x=e.target.closest("[data-trx]"); if(x){ const a=x.dataset.trx; T.teams=T.teams.filter(b=>b!==a); for(const [id,to] of Object.entries(T.sel)){ if(to===a || (T.ros[a]||[]).some(p=>p.id===id)) delete T.sel[id]; } return betaTrade(); }
+  if(e.target.closest("[data-trreset]")){ T.sel={}; return betaTrade(); }
+  const p=e.target.closest("[data-trp]"); if(p){ const id=p.dataset.trp, a=p.dataset.tra, others=T.teams.filter(b=>b!==a);
+    if(!others.length){ toast("Önce takas yapılacak ikinci takımı ekle."); return; }
+    const cur=T.sel[id]; if(!cur) T.sel[id]=others[0]; else { const i=others.indexOf(cur); if(i<others.length-1) T.sel[id]=others[i+1]; else delete T.sel[id]; }
+    return betaTrade(); }
+});
