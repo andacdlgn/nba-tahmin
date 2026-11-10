@@ -46,12 +46,13 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.31.0";
+const VERSION = "1.31.1";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.31.1", d:"10 Kasım 2026", quiet:true, items:["Küçük düzeltme (yalnızca yönetici denemesi)."]},
   {v:"1.31.0", d:"10 Kasım 2026", quiet:true, items:["Arka planda hazırlık: yönetici için deneme altyapısı. Oyunculara görünen bir değişiklik yok."]},
   {v:"1.30.8", d:"10 Kasım 2026", items:["Uzun vade oyuncu seçimi: telefonda sayı, ribaund ve asist sütunları artık üst üste binmiyor."]},
   {v:"1.30.7", d:"9 Kasım 2026", items:["Günün tahminleri: birinin adına dokununca isim şeridi artık en başa dönmüyor, seçilen kişi ortaya kayıyor. ‹ › düğmeleriyle ya da listeyi sağa-sola kaydırarak sıradaki oyuncuya geçebilirsin."]},

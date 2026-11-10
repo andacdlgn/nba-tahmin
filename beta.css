@@ -121,3 +121,4 @@ body.beta .toast{bottom:calc(180px + env(safe-area-inset-bottom))}
 .ft-go{min-height:52px;font-size:16px;font-weight:800;border-radius:14px;background:var(--amber);color:#10161e;border:0}
 .ft-go.big{min-height:58px;font-size:18px}
 .ft-res{text-align:center;line-height:1.1} .ft-res b{font-size:56px;display:block}
+body.beta:has(#sheet:not(.hide)) .b-strip, body.beta:has(#chat:not(.hide)) .b-strip{display:none}
