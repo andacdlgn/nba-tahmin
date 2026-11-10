@@ -665,3 +665,19 @@ body.beta .tcell small{color:var(--ink);opacity:.75}
 .b-ltrow{background:var(--amber-soft);border:1.5px solid color-mix(in srgb,var(--amber) 70%,var(--line))}
 .b-ltrow b:first-of-type{color:var(--amber-ink)}
 .bl-row.soon{background:var(--amber-soft);box-shadow:inset 3px 0 0 var(--amber)}
+
+/* 1.40.2: tahmin destesinde bölümler sıkışmasın (kısa ekranda fark kaydırıcısı kesiliyordu) */
+.bd-body>*{flex-shrink:0}
+.bd-sec input[type=range]{width:100%;margin:4px 0}
+/* Bu gece ekstraları: yapılmamışsa sarı dolu, yapılınca normal kart */
+.b-ext .warn{background:var(--amber);border-color:var(--amber);box-shadow:0 4px 14px color-mix(in srgb,var(--amber) 30%,transparent)}
+.b-ext .warn small,.b-ext .warn b,.b-ext .warn i{color:#10161e!important;opacity:1}
+.b-ext .warn small,.b-ext .warn i{opacity:.75}
+/* eski görünümden kalan parçalar: fikstür süzgeci tek satır, kadro tek kart içinde liste */
+body.beta .fx-head{display:flex;flex-direction:column;align-items:stretch;gap:6px}
+body.beta .fx-f{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));width:100%}
+body.beta .seg2 button{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+body.beta .roster{gap:0;border-radius:18px;background:var(--panel);border:1px solid var(--line);overflow:hidden}
+body.beta .roster .ro-p{border-radius:0;border:0;border-bottom:1px solid var(--line);background:none;margin:0}
+body.beta .roster .ro-p:last-child{border-bottom:0}
+body.beta .seg2:not([style*="grid-template-columns"]){grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr)}

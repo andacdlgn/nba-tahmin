@@ -46,12 +46,13 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.40.2";
+const VERSION = "1.40.3";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.40.3", d:"10 Kasım 2026", quiet:true, items:["Yönetici denemesi için hazırlık; oyunculara görünen bir değişiklik yok."]},
   {v:"1.40.2", d:"10 Kasım 2026", quiet:true, items:["Yönetici denemesi için hazırlık; oyunculara görünen bir değişiklik yok."]},
   {v:"1.40.1", d:"10 Kasım 2026", quiet:true, items:["Yönetici denemesi için hazırlık; oyunculara görünen bir değişiklik yok."]},
   {v:"1.40.0", d:"10 Kasım 2026", quiet:true, items:["Yönetici denemesi için hazırlık; oyunculara görünen bir değişiklik yok."]},
@@ -3386,7 +3387,11 @@ function badgesFull(u){
   let html=`<div class="bsum"><div class="bsum-p"><b>${pts}</b><small>rozet puanı</small></div><div class="bsum-r"><b>${got.length}<small>/${all.length}</small></b><small>rozet</small></div><div class="bsum-r"><b>${rank||"–"}.</b><small>rozet sırası</small></div></div>
     <div class="btiers">${Object.entries(BTIER).map(([k,v])=>`<span class="bt-chip t-${k}">${v.n} <b>${tc[k]||0}</b><small>+${v.p}</small></span>`).join("")}</div>`;
   for(const [cat,ico,cname] of BCATS){
-    const fams=BFAM.filter(f=>f[1]===cat); if(!fams.length) continue;
+    let fams=BFAM.filter(f=>f[1]===cat); if(!fams.length) continue;
+    // 1.40.2 (beta): kazanılan ve ilerlenen rozetler kategorinin başında; önce kazanılan seviye sayısı, sonra sıradaki seviyeye yakınlık
+    if(BETA.on){ const sc=f=>{ const lv=all.filter(b=>b.fam===f[0]), have=lv.filter(b=>b.n).length, nx=lv.find(b=>!b.n), v=lv[0]?.val||0, prev=have?lv[have-1].t:0;
+        return have*1000 + (nx ? Math.max(0,Math.min(999,(v-prev)/((nx.t-prev)||1)*999)) : 999); };
+      fams=fams.map(f=>[f,sc(f)]).sort((x,y)=>y[1]-x[1]).map(x=>x[0]); }
     const cards=fams.map(([id,,fico,name,th])=>{
       const lv=all.filter(b=>b.fam===id), have=lv.filter(b=>b.n), top=have[have.length-1], next=lv.find(b=>!b.n), v=lv[0].val;
       const prev = top ? top.t : 0, pct = next ? Math.min(100, Math.max(0,(v-prev)/(next.t-prev)*100)) : 100;
@@ -5810,8 +5815,7 @@ function betaTonight(){
       ["Gecenin sorusu", daily.q?(daily.q==="y"?"Evet":"Hayır"):"Yok", qr?.final?(qr.ans===daily.q?"+1":`cevap ${qr.ans==="y"?"evet":"hayır"}`):"bekliyor"]]); }
   const prog = anyLive ? "" : `<div class="b-prog"><i style="width:${done/n*100}%"></i></div>`;
   const lt=betaLtDue(), ltRow = lt ? `<button class="b-gr b-ltrow" type="button" data-blt2="${lt.k}">⏳ <b>Uzun vade kilitleniyor:</b> ${esc(ltTitle(lt.k).split(" · ")[0])} ${lt.n}/${lt.of} · ${Math.floor(lt.ms/864e5)?Math.floor(lt.ms/864e5)+" gün ":""}${Math.floor(lt.ms%864e5/36e5)} sa kaldı <b class="amb">›</b></button>` : "";
-  box.innerHTML = `<div class="b-wrap">${prog}${extras}${ltRow}
-    ${!locked?`<p class="b-q"><b>Soru:</b> ${q.t}</p>`:""}
+  box.innerHTML = `<div class="b-wrap">${prog}${extras.replace('class="b-bx"','class="b-bx b-ext"')}${ltRow}
     <div class="b-gr">${D.games.map(g=>betaRow(g,D)).join("")}</div>
     <p class="b-note">${anyLive?"Satıra dokun: kutu skoru, akış ve herkesin seçimi.":"Satıra dokununca o maçın kartı açılır: kazanan, fark ve skorer."}</p>
     </div>`;
@@ -6031,7 +6035,7 @@ function betaBadgesPage(u){
   const box=$("#brz"); if(!box) return;
   const others = S.order.filter(x=>S.players[x]);
   box.innerHTML = `<div class="b-chips">${others.map(x=>`<button class="chip" type="button" data-bpu="${x}" data-bput="roz" aria-pressed="${x===u}">${esc(pname(x))}</button>`).join("")}</div>
-    ${betaOwnedBadges(u)}${betaNearBadges(u)}<div class="b-lb"><span>BÜTÜN ROZETLER</span><span>dokun: ayrıntı</span></div>
+    <div class="b-lb"><span>ROZETLER</span><span>kazanılanlar ve ilerleyenler başta · dokun: ayrıntı</span></div>
     <div class="b-chips" id="bzCats"><button class="chip" type="button" data-bzc="" aria-pressed="${!BETA.bzCat}">Hepsi</button>${BCATS.filter(([c])=>BFAM.some(f=>f[1]===c)).map(([c,i,n])=>`<button class="chip" type="button" data-bzc="${c}" aria-pressed="${BETA.bzCat===c}">${i} ${esc(n.replace(/ \(.*\)$/,""))}</button>`).join("")}</div>
     <div class="b-old b-badges" id="bzAll">${badgesFull(u)}</div>`;
   BETA.bzU=u; betaBzTag(); betaBzFilter();
@@ -6076,7 +6080,7 @@ function betaDuzAcc(){
 // tahmin destesinde maç önü: ESPN şansı, son 5 maç, eksikler, son karşılaşma (özet yoksa yüklenir, gelince kart yenilenir)
 function betaSwInfo(g){
   if(!S.sums[g.id]?.data && !betaSwInfo.wait?.[g.id]){ (betaSwInfo.wait ||= {})[g.id]=1; loadSummary(g).then(()=>{ if($("#swipe")) paintSwipe(); if(BETA.deck) betaDeckPaint(); }).catch(()=>{}); }
-  return `<div class="row-lbl">Maç önü</div>` + infoBox(g).replace('<button class="info-box"','<button type="button" data-sw="info" class="info-box sw-info"').replace(/<span class="ib-more">[^<]*<\/span>/,'<span class="ib-more">Takım ve oyuncu istatistikleri ›</span>');
+  return (BETA.deck?"":`<div class="row-lbl">Maç önü</div>`) + infoBox(g).replace('<button class="info-box"','<button type="button" data-sw="info" class="info-box sw-info"').replace(/<span class="ib-more">[^<]*<\/span>/,'<span class="ib-more">Takım ve oyuncu istatistikleri ›</span>');
 }
 document.addEventListener("click", e=>{ if(!e.target.closest("[data-swback]")) return; const i=BETA.swBack||0; openSwipe(); S.swipeIdx=i; paintSwipe(); });
 // Yeni görünümde her yazı büyük harfle başlar; ondalıklar virgülle yazılır. Kullanıcı yazıları (sohbet, yorum, profil yazıları) olduğu gibi kalır.
