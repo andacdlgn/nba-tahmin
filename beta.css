@@ -820,3 +820,15 @@ body.beta .ell{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-wid
 .tr-r.in{background:color-mix(in srgb,var(--win) 10%,var(--panel))}
 @media (max-width:380px){ .tr-tg{grid-template-columns:repeat(4,minmax(0,1fr))} }
 .tr-tab .d.idle{background:var(--muted)}
+/* 1.42.5 UX: min font + tap targets + even tiles */
+body.beta .ns-i b span{display:inline}
+body.beta .ns>.ns-i:last-child:nth-child(odd){grid-column:1/-1}
+body.beta .bt-chip{font-size:12px}
+body.beta .bt-chip small{font-size:11px}
+body.beta .cal-g small{font-size:11px}
+body.beta .plr .ppg small{font-size:11px}
+body.beta .share-l small{font-size:11.5px}
+body.beta .ib-l5 i{font-size:11px}
+body.beta .bq-meta .linkish{padding:6px 0;margin:-6px 0;display:inline-block}
+body.beta .fo-hb{min-height:36px;padding:6px 0}
+body.beta .lbteams button small,body.beta .bi-tk small,body.beta .lbfv small{font-size:11px}
