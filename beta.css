@@ -832,3 +832,4 @@ body.beta .ib-l5 i{font-size:11px}
 body.beta .bq-meta .linkish{padding:6px 0;margin:-6px 0;display:inline-block}
 body.beta .fo-hb{min-height:36px;padding:6px 0}
 body.beta .lbteams button small,body.beta .bi-tk small,body.beta .lbfv small{font-size:11px}
+body.beta tr[data-ath],tr[data-ath]{cursor:pointer}
