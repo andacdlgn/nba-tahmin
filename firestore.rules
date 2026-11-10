@@ -520,6 +520,29 @@ service cloud.firestore {
         && request.resource.data.at == request.time;
       allow delete: if signedIn() && resource.data.uid == request.auth.uid;
     }
+    // LetterBasket listeleri ve izleme listesi (1.39.0): lbx/{uid} = {uid, watch:[maç], lists:[{n, g:[maç]}], at}. Herkes okur, herkes yalnızca kendisininkini yazar.
+    match /lbx/{uid} {
+      allow read: if isPlayer();
+      allow create, update: if isPlayer() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['uid', 'watch', 'lists', 'at'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.watch is list && request.resource.data.watch.size() <= 100
+        && request.resource.data.lists is list && request.resource.data.lists.size() <= 20
+        && request.resource.data.at == request.time;
+      allow delete: if signedIn() && request.auth.uid == uid;
+    }
+    // Serbest atış (1.39.0): ft/{gün}_{uid} = {uid, day, s (0–40), at}. Puan tablosunu etkilemez; ligin günlük sıralaması için.
+    match /ft/{id} {
+      allow read: if isPlayer();
+      allow create, update: if isPlayer()
+        && request.resource.data.keys().hasOnly(['uid', 'day', 's', 'at'])
+        && request.resource.data.uid == request.auth.uid
+        && id == request.resource.data.day + '_' + request.auth.uid
+        && request.resource.data.day is string && request.resource.data.day.matches('^[0-9]{8}$')
+        && request.resource.data.s is int && request.resource.data.s >= 0 && request.resource.data.s <= 40
+        && request.resource.data.at == request.time;
+      allow delete: if false;
+    }
     // Anket (1.30.0): polls/{id} = {yes, no} sayaç; polls/{id}/votes/{uid} = {v, at}. Oy anonim: herkes yalnızca kendi oyunu okur.
     // Sayaç yalnızca aynı yazımda oy belgesi oluşturulurken ve önceden oy yoksa 1 artabilir; oy değiştirilemez, silinemez.
     function pollPath(pid) { return /databases/$(database)/documents/polls/$(pid); }

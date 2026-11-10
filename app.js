@@ -46,12 +46,14 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.38.1";
+const VERSION = "1.40.0";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.40.0", d:"10 Kasım 2026", quiet:true, items:["Yönetici denemesi için hazırlık; oyunculara görünen bir değişiklik yok."]},
+  {v:"1.39.0", d:"10 Kasım 2026", quiet:true, items:["Yönetici denemesi için hazırlık; oyunculara görünen bir değişiklik yok."]},
   {v:"1.38.1", d:"10 Kasım 2026", quiet:true, items:["Küçük düzeltme (yalnızca yönetici denemesi)."]},
   {v:"1.38.0", d:"10 Kasım 2026", quiet:true, items:["Yönetici denemesi için hazırlık; oyunculara görünen bir değişiklik yok."]},
   {v:"1.37.0", d:"10 Kasım 2026", quiet:true, items:["Yönetici denemesi için hazırlık; oyunculara görünen bir değişiklik yok."]},
@@ -1359,7 +1361,7 @@ function flowChart(g){
   const [ca,ch]=pairCols(g.away.abbr,g.home.abbr);
   const qs=[720,1440,2160].filter(q=>q<end).map(q=>`<line x1="${X(q)}" x2="${X(q)}" y1="2" y2="${H-2}" class="fl-q"/>`).join("");
   const big=pts.reduce((a,b)=>Math.abs(b[1])>Math.abs(a[1])?b:a,[0,0]);
-  const bigTxt = big[1] ? `En büyük fark: ${esc(big[1]>0?g.home.abbr:g.away.abbr)} +${Math.abs(big[1])}` : "";
+  const bigTxt = big[1] ? `En büyük fark: ${escA(big[1]>0?g.home.abbr:g.away.abbr)} +${Math.abs(big[1])}` : "";
   return `<div class="flow"><div class="fl-h"><span>Skor akışı</span><small>${bigTxt}</small></div>
     <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">
       <defs><clipPath id="flT${g.id}"><rect x="0" y="0" width="${W}" height="${H/2}"/></clipPath><clipPath id="flB${g.id}"><rect x="0" y="${H/2}" width="${W}" height="${H/2}"/></clipPath></defs>
@@ -1839,12 +1841,15 @@ async function openPlayerPicker({mode, g}){
   const row = p => `<button class="plr" data-id="${p.id}" data-name="${esc(p.name)}" data-team="${p.team}" aria-pressed="${p.id===cur}">
     <img src="${p.img}" alt="" loading="lazy"><span class="pi"><b>${esc(p.name)}${injTxt(p.id)}</b><small>${p.team} · ${p.pos}${p.jersey?" · #"+p.jersey:""}</small></span>
     <span class="ppg">${p.ppg!=null?p.ppg.toFixed(1):"–"}<small>sayı ort.</small></span></button>`;
+  if(BETA.on) await new Promise(r=>{ betaPickerUI(list, mode, g, cur, r); });
+  else {
   $("#shBody").innerHTML = `<h3 id="shTitle">${mode==="game"?"Maçın en skoreri":"Günün oyuncusu"}</h3>${teamsChips}
     <input class="search" id="plSearch" placeholder="Oyuncu ara" autocomplete="off"><div id="plList">${list.length?list.map(row).join(""):'<p class="muted">Kadro alınamadı.</p>'}</div>`;
   let tf="";
   const filter = () => { const q=slug($("#plSearch").value); $$("#plList .plr").forEach(el=>{ el.classList.toggle("hide", (tf && el.dataset.team!==tf) || (q && !slug(el.dataset.name).includes(q))); }); };
   $("#plSearch").oninput = filter;
   $("#tmF")?.addEventListener("click", e=>{ const c=e.target.closest(".chip"); if(!c) return; tf=c.dataset.v; $$("#tmF .chip").forEach(x=>x.setAttribute("aria-pressed", x===c)); filter(); });
+  }
   $("#plList").onclick = e => {
     const b = e.target.closest(".plr"); if(!b) return;
     closeSheet();
@@ -5795,13 +5800,16 @@ function ftShoot(){ const F=BETA.ft; if(!F.on||F.done) return; const [l,w]=F.zon
   if(p>=l && p<=l+w){ const sw=Math.abs(p-c)<=w/6; F.streak++; pts=(sw?3:2)+(F.streak>=3?1:0); msg=(sw?"Filesiz! +":"Girdi +")+pts+(F.streak>=3?" · seri bonusu":""); F.speed=Math.min(2.4,F.speed+.13); F.zone=ftZone(Math.max(9,w-3)); }
   else { F.streak=0; msg=Math.abs(p-c)<w/2+7?"Çemberden döndü":"Hava topu"; F.zone=ftZone(w); }
   F.score+=pts; F.shots++; F.hist.push(pts); F.last=msg; F.lastOk=pts>0;
-  if(F.shots>=10){ F.done=true; F.newBest=F.score>F.best; if(F.newBest){ F.best=F.score; lsSet("ftBest",String(F.score)); } }
+  if(F.shots>=10){ F.done=true; F.newBest=F.score>F.best; if(F.newBest){ F.best=F.score; lsSet("ftBest",String(F.score)); } ftSaveScore(F.score); }
   betaTonight(); setTimeout(()=>$('[data-ft="shoot"]')?.focus({preventScroll:true}),0); }
 function ftCard(){
   const F=BETA.ft, head=`<div class="ft-h"><span class="ft-ic">🏀</span><span><b>Serbest atış</b><small>İşaret yeşildeyken at · ortası filesiz sayılır</small></span></div>`;
   const dots=`<div class="ft-dots">${Array.from({length:10},(_,k)=>`<i class="${F.hist[k]==null?"":F.hist[k]?"ok":"no"}"></i>`).join("")}</div>`;
-  if(!F.on) return `<div class="b-gr ft">${head}${BX2([["En iyin",F.best?String(F.best):"–","40 üzerinden"],["Atış","10","seri bonusu var"],["Puan","Etkilemez","sadece eğlence"]])}<button class="btn primary ft-go" type="button" data-ft="start">Oyna · 10 atış</button></div>`;
-  if(F.done) return `<div class="b-gr ft">${head}${dots}<div class="ft-res"><b class="cond tnum">${F.score}</b><small class="${F.newBest?"amb":"muted"}">${F.newBest?"Yeni rekorun!":"En iyin "+F.best}</small></div><button class="btn primary ft-go" type="button" data-ft="start">Tekrar oyna</button></div>`;
+  if(BETA.ftLb.day!==S.today && !ftCard.l){ ftCard.l=1; ftLoad().then(()=>{ ftCard.l=0; if(S.tab==="bugece") betaTonight(); }); }
+  const R=BETA.ftLb.rows||[], lead=R[0];
+  const board = R.length ? `<div class="b-lb"><span>LİGDE BUGÜN</span><span>${R.length} kişi oynadı</span></div><div class="b-gr b-rank">${R.slice(0,8).map((x,i)=>`<div class="b-rk ${x.uid===S.uid?"me":""}"><span class="pl">${i<3?MEDAL[i+1]:i+1}</span>${avatar(x.uid,"sm")}<span class="nm"><b style="color:${col(x.uid)}">${esc(S.players[x.uid]?.club||pname(x.uid))}</b></span><span class="pt"><b class="tnum">${x.s}</b></span></div>`).join("")}</div>` : "";
+  if(!F.on) return `<div class="b-gr ft">${head}${BX2([["En iyin",F.best?String(F.best):"–","40 üzerinden"],["Ligde bugün",lead?esc(S.players[lead.uid]?.club||pname(lead.uid))+" "+lead.s:"–",lead?"en iyi skor":"henüz kimse"],["Puan","Etkilemez","sadece eğlence"]])}<button class="btn primary ft-go" type="button" data-ft="start">Oyna · 10 atış</button>${board}</div>`;
+  if(F.done) return `<div class="b-gr ft">${head}${dots}<div class="ft-res"><b class="cond tnum">${F.score}</b><small class="${F.newBest?"amb":"muted"}">${F.newBest?"Yeni rekorun!":"En iyin "+F.best}</small></div><button class="btn primary ft-go" type="button" data-ft="start">Tekrar oyna</button>${board}</div>`;
   const [l,w]=F.zone, c=l+w/2;
   return `<div class="b-gr ft">${head}<div class="ft-st"><span>Atış <b>${F.shots+1}/10</b></span><span>Skor <b class="tnum">${F.score}</b></span><span>Seri <b>${F.streak?F.streak+" 🔥":"0"}</b></span></div>${dots}
     <div class="ft-bar" aria-hidden="true"><i class="z" style="left:${l}%;width:${w}%"></i><i class="c" style="left:${c-w/6}%;width:${w/3}%"></i><i id="ftm" class="m" style="left:${F.pos}%"></i></div>
@@ -6377,7 +6385,8 @@ function betaBoxPaint(){
   const talk = started(g) ? `<div class="b-lb"><span>YORUMLAR</span><span>${tl.length}</span></div><div class="b-gr bb-talk">${tl.map(u=>`<div class="tk">${avatar(u,"sm")}<span><b style="color:${col(u)}">${esc(pname(u))}</b>${T[u].e?` <span class="tk-e">${T[u].e}</span>`:""}${T[u].t?` ${esc(T[u].t)}`:""}</span></div>`).join("")||`<p class="b-note" style="text-align:left;margin:0">Henüz yorum yok.</p>`}
       <div class="b-chips">${TALK_EMOJI.map(e=>`<button class="chip" type="button" data-btk="${e}" aria-pressed="${me.e===e}">${e}</button>`).join("")}<button class="chip" type="button" data-btkw>${me.t?"Yorumunu değiştir":"✍ Yorum yaz"}</button></div></div>` : "";
   const lbBtn = g.state==="post" ? `<button class="btn b-wide" type="button" data-lbl="${g.id}">🏀 LetterBasket'te logla${lbMine(g.id)?" · "+lbFmt(lbMine(g.id).r)+" top":""}</button>` : "";
-  $("#shBody").innerHTML = `<div class="bb">${head}${lbBtn}${box}${stats}${qs}${who}${talk}</div>`;
+  const flow = flowChart(g); const flowH = flow ? `<div class="b-lb"><span>SKOR AKIŞI</span><span></span></div><div class="b-gr bb-flow">${flow}</div>` : "";
+  $("#shBody").innerHTML = `<div class="bb">${head}${lbBtn}${box}${flowH}${stats}${qs}${who}${talk}</div>`;
 }
 document.addEventListener("click", e=>{
   if(!BETA.on || !BETA.box) return;
@@ -6414,17 +6423,22 @@ async function betaLb(){
   if(!BETA.lb.at){ box.innerHTML=skeletonCards(2); await lbLoad(); }
   const seg=BETA.lbSeg||"akis", G=lbGames(), logs=Object.values(BETA.lb.all).filter(x=>G[x.gid]||x.a).sort((a,b)=>(b.at?.seconds||0)-(a.at?.seconds||0));
   const mine=logs.filter(x=>x.uid===S.uid);
-  const segH=`<div class="b-seg" style="grid-template-columns:repeat(3,1fr)">${[["akis","Akış"],["gunluk","Günlüğüm"],["iyi","En iyiler"]].map(([k,l])=>`<button type="button" data-lbs="${k}" aria-pressed="${seg===k}">${l}</button>`).join("")}</div>`;
+  if(!BETA.lbx.at) await lbxLoad();
+  const segH=`<div class="b-chips">${[["akis","Akış"],["gunluk","Günlüğüm"],["listeler","Listeler"],["izle","İzleyeceklerim"],["iyi","En iyiler"]].map(([k,l])=>`<button class="chip" type="button" data-lbs="${k}" aria-pressed="${seg===k}">${l}</button>`).join("")}</div>`;
   const card=x=>{ const g=G[x.gid]||{id:x.gid,a:x.a,h:x.h,day:x.day}; const hide=x.sp && !lbMine(x.gid) && x.uid!==S.uid;
     return `<div class="b-gr lbc"><div class="h">${avatar(x.uid,"sm")}<span class="nm"><b style="color:${col(x.uid)}">${esc(S.players[x.uid]?.club||pname(x.uid))}</b><small>${esc(dayNice(x.day,{day:"numeric",month:"short"}))} maçı · ${LB_HOW[x.how]||""}${x.re?" · 🔁 tekrar":""}</small></span>${lbBalls(x.r)}</div>
       <button type="button" class="lbgl" data-lbg="${x.gid}">${lbGameLine(g, hide)}<b class="amb">›</b></button>
       ${x.txt?`<p class="tx">${hide?`<i class="muted">Spoiler içeriyor; maçı loglayınca görünür.</i>`:esc(x.txt)}</p>`:""}
       ${(x.tags?.length||x.mvpN)?`<div class="tg">${x.mvpN?`<span class="chip sm">⭐ MVP: ${esc(bSur(x.mvpN))}</span>`:""}${(x.tags||[]).map(t=>`<span class="chip sm">#${esc(t)}</span>`).join("")}</div>`:""}</div>`; };
   let body;
-  if(seg==="gunluk"){
+  if(seg==="listeler") body=lbListsBody(G);
+  else if(seg==="izle") body=lbWatchBody(G);
+  else if(seg==="gunluk"){
     const avg=mine.length?mine.reduce((a,x)=>a+x.r,0)/mine.length:0, tc={}; for(const x of mine) for(const t of [x.a,x.h]) tc[t]=(tc[t]||0)+1;
     const fav=Object.entries(tc).sort((a,b)=>b[1]-a[1])[0], best=[...mine].sort((a,b)=>b.r-a.r)[0];
-    body = `${BX2([["İzlediğin maç", String(mine.length), "loglanan"],["Ortalama puanın", mine.length?lbFmt(avg.toFixed(1)):"–", "5 üzerinden"],["En çok izlediğin", fav?escA(fav[0]):"–", fav?fav[1]+" maç":""]])}
+    const mk=S.today.slice(0,6), mMine=mine.filter(x=>(x.wd||x.day).startsWith(mk)).length;
+    const wraps = mine.length ? `<button class="b-gr lbwr" type="button" data-lbwrap="${mk}"><span class="i">🎬</span><span><b>${MONTHS_TR[+mk.slice(4,6)-1]} özetin</b><small>${mMine?mMine+" maç · şimdiye kadar":"Bu ay henüz log yok"}</small></span><b class="amb">Aç ›</b></button><button class="b-gr lbwr" type="button" data-lbwrap="all"><span class="i">🏆</span><span><b>Sezon özetin</b><small>${mine.length} maç · en sevdiğin maç, MVP'lerin</small></span><b class="amb">Aç ›</b></button>` : "";
+    body = `${wraps}${BX2([["İzlediğin maç", String(mine.length), "loglanan"],["Ortalama puanın", mine.length?lbFmt(avg.toFixed(1)):"–", "5 üzerinden"],["En çok izlediğin", fav?escA(fav[0]):"–", fav?fav[1]+" maç":""]])}
       ${best?`<div class="b-lb"><span>EN SEVDİĞİN MAÇ</span><span>${lbFmt(best.r)} top</span></div><button class="b-gr lbgl big" type="button" data-lbg="${best.gid}">${lbGameLine(G[best.gid]||best)}<b class="amb">›</b></button>`:""}
       <div class="b-lb"><span>GÜNLÜĞÜN</span><span>${mine.length} kayıt</span></div>
       ${mine.length?`<div class="b-gr">${mine.map(x=>`<button class="b-row" type="button" data-lbl="${x.gid}"><span class="teams">${lbGameLine(G[x.gid]||x)}<small class="muted">${esc(dayNice(x.wd||x.day,{day:"numeric",month:"short"}))} · ${LB_HOW[x.how]||""}${x.re?" · 🔁":""}</small></span><span class="right">${lbBalls(x.r,14)}<small class="muted">Düzenle ›</small></span></button>`).join("")}</div>`:`<div class="b-gr bq-note">Henüz maç loglamadın. "Maç logla" ile başla.</div>`}`;
@@ -6501,7 +6515,7 @@ async function betaLbDelete(){
 }
 // bir maçın LetterBasket sayfası
 async function betaLbGame(gid){
-  await lbLoad(); const G=lbGames()[gid]; const L=Object.values(BETA.lb.all).filter(x=>x.gid===gid);
+  await lbLoad(); await lbxLoad(); const G=lbGames()[gid]; const L=Object.values(BETA.lb.all).filter(x=>x.gid===gid);
   const g=G||L[0]; if(!g) return toast("Maç bulunamadı.");
   const avg=L.length?L.reduce((a,x)=>a+x.r,0)/L.length:0, mine=lbMine(gid), hideAll=!mine;
   const dist=[1,2,3,4,5].map(k=>L.filter(x=>Math.ceil(x.r)===k).length), mx=Math.max(1,...dist);
@@ -6509,13 +6523,21 @@ async function betaLbGame(gid){
     ${BX2([["Ligin puanı", L.length?lbFmt(avg.toFixed(1)):"–", L.length+" log"],["Senin puanın", mine?lbFmt(mine.r):"–", mine?LB_HOW[mine.how]:"loglamadın"],["Tarih", esc(dayNice(g.day,{day:"numeric",month:"short"})), ""]])}
     ${L.length?`<div class="b-gr lbdist">${dist.map((n,i)=>`<span><i style="height:${n/mx*60+4}px"></i><small>${i+1}🏀</small><b>${n}</b></span>`).join("")}</div>`:""}
     ${L.map(x=>`<div class="b-gr lbc"><div class="h">${avatar(x.uid,"sm")}<span class="nm"><b style="color:${col(x.uid)}">${esc(S.players[x.uid]?.club||pname(x.uid))}</b><small>${LB_HOW[x.how]||""}${x.re?" · 🔁":""}${x.mvpN?" · MVP "+esc(bSur(x.mvpN)):""}</small></span>${lbBalls(x.r)}</div>${x.txt?`<p class="tx">${x.sp&&hideAll&&x.uid!==S.uid?`<i class="muted">Spoiler; loglayınca görünür.</i>`:esc(x.txt)}</p>`:""}</div>`).join("")}
-    <button class="btn b-wide primary-ish" type="button" data-lbl="${gid}">${mine?"Logunu düzenle":"Bu maçı logla"}</button></div>`);
+    <button class="btn b-wide primary-ish" type="button" data-lbl="${gid}">${mine?"Logunu düzenle":"Bu maçı logla"}</button>
+    <div class="b-two"><button class="btn" type="button" data-lbw="${gid}">${(lbxMe().watch||[]).includes(gid)?"✓ İzleyeceklerimde":"👁 İzleyeceğim"}</button><button class="btn" type="button" data-lbli="${gid}">📋 Listeye ekle</button></div></div>`);
 }
 document.addEventListener("click", e=>{
   if(!BETA.on) return;
-  const b=e.target.closest("[data-lbs],[data-lbpick],[data-lbmode],[data-lbseen],[data-lbt],[data-lbday],[data-lbm],[data-lbl],[data-lbg],[data-lbr],[data-lbhow],[data-lbre],[data-lbwd],[data-lbmvp],[data-lbtag],[data-lbsp],[data-lbsave],[data-lbdel]"); if(!b || b.disabled) return;
+  const b=e.target.closest("[data-lbwrap],[data-lbw],[data-lbli],[data-lbadd],[data-lbnew],[data-lbnewl],[data-lbdl],[data-lbs],[data-lbpick],[data-lbmode],[data-lbseen],[data-lbt],[data-lbday],[data-lbm],[data-lbl],[data-lbg],[data-lbr],[data-lbhow],[data-lbre],[data-lbwd],[data-lbmvp],[data-lbtag],[data-lbsp],[data-lbsave],[data-lbdel]"); if(!b || b.disabled) return;
   const d=b.dataset, D=BETA.lbD;
   if(d.lbs){ BETA.lbSeg=d.lbs; return betaLb(); }
+  if(d.lbwrap) return betaLbWrap(S.uid, d.lbwrap==="all"?null:d.lbwrap);
+  if(d.lbw){ return lbToggleWatch(d.lbw).then(()=>{ if(!$("#sheet").classList.contains("hide") && $("#shBody").querySelector("[data-lbli]")) betaLbGame(d.lbw); if(S.tab==="lb") betaLb(); }); }
+  if(d.lbli) return lbListPick(d.lbli);
+  if(d.lbadd){ const L=JSON.parse(JSON.stringify(lbxMe().lists||[])), l=L[+d.lbadd]; if(!l) return; const i=l.g.indexOf(d.g); if(i>=0) l.g.splice(i,1); else l.g.unshift(d.g); return lbxSave({lists:L}).then(ok=>{ if(ok){ toast(i>=0?"Listeden çıkarıldı":"Listeye eklendi"); lbListPick(d.g); } }); }
+  if(b.hasAttribute("data-lbnew")){ const n=($("#lbNewL")?.value||"").trim(); if(!n) return toast("Listeye bir ad ver."); if(textProblem(n)) return toast("Küfür ve hakaret yazılamaz."); const L=[...(lbxMe().lists||[]), {n, g:d.g?[d.g]:[]}]; return lbxSave({lists:L}).then(ok=>{ if(ok){ toast("Liste oluşturuldu"); if(d.g) lbListPick(d.g); else { closeSheet(); BETA.lbSeg="listeler"; betaLb(); } } }); }
+  if(b.hasAttribute("data-lbnewl")){ openSheet(`<div class="lbf"><h3 id="shTitle">Yeni liste</h3><div class="adm-row" style="display:flex;gap:8px"><input id="lbNewL" class="adm-in" maxlength="40" placeholder="ör. Sezonun gerilim maçları"><button class="btn primary-ish" type="button" data-lbnew>Oluştur</button></div></div>`); return; }
+  if(d.lbdl!=null){ const L=[...(lbxMe().lists||[])]; L.splice(+d.lbdl,1); return lbxSave({lists:L}).then(ok=>{ if(ok){ toast("Liste silindi"); betaLb(); } }); }
   if(b.hasAttribute("data-lbpick")) return betaLbPick();
   if(d.lbmode){ BETA.lbMode=d.lbmode; return betaLbPick(); }
   if(d.lbseen){ BETA.lbSeen=d.lbseen; return betaLbPick(); }
@@ -6553,3 +6575,138 @@ function betaResTop(){
   addEventListener("scroll", ()=>{ if(!BETA.on) return; const y=scrollY, d=y-last; last=y;
     if(Math.abs(d)<6) return; document.body.classList.toggle("b-stripsaway", d>0 && y>120);
     clearTimeout(t); t=setTimeout(()=>document.body.classList.remove("b-stripsaway"), 1400); }, {passive:true}); })();
+
+/* 1.39.0 (beta): LetterBasket özeti (aylık / sezon hikâye kartları), Listeler, İzleyeceklerim; Serbest atışta ligin günlük sıralaması. */
+// lbx/{uid}: {uid, watch:[gid], lists:[{n, g:[gid]}], at}
+BETA.lbx={all:{}, at:0};
+async function lbxLoad(force=false){
+  if(!force && Date.now()-BETA.lbx.at<60e3) return;
+  try{ const snap=await getDocs(collection(S.db,"lbx")); const all={}; snap.forEach(x=>{ all[x.id]=x.data(); }); BETA.lbx={all, at:Date.now()}; }catch(e){ BETA.lbx.at=Date.now(); }
+}
+const lbxMe = () => BETA.lbx.all[S.uid] || {uid:S.uid, watch:[], lists:[]};
+async function lbxSave(patch){
+  const cur=lbxMe(), data={uid:S.uid, watch:(patch.watch??cur.watch??[]).slice(0,100), lists:(patch.lists??cur.lists??[]).slice(0,20).map(l=>({n:String(l.n||"").slice(0,40), g:(l.g||[]).slice(0,50)})), at:serverTimestamp()};
+  try{ await setDoc(doc(S.db,"lbx",S.uid), data); BETA.lbx.all[S.uid]={...data}; return true; }catch(e){ toast("Kaydedilemedi."); return false; }
+}
+async function lbToggleWatch(gid){ await lbxLoad(); const w=[...(lbxMe().watch||[])], i=w.indexOf(gid); if(i>=0) w.splice(i,1); else w.unshift(gid); if(await lbxSave({watch:w})) toast(i>=0?"İzleyeceklerinden çıkarıldı":"İzleyeceklerine eklendi"); }
+// liste seçme penceresi
+async function lbListPick(gid){
+  await lbxLoad(); const L=lbxMe().lists||[];
+  openSheet(`<div class="lbf"><h3 id="shTitle">Listeye ekle</h3>
+    ${L.length?`<div class="b-gr">${L.map((l,i)=>`<button class="b-row" type="button" data-lbadd="${i}" data-g="${gid}"><span class="teams"><b>${esc(l.n)}</b><small class="muted">${l.g.length} maç</small></span><span class="right"><b class="amb">${l.g.includes(gid)?"✓ Listede":"Ekle ›"}</b></span></button>`).join("")}</div>`:`<p class="b-note">Henüz listen yok.</p>`}
+    <div class="b-lb"><span>YENİ LİSTE</span><span>En fazla 40 karakter</span></div>
+    <div class="adm-row" style="display:flex;gap:8px"><input id="lbNewL" class="adm-in" maxlength="40" placeholder="ör. Sezonun gerilim maçları"><button class="btn primary-ish" type="button" data-lbnew data-g="${gid}">Oluştur</button></div></div>`);
+}
+function lbListsBody(G){
+  const me=lbxMe(), mine=me.lists||[], others=Object.values(BETA.lbx.all).filter(x=>x.uid!==S.uid && x.lists?.length);
+  const card=(l,u,i)=>`<div class="b-gr lbc"><div class="h">${avatar(u,"sm")}<span class="nm"><b>${esc(l.n)}</b><small>${esc(S.players[u]?.club||pname(u))} · ${l.g.length} maç</small></span>${u===S.uid?`<button class="chip sm" type="button" data-lbdl="${i}">Sil</button>`:""}</div>
+    ${l.g.length?l.g.map(gid=>{ const g=G[gid]; return g?`<button type="button" class="lbgl" data-lbg="${gid}">${lbGameLine(g)}<b class="amb">›</b></button>`:""; }).join(""):`<p class="b-note" style="text-align:left;margin:4px 0">Boş liste. Bir maçın LetterBasket sayfasından "Listeye ekle".</p>`}</div>`;
+  return `<button class="btn b-wide" type="button" data-lbnewl>＋ Yeni liste</button>
+    <div class="b-lb"><span>LİSTELERİN</span><span>${mine.length}</span></div>${mine.length?mine.map((l,i)=>card(l,S.uid,i)).join(""):`<div class="b-gr bq-note">Henüz liste yok. Maç sayfalarından "Listeye ekle" ile başla.</div>`}
+    ${others.length?`<div class="b-lb"><span>LİGİN LİSTELERİ</span><span></span></div>${others.flatMap(x=>x.lists.map(l=>card(l,x.uid))).join("")}`:""}`;
+}
+function lbWatchBody(G){
+  const w=(lbxMe().watch||[]).filter(gid=>G[gid]);
+  return w.length?`<div class="b-gr">${w.map(gid=>{ const g=G[gid], m=lbMine(gid); return `<div class="b-row"><span class="teams">${lbGameLine(g, true)}<small class="muted">${esc(dayNice(g.day,{day:"numeric",month:"short"}))} · skor gizli</small></span><span class="right"><button class="chip sm" type="button" data-lbl="${gid}">${m?"Düzenle":"İzledim, logla"}</button><button class="chip sm" type="button" data-lbw="${gid}">Çıkar</button></span></div>`; }).join("")}</div>`
+    : `<div class="b-gr bq-note">İzleyecek maç eklemedin. Bir maçın LetterBasket sayfasında "İzleyeceğim" de; skor burada gizli kalır.</div>`;
+}
+// aylık ve sezon özeti: hikâye kartları
+function lbWrapData(u, month){
+  const G=lbGames(), all=Object.values(BETA.lb.all).filter(x=>x.uid===u && (!month || (x.wd||x.day).startsWith(month)));
+  if(!all.length) return null;
+  const n=all.length, avg=all.reduce((a,x)=>a+x.r,0)/n, live=all.filter(x=>x.how==="canli").length;
+  const best=[...all].sort((a,b)=>b.r-a.r||(b.at?.seconds||0)-(a.at?.seconds||0))[0];
+  const tc={}; for(const x of all) for(const t of [x.a,x.h]) tc[t]=(tc[t]||0)+1; const team=Object.entries(tc).sort((a,b)=>b[1]-a[1])[0];
+  const mv={}; for(const x of all) if(x.mvpN) mv[x.mvpN]=(mv[x.mvpN]||0)+1; const mvps=Object.entries(mv).sort((a,b)=>b[1]-a[1]).slice(0,3);
+  const dist=[1,2,3,4,5].map(k=>all.filter(x=>Math.ceil(x.r)===k).length);
+  const league=S.order.map(v=>[v, Object.values(BETA.lb.all).filter(x=>x.uid===v && (!month||(x.wd||x.day).startsWith(month))).length]).sort((a,b)=>b[1]-a[1]);
+  const rank=league.findIndex(x=>x[0]===u)+1;
+  const tags={}; for(const x of all) for(const t of x.tags||[]) tags[t]=(tags[t]||0)+1; const tag=Object.entries(tags).sort((a,b)=>b[1]-a[1])[0];
+  return {n, avg, live, best, bestG:G[best.gid]||best, team, mvps, dist, rank, leader:league[0], tag};
+}
+function betaLbWrap(u, month){
+  const W=lbWrapData(u, month); if(!W) return toast("Bu dönemde log yok.");
+  const per = month ? `${MONTHS_TR[+month.slice(4,6)-1]} ${month.slice(0,4)}` : "Sezon";
+  const mx=Math.max(1,...W.dist);
+  const C=[
+    ["#1e5b3f",`<small class="k">LETTERBASKET · ${esc(per.toLocaleUpperCase("tr"))}</small><b class="big">${esc(per)}'da<br>${W.n} maç<br>izledin</b><span class="m">${W.live} tanesini canlı · ortalama puanın ${lbFmt(W.avg.toFixed(1))}</span>`],
+    ["#4a3a12",`<small class="k">${month?"AYIN MAÇI":"SEZONUN MAÇI"}</small><span class="lbg big">${lbGameLine(W.bestG)}</span><span>${lbBalls(W.best.r,24)}</span>${W.best.txt?`<span class="m">“${esc(W.best.txt)}”</span>`:""}<span class="m">${esc(dayNice(W.best.day,{day:"numeric",month:"long"}))}</span>`],
+    ["#0e2a4a",`<small class="k">EN ÇOK İZLEDİĞİN TAKIM</small>${W.team?`${bLogo({abbr:W.team[0]},88)}<b class="big">${escA(W.team[0])} · ${W.team[1]} maç</b>`:""}${W.tag?`<span class="m">En çok kullandığın etiket: #${esc(W.tag[0])}</span>`:""}`],
+    ["#2a1a3a",`<small class="k">MVP'LERİN</small>${W.mvps.length?W.mvps.map(([n,c])=>`<span class="mvr"><b>${esc(n)}</b><b class="cond">${c}×</b></span>`).join(""):`<span class="m">Henüz MVP seçmedin.</span>`}`],
+    ["#18304a",`<small class="k">PUAN DAĞILIMIN</small><div class="dist">${W.dist.map((v,k)=>`<span><b>${v}</b><i style="height:${v/mx*100+4}px"></i><small>${k+1}🏀</small></span>`).join("")}</div><span class="m">Ortalaman ${lbFmt(W.avg.toFixed(1))}</span>`],
+    ["#3a2a10",`<small class="k">LİGDE</small><b class="big">En çok maç izleyen<br>${W.rank}. kişisin</b><span class="m">1. ${esc(pname(W.leader[0]))} · ${W.leader[1]} maç</span>`]];
+  BETA.wrap={C, i:0, per};
+  let el=$("#bWrap"); if(!el){ document.body.insertAdjacentHTML("beforeend", `<div class="b-wrapx" id="bWrap" role="dialog" aria-label="LetterBasket özeti"></div>`); el=$("#bWrap");
+    el.addEventListener("click", e=>{ if(e.target.closest("[data-wx]")){ el.classList.add("hide"); return; } const r=el.getBoundingClientRect(); BETA.wrap.i += (e.clientX-r.left < r.width/3) ? -1 : 1; if(BETA.wrap.i>=BETA.wrap.C.length){ el.classList.add("hide"); return; } BETA.wrap.i=Math.max(0,BETA.wrap.i); betaWrapPaint(); }); }
+  el.classList.remove("hide"); betaWrapPaint();
+}
+function betaWrapPaint(){ const el=$("#bWrap"), W=BETA.wrap; if(!el||!W) return; const [c,h]=W.C[W.i];
+  el.innerHTML=`<div class="wx" style="background:linear-gradient(170deg,${c},#0b1118 75%)"><div class="bars">${W.C.map((_,k)=>`<i class="${k<=W.i?"on":""}"></i>`).join("")}</div>
+    <div class="top"><b>LetterBasket · ${esc(W.per)} özeti</b><button class="b-ib" type="button" data-wx aria-label="Kapat">${bic("x",16,2.4)}</button></div><div class="body">${h}</div><small class="hint">Sağa dokun: sonraki · sola dokun: önceki</small></div>`; }
+// Serbest atış: ligin bugünkü en iyileri (ft/{gün}_{uid})
+BETA.ftLb={day:null, rows:[]};
+async function ftLoad(){ try{ const snap=await getDocs(query(collection(S.db,"ft"), where("day","==",S.today))); const r=[]; snap.forEach(x=>r.push(x.data())); BETA.ftLb={day:S.today, rows:r.sort((a,b)=>b.s-a.s)}; }catch(e){ BETA.ftLb={day:S.today, rows:[]}; } }
+async function ftSaveScore(sc){ const mine=BETA.ftLb.rows.find(x=>x.uid===S.uid); if(mine && mine.s>=sc) return; try{ await setDoc(doc(S.db,"ft",`${S.today}_${S.uid}`), {uid:S.uid, day:S.today, s:sc, at:serverTimestamp()}); await ftLoad(); if(S.tab==="bugece") betaTonight(); }catch(e){} }
+
+/* ====================================================== beta: gelişmiş skorer seçimi (1.40.0) */
+// Sıralama: sezon ortalaması, son 5 maç, bu sezon bu rakibe karşı, dakika. Etiketler: form, rakip, dakika sınırı, sakatlık.
+const PK = {sort:"avg", hideOut:true};
+function pkLog(gl, opp, skipId){
+  const nm=gl?.names||[], ip=nm.indexOf("points"), im=nm.indexOf("minutes");
+  const sts=gl?.seasonTypes||[], st=sts.find(t=>/regular/i.test(t.displayName||""))||sts[0];
+  const evs=(st?.categories||[]).flatMap(c=>c.events||[]).filter(e=>String(e.eventId)!==String(skipId));
+  const pts=e=>+e.stats?.[ip]||0, mn=e=>+e.stats?.[im]||0;
+  const l5=evs.slice(0,5), vs=evs.filter(e=>gl.events?.[e.eventId]?.opponent?.abbreviation===opp);
+  const avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:null;
+  return {n:evs.length, l5:l5.map(pts).reverse(), f5:avg(l5.map(pts)), m5:avg(l5.map(mn)), vs:avg(vs.map(pts)), vn:vs.length, last:evs[0]?pts(evs[0]):null};
+}
+async function betaPickerUI(list, mode, g, cur, ready=()=>{}){
+  const D=S.days[S.day], games = mode==="game" ? [g] : D.games.filter(x=>!started(x));
+  const opp={}, gidOf={}; games.forEach(x=>{ opp[x.away.abbr]=x.home.abbr; opp[x.home.abbr]=x.away.abbr; gidOf[x.away.abbr]=gidOf[x.home.abbr]=x.id; });
+  await loadInj().catch(()=>{});
+  const LOG={}; let tf="", q="", loading=true;
+  const title = mode==="game" ? "Maçın en skoreri" : "Günün oyuncusu";
+  const sub = mode==="game" ? `${escA(g.away.abbr)} @ ${escA(g.home.abbr)} · en çok sayıyı kim atar?` : `Bu gece ${games.length} maçın tüm oyuncuları · gecenin en skoreri kim olur?`;
+  const SORTS=[["avg","Sezon ort.","sezon ort."],["l5","Son 5 maç","son 5 ort."],["vs","Rakibe karşı","rakibe karşı"],["min","Dakika","dk ort. (son 5)"]];
+  const val=(p,k)=>{ const l=LOG[p.id]; return k==="avg"?p.ppg : k==="l5"?l?.f5 : k==="vs"?l?.vs : l?.m5; };
+  const tags=p=>{ const out=[], l=LOG[p.id], i=S.inj?.[p.id];
+    if(i) out.push(`<span class="inj ${i.o?"":"q"}">${i.s}</span>`);
+    if(i && /minute|restrict|dakika/i.test(i.c||"")) out.push(`<span class="pk-t warn">Dakika sınırı</span>`);
+    if(l?.f5!=null && p.ppg!=null && l.n>=5){ const d=l.f5-p.ppg; if(d>=4) out.push(`<span class="pk-t hot">Formda +${d.toFixed(1)}</span>`); else if(d<=-4) out.push(`<span class="pk-t cold">Düşüşte ${d.toFixed(1)}</span>`); }
+    if(l?.vn && p.ppg!=null && l.vs-p.ppg>=4) out.push(`<span class="pk-t hot">Bu rakibe ${l.vs.toFixed(1)} atıyor</span>`);
+    if(l?.m5!=null && l.n>=3 && l.m5<18) out.push(`<span class="pk-t">Az süre alıyor (${Math.round(l.m5)} dk)</span>`);
+    if(l?.last!=null && l.last>=35) out.push(`<span class="pk-t hot">Son maçta ${l.last}</span>`);
+    return out.join(""); };
+  const spark=p=>{ const a=LOG[p.id]?.l5||[]; if(!a.length) return `<span class="pk-spark"></span>`; const mx=Math.max(1,...a);
+    return `<span class="pk-spark" title="Son ${a.length} maç: ${a.join(", ")}">${a.map(v=>`<i style="height:${Math.max(8,v/mx*100)}%"></i>`).join("")}</span>`; };
+  const row=p=>{ const v=val(p,PK.sort), lab=SORTS.find(s=>s[0]===PK.sort)[2], l=LOG[p.id];
+    const vtxt = v==null ? "–" : PK.sort==="min" ? Math.round(v) : v.toFixed(1);
+    const extra = PK.sort==="vs" && l?.vn ? ` (${l.vn} maç)` : "";
+    return `<button class="plr bpk" data-id="${p.id}" data-name="${esc(p.name)}" data-team="${p.team}" aria-pressed="${p.id===cur}">
+      <img src="${p.img}" alt="" loading="lazy"><span class="pi"><b>${esc(p.name)}</b><small>${escA(p.team)} · ${p.pos||"–"} · ${mode==="game"?"":"rakip "}${opp[p.team]?escA(opp[p.team]):""}</small><span class="pk-tags">${tags(p)}</span></span>
+      ${spark(p)}<span class="ppg">${vtxt}<small>${lab}${extra}</small></span></button>`; };
+  const paint=()=>{ const box=$("#plList"); if(!box) return;
+    let a=list.filter(p=>(!tf || p.team===tf) && (!q || slug(p.name).includes(q)) && !(PK.hideOut && S.inj?.[p.id]?.o));
+    a=a.slice().sort((x,y)=>(val(y,PK.sort)??-1)-(val(x,PK.sort)??-1) || (y.ppg??-1)-(x.ppg??-1) || x.name.localeCompare(y.name));
+    const hidden=list.filter(p=>S.inj?.[p.id]?.o && (!tf||p.team===tf)).length;
+    box.innerHTML = (a.length ? a.map(row).join("") : `<p class="muted">Bu filtreyle oyuncu yok.</p>`)
+      + (PK.hideOut && hidden ? `<button class="linkish pk-more" data-pkout="1" type="button">Oynamayacak ${hidden} oyuncuyu da göster</button>` : "");
+    const n=$("#pkNote"); if(n) n.textContent = loading ? "Son maç verileri yükleniyor…" : PK.sort==="vs" ? "Bu sezon bu rakibe karşı attığı sayı ortalaması. Hiç karşılaşmadıysa en altta." : "Çubuklar son 5 maçta attığı sayılar, en sağdaki son maç.";
+  };
+  const teamsChips = mode==="game" ? `<div class="chips" id="tmF"><button class="chip" data-v="" aria-pressed="true">Hepsi</button><button class="chip" data-v="${g.away.abbr}" aria-pressed="false">${esc(g.away.name)}</button><button class="chip" data-v="${g.home.abbr}" aria-pressed="false">${esc(g.home.name)}</button></div>` : "";
+  $("#shBody").innerHTML = `<h3 id="shTitle">${title}</h3><p class="muted" style="margin:-4px 0 8px;font-size:13px">${sub}</p>
+    <div class="seg2 pk-sort" id="pkSort">${SORTS.map(s=>`<button data-pks="${s[0]}" aria-pressed="${s[0]===PK.sort}">${s[1]}</button>`).join("")}</div>
+    ${teamsChips}<input class="search" id="plSearch" placeholder="Oyuncu ara" autocomplete="off"><small class="muted pk-note" id="pkNote"></small>
+    <div id="plList">${list.length?"":'<p class="muted">Kadro alınamadı.</p>'}</div>`;
+  if(!list.length) return ready();
+  paint();
+  $("#plSearch").oninput=()=>{ q=slug($("#plSearch").value); paint(); };
+  $("#pkSort").onclick=e=>{ const b=e.target.closest("[data-pks]"); if(!b) return; PK.sort=b.dataset.pks; $$("#pkSort [data-pks]").forEach(x=>x.setAttribute("aria-pressed", x===b)); paint(); };
+  $("#tmF")?.addEventListener("click", e=>{ const c=e.target.closest(".chip"); if(!c) return; tf=c.dataset.v; $$("#tmF .chip").forEach(x=>x.setAttribute("aria-pressed", x===c)); paint(); });
+  $("#plList").addEventListener("click", e=>{ if(e.target.closest("[data-pkout]")){ e.stopPropagation(); PK.hideOut=false; paint(); } }, true);
+  ready();
+  // Son maç kayıtları: oynayacak oyuncular, ortalamaya göre ilk 30 (maç) / 45 (gece); 30 dk önbellek
+  const want=list.filter(p=>!S.inj?.[p.id]?.o).slice(0, mode==="game"?30:45);
+  let n=0; await Promise.allSettled(want.map(async p=>{ try{ LOG[p.id]=pkLog(await gamelogOf(p.id), opp[p.team], gidOf[p.team]); }catch(e){} if(++n%10===0) paint(); }));
+  loading=false; paint();
+}
