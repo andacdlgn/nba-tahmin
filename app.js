@@ -46,12 +46,13 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.40.3";
+const VERSION = "1.40.4";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.40.4", d:"10 Kasım 2026", quiet:true, items:["Yeni sürüm çıkınca site kendiliğinden ve daha güvenilir biçimde güncelleniyor."]},
   {v:"1.40.3", d:"10 Kasım 2026", quiet:true, items:["Yönetici denemesi için hazırlık; oyunculara görünen bir değişiklik yok."]},
   {v:"1.40.2", d:"10 Kasım 2026", quiet:true, items:["Yönetici denemesi için hazırlık; oyunculara görünen bir değişiklik yok."]},
   {v:"1.40.1", d:"10 Kasım 2026", quiet:true, items:["Yönetici denemesi için hazırlık; oyunculara görünen bir değişiklik yok."]},
@@ -6875,3 +6876,19 @@ function betaNews(all){
     ${all?"":`<button class="linkish" id="newsAll" type="button">Önceki sürümler</button>`}<button class="btn-primary" id="newsOk" type="button" style="margin-top:12px;width:100%">Tamam</button>`);
   $("#newsOk").onclick=()=>closeSheet(); $("#newsAll")?.addEventListener("click", ()=>openNews(true));
 }
+
+/* ====================================================== sürüm takibi (1.40.4) */
+// Sayfa açık kaldıkça (telefonda arka planda bekleyen sekme ya da ana ekran uygulaması) yeni sürüm gelince kendiliğinden yenilenir.
+// Açık pencere, sohbet, tahmin destesi ya da yazı yazılan bir kutu varken beklenir; kullanıcının işi yarıda kesilmez.
+(()=>{ let busyWait=0;
+  const busy = () => !$("#sheet").classList.contains("hide") || S.chatOpen || BETA.deck || BETA.plus || /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName||"");
+  async function check(){
+    if(document.hidden) return;
+    let j; try{ j=await (await fetch("version.json?t="+Date.now(), {cache:"no-store"})).json(); }catch(e){ return; }
+    if(!j?.v || j.v===VERSION) return;
+    if(busy()){ if(++busyWait < 20){ setTimeout(check, 30e3); } return; }
+    busyWait=0; window.ntUpdate?.(j.v);
+  }
+  setInterval(check, 3*60e3);
+  document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) check(); });
+})();
