@@ -220,3 +220,56 @@ body.beta #shBody th,body.beta #shBody td{white-space:nowrap;padding:7px 7px}
 body.beta #shBody table th:first-child,body.beta #shBody table td:first-child{position:sticky;left:0;z-index:1;background:var(--panel);max-width:150px;overflow:hidden;text-overflow:ellipsis}
 body.beta #shBody table tr.top td:first-child,body.beta #shBody table tr[class*="hi"] td:first-child{background:inherit}
 body.beta #shBody div:has(>table){overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%}
+
+/* 1.34.0: Maçlar */
+.b-mrow{flex-direction:column;align-items:stretch;gap:6px}
+.b-mrow .top{display:flex;align-items:center;gap:10px;min-width:0}
+.b-mrow .lds{display:flex;flex-direction:column;gap:3px;padding:6px 8px;border-radius:10px;background:var(--panel-2);font-size:12px;color:var(--muted)}
+.b-mrow .ld{display:flex;align-items:center;gap:6px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.b-mrow .ld b{color:var(--ink)}
+.b-mrow .ld .b-logo{width:16px;height:16px}
+.b-mrow .split{display:block;width:100%;height:5px;border-radius:3px;background:var(--p1);overflow:hidden}
+.b-mrow .split i{display:block;height:100%;background:var(--p0)}
+.b-gece{display:flex;flex-direction:column;gap:8px;padding:10px 12px 12px;width:100%;text-align:left;color:var(--ink);font:inherit;cursor:pointer}
+.b-gece .h{display:flex;justify-content:space-between;font-size:12px;letter-spacing:.08em;font-weight:800;color:var(--muted)}
+.b-gece .b-bx>span{flex:1;min-width:0;padding:9px 6px;border-radius:14px;background:var(--panel-2);border:1px solid var(--line);display:flex;flex-direction:column;align-items:center;gap:1px;text-align:center}
+.b-gece .b-bx small{color:var(--muted);font-size:11px;font-weight:700}.b-gece .b-bx b{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}.b-gece .b-bx i{font-style:normal;color:var(--muted);font-size:11px}
+#view-maclar .b-seg button{height:36px;border-radius:10px;font-size:14px;font-weight:700;color:var(--muted);border:0;background:none;cursor:pointer}
+#view-maclar .b-seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+#view-maclar .b-two .btn{display:grid;place-items:center}
+
+/* 1.35.0: uzun vade kilit şeridi (sarı şeridin yarısı kadar, gri) */
+.b-ltstrip{position:fixed;left:50%;transform:translateX(-50%);width:min(580px,calc(100% - 20px));bottom:calc(86px + env(safe-area-inset-bottom));z-index:28;min-height:32px;border-radius:12px;border:1px solid var(--line);
+  background:color-mix(in srgb,var(--muted) 22%,var(--panel));color:var(--ink);display:flex;align-items:center;gap:8px;padding:5px 12px;font:inherit;font-size:12.5px;text-align:left;cursor:pointer;box-shadow:0 6px 16px rgba(0,0,0,.18)}
+.b-ltstrip .tx{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.b-ltstrip .go{color:var(--muted);font-weight:800}
+body.beta.b-hasstrip .b-ltstrip{bottom:calc(150px + env(safe-area-inset-bottom))}
+body.beta.b-haslt{padding-bottom:calc(136px + env(safe-area-inset-bottom))}
+body.beta.b-haslt.b-hasstrip{padding-bottom:calc(210px + env(safe-area-inset-bottom))}
+body.beta:has(#sheet:not(.hide)) .b-ltstrip{display:none}
+/* destede maç önü kutusu dokunulabilir */
+.sw-info{cursor:pointer}
+.sw-info .ib-more{color:var(--amber-ink);font-weight:700}
+
+/* eski bölümler yeni dilde: başlıklar küçük etiket, kutular kart, sayılar karo */
+body.beta .b-old .sec-title,body.beta #uzun .sec-title,body.beta #puan .sec-title,body.beta #nba .sec-title,body.beta #takim .sec-title{margin:18px 2px 8px}
+body.beta .b-old .sec-title h2{font-family:Barlow,sans-serif!important;font-size:12px!important;letter-spacing:.08em;font-weight:800;color:var(--muted);text-transform:uppercase}
+body.beta .b-old .box{border-radius:18px;padding:14px}
+body.beta .b-old .box + .box{margin-top:12px}
+body.beta .b-old .cards2{grid-template-columns:repeat(3,minmax(0,1fr))}
+body.beta .b-old .kpi{border-radius:14px;padding:9px 6px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:2px}
+body.beta .b-old .kpi b{font-family:Barlow,sans-serif;font-size:16px;font-weight:800}
+body.beta .b-old .kpi small{font-size:11px;font-weight:700;line-height:1.3}
+body.beta .b-old .kpi .bar2{width:100%;margin-top:4px}
+body.beta .b-old .row-lbl{font-size:12px;letter-spacing:.06em;font-weight:800;color:var(--muted);text-transform:uppercase}
+body.beta .b-old .recs{grid-template-columns:repeat(2,minmax(0,1fr))}
+body.beta .b-old .rec-i{border-radius:14px}
+body.beta .b-old .lk-parts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+body.beta .b-old .lk-parts span{background:var(--panel-2);border-radius:12px;padding:8px 6px;align-items:center;text-align:center}
+body.beta .b-old .lk-parts b{font:800 17px Barlow,sans-serif}
+body.beta .b-old .seg2{border-radius:14px;padding:4px}
+body.beta .b-old .seg2 button{border-radius:10px;min-height:36px}
+body.beta .b-old .pf-sec h4{font-size:15px;font-weight:800}
+body.beta .b-old .btn{border-radius:12px;min-height:42px;font-weight:700}
+body.beta .b-old .adm-in{border-radius:12px;min-height:44px}
+@media (max-width:380px){ body.beta .b-old .cards2{grid-template-columns:repeat(2,minmax(0,1fr))} }
