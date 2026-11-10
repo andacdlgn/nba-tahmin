@@ -2883,7 +2883,7 @@ function renderPuan(){
   html += awardsHTML() + `<button class="btn awards-btn" id="awardsBtn" type="button">${ICON.medal}Sezon ödüllerine bak</button>`;
   const hist=[...(S.league?.history||[])].reverse();
   html += `<button class="btn awards-btn" id="archBtn" type="button">📚 Sezon arşivi</button>`;
-  if(hist.length) html += `<div class="sec-title"><h2>Geçmiş ligler</h2></div><div class="months">${hist.map((h,hi)=>{ const w=h.rows?.[0];
+  if(hist.length && !BETA.on) html += `<div class="sec-title"><h2>Geçmiş ligler</h2></div><div class="months">${hist.map((h,hi)=>{ const w=h.rows?.[0];
     return `<div class="mo done" data-arch="${hist.length-1-hi}" role="button" tabindex="0"><span class="mo-n" style="text-transform:none">${h.name?`<b>${esc(h.name)}</b> · `:""}${dayNice(h.start,{day:"numeric",month:"short"})} – ${dayNice(h.end,{day:"numeric",month:"short"})}</span>
       <span class="mo-w">👑 <b>${esc(w?.name||"?")}</b><small>${w?.pts??0} puan</small></span><span class="mo-s">${(h.rows||[]).slice(1).map(r=>`${esc(r.name)} ${r.pts}`).join(" · ")}</span></div>`; }).join("")}</div>`;
   html += seasonChart();
@@ -5814,7 +5814,7 @@ function betaTonight(){
     ${!locked?`<p class="b-q"><b>Soru:</b> ${q.t}</p>`:""}
     <div class="b-gr">${D.games.map(g=>betaRow(g,D)).join("")}</div>
     <p class="b-note">${anyLive?"Satıra dokun: kutu skoru, akış ve herkesin seçimi.":"Satıra dokununca o maçın kartı açılır: kazanan, fark ve skorer."}</p>
-    <div class="b-two"><a class="btn" href="#ayrisma">Kim ne tahmin etti ›</a><a class="btn" href="#sonuclar">Skorlar ›</a></div></div>`;
+    </div>`;
 }
 // maç olmayan gece: yarının maçları ve Serbest atış (puanı etkilemez)
 BETA.ft={on:false,done:false,shots:0,score:0,streak:0,hist:[],zone:[38,30],pos:0,dir:1,speed:.9,last:"",lastOk:false,raf:0,best:+(lsGet("ftBest")||0)};
@@ -6255,7 +6255,7 @@ function betaUzun(){
   if(!S.lt.loaded){ el.innerHTML=`<div class="b-wrap"><div class="b-gr" style="padding:16px"><p class="b-note">Yükleniyor…</p></div></div>`; return; }
   const rows=S.order.map(u=>({u, p:ltPoints(u)})).sort((a,b)=>b.p-a.p);
   let place=0; const places={}; rows.forEach((r,i)=>{ if(i===0||r.p!==rows[i-1].p) place=i+1; places[r.u]=place; });
-  const rounds=ltRounds(), open=rounds.filter(k=>ltStatus(k).open), past=rounds.filter(k=>!ltStatus(k).open);
+  const rounds=ltRounds(), open=rounds.filter(k=>ltStatus(k).open), past=rounds.filter(k=>!ltStatus(k).open && ltInLeague(k));
   const missing=open.reduce((n,k)=>{ const d=S.lt.all[k]?.[S.uid]; return n+LT_CATS[ltType(k)].filter(([c])=>!d?.picks?.[c]).length; },0);
   const PTS={w:"doğru tahmin +2", m:"oyuncu +4 · çaylak ve savunmacı +3", c:"şampiyon +8 · finalist +3 · MVP +6", s:"MVP +12 · diğerleri +8 · şampiyon +10", k:"doğru sıra +2 · bir sıra şaşarsa +1"};
   const lockTxt=k=>new Date(ltLock(k)).toLocaleString(LOC,{day:"numeric",month:"long",weekday:"long",hour:"2-digit",minute:"2-digit",timeZone:TZ});

@@ -655,3 +655,13 @@ body.beta .trial-tag,body.beta .chat-n.ment,body.beta .conf-btn[aria-pressed="tr
 :root[data-theme="light"] :is(.wk-prize,.wk-s-h b,.wk-s-go,.wk-hint,.wk-ban-p b){color:#a16207}
 @media (prefers-color-scheme: light){ :root:not([data-theme="dark"]) :is(.wk-prize,.wk-s-h b,.wk-s-go,.wk-hint,.wk-ban-p b){color:#a16207} }
 body.beta .tcell small{color:var(--ink);opacity:.75}
+
+/* 1.40.3: uzun vade kilit uyarısı daha belirgin */
+.b-ltstrip{background:var(--panel);border:1.5px solid var(--amber);color:var(--ink);font-weight:600;box-shadow:0 6px 18px rgba(0,0,0,.25),0 0 0 3px color-mix(in srgb,var(--amber) 18%,transparent)}
+.b-ltstrip .go{color:var(--amber-ink)}
+.b-ltstrip::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--amber);flex:none;animation:bltp 1.4s ease-in-out infinite}
+@keyframes bltp{50%{opacity:.25;transform:scale(.7)}}
+@media (prefers-reduced-motion:reduce){.b-ltstrip::before{animation:none}}
+.b-ltrow{background:var(--amber-soft);border:1.5px solid color-mix(in srgb,var(--amber) 70%,var(--line))}
+.b-ltrow b:first-of-type{color:var(--amber-ink)}
+.bl-row.soon{background:var(--amber-soft);box-shadow:inset 3px 0 0 var(--amber)}
