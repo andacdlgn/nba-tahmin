@@ -681,3 +681,21 @@ body.beta .roster{gap:0;border-radius:18px;background:var(--panel);border:1px so
 body.beta .roster .ro-p{border-radius:0;border:0;border-bottom:1px solid var(--line);background:none;margin:0}
 body.beta .roster .ro-p:last-child{border-bottom:0}
 body.beta .seg2:not([style*="grid-template-columns"]){grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr)}
+#bzAll .bfam.hide{display:none!important}
+
+/* 1.40.4: eski görünümden kalan bölümler yeni düzende. Başlıklar diğer sayfalardaki gibi küçük etiket */
+body.beta .sec-title{margin:18px 2px 8px;align-items:center}
+body.beta .sec-title h2{font-family:Barlow,system-ui,sans-serif;font-weight:800;font-size:12px!important;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+body.beta .sec-title .aside{font-size:12px}
+body.beta #puan .bb{gap:0;border-radius:18px;background:var(--panel);border:1px solid var(--line);overflow:hidden}
+body.beta #puan .bb-row{border:0;border-bottom:1px solid var(--line);border-radius:0;box-shadow:inset 3px 0 0 var(--pc);background:none;min-height:56px}
+body.beta #puan .bb-row:last-child{border-bottom:0}
+body.beta #puan .bb-row.me{background:var(--amber-soft)}
+body.beta #puan .months{grid-template-columns:1fr}
+body.beta #puan .mo{border-radius:18px;min-height:56px}
+body.beta #puan .wk-strip{border-radius:18px;padding:12px 14px;flex-direction:column;align-items:flex-start;text-align:left}
+body.beta .awards-btn{border-radius:14px;min-height:48px}
+body.beta .aw-m{border-radius:18px}
+body.beta .wk-ban-btn{display:block;width:100%;text-align:left;font:inherit;color:var(--ink);cursor:pointer;margin:10px 0 0}
+body.beta .wk-ban-btn .wk-ban-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+body.beta .wk-ban-btn .wk-s-go{font-size:13px;white-space:nowrap}

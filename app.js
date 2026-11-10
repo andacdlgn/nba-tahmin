@@ -46,12 +46,13 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.40.4";
+const VERSION = "1.40.5";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.40.5", d:"10 Kasım 2026", quiet:true, items:["Yönetici denemesi için hazırlık; oyunculara görünen bir değişiklik yok."]},
   {v:"1.40.4", d:"10 Kasım 2026", quiet:true, items:["Yeni sürüm çıkınca site kendiliğinden ve daha güvenilir biçimde güncelleniyor."]},
   {v:"1.40.3", d:"10 Kasım 2026", quiet:true, items:["Yönetici denemesi için hazırlık; oyunculara görünen bir değişiklik yok."]},
   {v:"1.40.2", d:"10 Kasım 2026", quiet:true, items:["Yönetici denemesi için hazırlık; oyunculara görünen bir değişiklik yok."]},
@@ -2865,7 +2866,11 @@ function renderPuan(){
   }
   let wkStrip="";
   if(S.pv==="sezon"){ const W=weekStandings(curWk), top=W.rows.filter(r=>r.p>0 && r.place<=3), on=curWk>=WEEK_FROM, medal={1:"🥇",2:"🥈",3:"🥉"};
-    wkStrip=`<button class="wk-strip" type="button" data-pv="hafta"><span class="wk-s-h">🏆 Bu haftanın ilk 3'ü sezon puanı kazanır <b>+10 / +7 / +5</b></span><span class="wk-s-l">${!on?"9 Kasım haftasından itibaren":top.length?top.map(r=>`${medal[r.place]} ${esc(S.players[r.u]?.club||pname(r.u))} <small>${r.p}</small>`).join(" · "):"Henüz puan yok"}</span><span class="wk-s-go">Haftalık tablo ›</span></button>`; }
+    wkStrip=`<button class="wk-strip" type="button" data-pv="hafta"><span class="wk-s-h">🏆 Bu haftanın ilk 3'ü sezon puanı kazanır <b>+10 / +7 / +5</b></span><span class="wk-s-l">${!on?"9 Kasım haftasından itibaren":top.length?top.map(r=>`${medal[r.place]} ${esc(S.players[r.u]?.club||pname(r.u))} <small>${r.p}</small>`).join(" · "):"Henüz puan yok"}</span><span class="wk-s-go">Haftalık tablo ›</span></button>`;
+    // 1.40.4 (beta): sezon görünümünde de Bu hafta'daki ödül kartı, şu anki ilk üçle
+    if(BETA.on) wkStrip=`<button type="button" class="wk-ban wk-ban-btn${on?"":" off"}" data-pv="hafta"><div class="wk-ban-h">🏆 Haftanın ilk 3'ü sezon puanı kazanır<span class="wk-s-go">Haftalık tablo ›</span></div>
+      <div class="wk-ban-p"><span><b>🥇 +10</b><small>1.</small></span><span><b>🥈 +7</b><small>2.</small></span><span><b>🥉 +5</b><small>3.</small></span></div>
+      <div class="wk-ban-s">${!on?"Asıl ligle, 9 Kasım haftasından itibaren verilir.":top.length?`Şu an ödül sırasında: ${top.map(r=>`${medal[r.place]} ${esc(S.players[r.u]?.club||pname(r.u))} <b>${r.p}</b>`).join(" · ")}`:"Bu hafta henüz puan yok."}</div></button>`; }
   let html = pod + rivalBox + pvBar + wkStrip + (S.pv==="sezon" ? seasonTbl : weekTbl);
   // rozet sıralaması (ana puandan ayrı)
   const bb=badgeBoard();
@@ -3387,24 +3392,30 @@ function badgesFull(u){
   const tc={}; for(const b of got) tc[b.tier]=(tc[b.tier]||0)+1;
   let html=`<div class="bsum"><div class="bsum-p"><b>${pts}</b><small>rozet puanı</small></div><div class="bsum-r"><b>${got.length}<small>/${all.length}</small></b><small>rozet</small></div><div class="bsum-r"><b>${rank||"–"}.</b><small>rozet sırası</small></div></div>
     <div class="btiers">${Object.entries(BTIER).map(([k,v])=>`<span class="bt-chip t-${k}">${v.n} <b>${tc[k]||0}</b><small>+${v.p}</small></span>`).join("")}</div>`;
+  // 1.40.4 (beta): kazanılan ya da ilerlenen rozetler kendi kategorisinden çıkar, en üstte tek listede durur (tekrar etmez)
+  const lvOf=id=>all.filter(b=>b.fam===id);
+  const score=f=>{ const lv=lvOf(f[0]), have=lv.filter(b=>b.n).length, nx=lv.find(b=>!b.n), v=lv[0]?.val||0, prev=have?lv[have-1].t:0;
+    return have*1000 + (nx ? Math.max(0,Math.min(999,(v-prev)/((nx.t-prev)||1)*999)) : 999); };
+  const started=f=>{ const lv=lvOf(f[0]); return lv.some(b=>b.n) || (lv[0]?.val||0)>0; };
+  const card=([id,cat,fico,name,th])=>{
+    const lv=lvOf(id), have=lv.filter(b=>b.n), top=have[have.length-1], next=lv.find(b=>!b.n), v=lv[0].val;
+    const prev = top ? top.t : 0, pct = next ? Math.min(100, Math.max(0,(v-prev)/(next.t-prev)*100)) : 100;
+    if(cat==="takim" || cat==="oyuncu") return `<div data-bfam="${id}" data-cat="${cat}" class="bfam mini ${top?"on t-"+top.tier:"locked"}" title="${esc(lv[0].desc)}"><span class="bf-ico">${fico}</span><span class="bf-b"><b>${esc(name.replace(/ uzmanı$/,""))}</b><span class="bd-bar"><i style="width:${Math.min(100,v/lv[0].t*100)}%"></i></span><span class="bf-pr">${top?"✓ kazanıldı":`${v}/${lv[0].t}`}</span></span></div>`;
+    return `<div data-bfam="${id}" data-cat="${cat}" class="bfam ${top?"on t-"+top.tier:"locked"}"><span class="bf-ico">${fico}</span>
+      <span class="bf-b"><b>${esc(name)}</b>${top?`<em class="bf-lv t-${top.tier}">${th.length>1?`Seviye ${top.lvl}/${th.length} · `:""}${top.tier==="o"?"Özel rozet":BTIER[top.tier].n} · +${BTIER[top.tier].p}</em>`:`<em class="bf-lv">Kilitli · ${lv[0].tier==="o"?"Özel rozet":BTIER[lv[0].tier].n} +${BTIER[lv[0].tier].p}</em>`}
+      <small>${next?esc(next.desc):esc(lv[lv.length-1].desc)}</small>${!next?`<span class="bf-pr">✓ ${th.length>1?"Bütün seviyeler tamam":"Kazanıldı"}</span>`:""}
+      ${next?`<span class="bd-bar"><i style="width:${pct}%"></i></span><span class="bf-pr">${v}/${next.t}${own[next.id]?` · ligde ${own[next.id]} kişide var`:""}</span>`:""}
+      <span class="bf-dots">${lv.map(b=>`<i class="${b.n?"on t-"+b.tier:""}" title="${esc(b.name+" · "+BTIER[b.tier].n+" (+"+BTIER[b.tier].p+")")}"></i>`).join("")}</span></span></div>`; };
+  const moved = BETA.on ? new Set(BFAM.filter(started).map(f=>f[0])) : new Set();
+  if(BETA.on){ const top=BFAM.filter(f=>moved.has(f[0])).sort((x,y)=>score(y)-score(x));
+    html+=`<div class="sec-title" data-btop="1"><h2 style="font-size:19px">⭐ ${u===S.uid?"Kazandıkların ve ilerlediklerin":"Kazandıkları ve ilerledikleri"}</h2><span class="aside">${got.length} kazanıldı · ${top.length} rozette ilerleme</span></div>`
+      + (top.length ? `<div class="bfams" data-btop="1">${top.filter(f=>f[1]!=="takim"&&f[1]!=="oyuncu").map(card).join("")}</div>${top.some(f=>f[1]==="takim"||f[1]==="oyuncu")?`<div class="bfams mini" data-btop="1">${top.filter(f=>f[1]==="takim"||f[1]==="oyuncu").map(card).join("")}</div>`:""}`
+        : `<p class="muted bf-sub" data-btop="1">${u===S.uid?"Henüz hiçbir rozette ilerlemen yok. İlk rozetler birkaç gece içinde gelir.":"Henüz hiçbir rozette ilerlemesi yok."}</p>`); }
   for(const [cat,ico,cname] of BCATS){
-    let fams=BFAM.filter(f=>f[1]===cat); if(!fams.length) continue;
-    // 1.40.2 (beta): kazanılan ve ilerlenen rozetler kategorinin başında; önce kazanılan seviye sayısı, sonra sıradaki seviyeye yakınlık
-    if(BETA.on){ const sc=f=>{ const lv=all.filter(b=>b.fam===f[0]), have=lv.filter(b=>b.n).length, nx=lv.find(b=>!b.n), v=lv[0]?.val||0, prev=have?lv[have-1].t:0;
-        return have*1000 + (nx ? Math.max(0,Math.min(999,(v-prev)/((nx.t-prev)||1)*999)) : 999); };
-      fams=fams.map(f=>[f,sc(f)]).sort((x,y)=>y[1]-x[1]).map(x=>x[0]); }
-    const cards=fams.map(([id,,fico,name,th])=>{
-      const lv=all.filter(b=>b.fam===id), have=lv.filter(b=>b.n), top=have[have.length-1], next=lv.find(b=>!b.n), v=lv[0].val;
-      const prev = top ? top.t : 0, pct = next ? Math.min(100, Math.max(0,(v-prev)/(next.t-prev)*100)) : 100;
-      if(cat==="takim" || cat==="oyuncu") return `<div data-bfam="${id}" class="bfam mini ${top?"on t-"+top.tier:"locked"}" title="${esc(lv[0].desc)}"><span class="bf-ico">${fico}</span><span class="bf-b"><b>${esc(name.replace(/ uzmanı$/,""))}</b><span class="bd-bar"><i style="width:${Math.min(100,v/lv[0].t*100)}%"></i></span><span class="bf-pr">${top?"✓ kazanıldı":`${v}/${lv[0].t}`}</span></span></div>`;
-      return `<div data-bfam="${id}" class="bfam ${top?"on t-"+top.tier:"locked"}"><span class="bf-ico">${fico}</span>
-        <span class="bf-b"><b>${esc(name)}</b>${top?`<em class="bf-lv t-${top.tier}">${th.length>1?`Seviye ${top.lvl}/${th.length} · `:""}${top.tier==="o"?"Özel rozet":BTIER[top.tier].n} · +${BTIER[top.tier].p}</em>`:`<em class="bf-lv">Kilitli · ${lv[0].tier==="o"?"Özel rozet":BTIER[lv[0].tier].n} +${BTIER[lv[0].tier].p}</em>`}
-        <small>${next?esc(next.desc):esc(lv[lv.length-1].desc)}</small>${!next?`<span class="bf-pr">✓ ${th.length>1?"Bütün seviyeler tamam":"Kazanıldı"}</span>`:""}
-        ${next?`<span class="bd-bar"><i style="width:${pct}%"></i></span><span class="bf-pr">${v}/${next.t}${own[next.id]?` · ligde ${own[next.id]} kişide var`:""}</span>`:""}
-        <span class="bf-dots">${lv.map(b=>`<i class="${b.n?"on t-"+b.tier:""}" title="${esc(b.name+" · "+BTIER[b.tier].n+" (+"+BTIER[b.tier].p+")")}"></i>`).join("")}</span></span></div>`; }).join("");
+    const fams=BFAM.filter(f=>f[1]===cat && !moved.has(f[0])); if(!BFAM.some(f=>f[1]===cat)) continue;
     const cGot=all.filter(b=>b.cat===cat && b.n).length, cAll=all.filter(b=>b.cat===cat).length;
     const sub = cat==="takim" ? `<p class="muted bf-sub">Bir takımın maçlarında 10 kez kazananı doğru bil · Özel rozet +3</p>` : cat==="oyuncu" ? `<p class="muted bf-sub">Maçın en skorerini bu oyuncu olarak 3 kez doğru bil · Özel rozet +3</p>` : "";
-    html+=`<div class="sec-title"><h2 style="font-size:19px">${ico} ${cname}</h2><span class="aside">${cGot}/${cAll}</span></div>${sub}<div class="bfams${sub?" mini":""}">${cards}</div>`;
+    html+=`<div class="sec-title"><h2 style="font-size:19px">${ico} ${cname}</h2><span class="aside">${BETA.on?`${fams.length} rozet henüz başlamadı`:`${cGot}/${cAll}`}</span></div>${sub}<div class="bfams${sub?" mini":""}">${fams.length?fams.map(card).join(""):`<p class="muted bf-sub">Bu kategorinin bütün rozetleri yukarıda.</p>`}</div>`;
   }
   return html;
 }
@@ -5629,7 +5640,7 @@ if("serviceWorker" in navigator){ navigator.serviceWorker.getRegistrations?.().t
     S.statFor=S.uid;
     $("#foot").innerHTML=`Kazanan +1 (sürprizde +2 / +3) · Fark ±3 +1 (tam fark +2) · En skorer +1 · Banko 2 kat / -1 · Günün oyuncusu +3 · Gecenin sorusu +1 · Haftada 4 gece +2<br><button class="linkish ver" id="pgFoot" type="button">📖 Puanlama rehberi</button><br>Veriler ESPN'den alınır. Maç varken 30 saniyede bir yenilenir.<br><button class="linkish ver" id="verBtn" type="button">Sürüm ${VERSION} · Yenilikler</button> · <button class="linkish ver" id="repBtn" type="button">Sorun bildir</button> · <button class="linkish ver" id="langBtn" type="button">${LANG==="en"?"Türkçe":"English"}</button>`;
     $("#verBtn").onclick=()=>openNews(true); $("#repBtn").onclick=()=>openReport(); $("#langBtn").onclick=()=>setLang(LANG==="en"?"tr":"en");
-    if(betaAllowed()) betaBoot();
+    if(betaAllowed()) betaBoot(); else if(BETA_TESTERS.includes(S.uid)) setTimeout(betaInvite, 4000);
     route(); showDay(); Promise.resolve(refresh()).catch(()=>{}).finally(()=>dispatchEvent(new Event("app-ready")));
     if(S.onboard){ if(S.joinP) await S.joinP.catch(()=>{}); await loadPlayers().catch(()=>{}); allPlayers().catch(()=>{}).finally(()=>openOnboard(4)); }
     else checkRecovery();
@@ -5671,6 +5682,18 @@ const bPts = v => `<b class="b-pts ${v>0?"pos":v<0?"neg":""}">${v>0?"+":""}${v}<
 const BX2 = items => `<div class="b-bx">${items.map(([l,v,s,warn,act])=>`<${act?"button":"div"} ${act?`data-bx="${act}"`:""} class="${warn?"warn":""}"><small>${l}</small><b>${v}</b>${s?`<i>${s}</i>`:""}</${act?"button":"div"}>`).join("")}</div>`;
 
 function betaAllowed(){ return lsGet("beta")==="1"; }
+// 1.40.4: kapalı betayı deneyen oyuncular (yönetici dışında). Yalnızca bu hesaplar eski görünümde "Yeni görünümü dene" kartını görür.
+const BETA_TESTERS = ["PPpe7UMqnHeLIHbFZabWRABWFOL2" /* Mustafa Eren */, "hHZvBcumlxSgNSu0s4ZyMgiQ1vh2" /* Aral */];
+function betaInvite(){
+  if(BETA.on || betaAllowed() || !BETA_TESTERS.includes(S.uid) || $("#betaInv")) return;
+  if(lsGet("betaInvLater")===S.today) return;
+  if(!$("#sheet").classList.contains("hide") || S.onboard){ setTimeout(betaInvite, 8000); return; }
+  document.body.insertAdjacentHTML("beforeend", `<div class="beta-inv" id="betaInv" role="dialog" aria-label="Yeni görünüm"><div class="bi-in"><b>✨ Yeni görünümü ilk sen dene</b>
+    <small>Sitenin yeni tasarımı hazırlanıyor ve şimdilik yalnızca sana açık. Tahminlerin, puanların ve her şey aynı kalır; istediğin an Daha fazla › Eski görünüm ile geri dönebilirsin. Gördüğün sorunları İstek / sorun'dan yazarsan çok iyi olur.</small>
+    <div class="bi-b"><button class="btn" type="button" id="betaInvNo">Sonra</button><button class="btn-primary" type="button" id="betaInvGo">Yeni görünüme geç</button></div></div></div>`);
+  $("#betaInvNo").onclick=()=>{ lsSet("betaInvLater", S.today); $("#betaInv").remove(); };
+  $("#betaInvGo").onclick=()=>{ lsSet("beta","1"); lsSet("bIntroSeen",""); location.hash="#bugece"; location.reload(); };
+}
 function betaBoot(){
   if(BETA.on) return; BETA.on=true; BETA.intro = lsGet("bIntroSeen") ? null : 0;
   const l=document.createElement("link"); l.rel="stylesheet"; l.href=`beta.css?v=${VERSION}`; document.head.appendChild(l);
@@ -6824,9 +6847,12 @@ function betaNearBadges(u){
 }
 function betaBzTag(){
   const box=$("#bzAll"); if(!box) return; let cat=null; const cats=BCATS.filter(([c])=>BFAM.some(f=>f[1]===c)).map(x=>x[0]); let i=-1;
-  for(const el of box.children){ if(el.classList.contains("sec-title")){ i++; cat=cats[i]; } if(cat) el.dataset.bzc=cat; }
+  for(const el of box.children){ if(el.dataset.btop) continue; if(el.classList.contains("sec-title")){ i++; cat=cats[i]; } if(cat) el.dataset.bzc=cat; }
 }
-function betaBzFilter(){ const c=BETA.bzCat||""; $$("#bzAll>[data-bzc]").forEach(el=>el.classList.toggle("hide", !!c && el.dataset.bzc!==c)); }
+function betaBzFilter(){ const c=BETA.bzCat||"";
+  $$("#bzAll>[data-bzc]").forEach(el=>el.classList.toggle("hide", !!c && el.dataset.bzc!==c));
+  $$("#bzAll>[data-btop] [data-cat]").forEach(el=>el.classList.toggle("hide", !!c && el.dataset.cat!==c));
+  $$("#bzAll>.bfams[data-btop]").forEach(g=>g.classList.toggle("hide", !g.querySelector("[data-cat]:not(.hide)"))); }
 function betaBzDetail(fam){
   const u=BETA.bzU||S.uid, f=BFAM.find(x=>x[0]===fam); if(!f) return; const lv=betaBzLevels(u,fam); if(!lv.length) return;
   const own={}; for(const x of S.order) for(const b of badgesOf(x)) if(b.n) own[b.id]=(own[b.id]||0)+1;

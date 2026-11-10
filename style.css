@@ -2375,3 +2375,10 @@ body.bars-hidden .chat-fab{transform:none}
 /* 1.30.8: uzun vade oyuncu listesi — sayı kutuları her zaman alt alta (sayı / etiket), telefonda daha dar */
 .lt-big span{display:block}
 @media (max-width:420px){ .lt-pl{gap:8px} .lt-big{grid-template-columns:repeat(3,34px);gap:0} .lt-big span{font-size:17px} .lt-big small{font-size:9px} .lt-sm{font-size:11px} }
+
+/* 1.40.4: kapalı beta daveti (yalnızca seçili oyuncular) */
+.beta-inv{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--nav-h,64px) + env(safe-area-inset-bottom) + 12px);z-index:60;width:min(560px,calc(100% - 20px))}
+.beta-inv .bi-in{display:flex;flex-direction:column;gap:6px;padding:14px;border-radius:18px;background:var(--panel);border:1.5px solid var(--amber);box-shadow:0 12px 30px rgba(0,0,0,.35)}
+.beta-inv b{font-size:16px}.beta-inv small{color:var(--muted);font-size:13px;line-height:1.45}
+.beta-inv .bi-b{display:flex;gap:8px;margin-top:6px}.beta-inv .bi-b>*{flex:1;margin:0}
+.beta-inv .btn-primary{background:var(--amber);color:#10161e;padding:11px;font-size:15px}
