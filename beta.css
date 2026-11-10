@@ -819,3 +819,4 @@ body.beta .ell{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-wid
 .tr-r.out{background:var(--amber-soft);opacity:.9}.tr-r.out .m b{text-decoration:line-through;text-decoration-color:color-mix(in srgb,var(--ink) 40%,transparent)}
 .tr-r.in{background:color-mix(in srgb,var(--win) 10%,var(--panel))}
 @media (max-width:380px){ .tr-tg{grid-template-columns:repeat(4,minmax(0,1fr))} }
+.tr-tab .d.idle{background:var(--muted)}

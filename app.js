@@ -47,12 +47,13 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.42.3";
+const VERSION = "1.42.4";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.42.4", d:"10 Kasım 2026", quiet:true, items:["Takas makinesinde daha açık uyarılar ve takası paylaşma."]},
   {v:"1.42.3", d:"10 Kasım 2026", quiet:true, items:["Takas makinesi yenilendi: takım sekmeleri, maaş çubuğu, dokun-gönder. Eski ve yeni görünüm arasında geçiş telefonda daha sağlam."]},
   {v:"1.42.2", d:"10 Kasım 2026", quiet:true, items:["Takas makinesi iki taraflı yeni düzende: her tarafa takım seç, oyuncu ekle ya da çıkar."]},
   {v:"1.42.1", d:"10 Kasım 2026", quiet:true, items:["Takas makinesinde yanlış kadro sayısı uyarısı düzeltildi."]},
@@ -4240,6 +4241,7 @@ function route(){
   const t=(location.hash||"#tahmin").slice(1);
   if(t==="istatistik"){ history.replaceState(null,"","#tahmin"); setTimeout(()=>S.uid && openProf(S.statFor||S.uid,"ist"),50); }
   S.tab=[...(BETA.on?["bugece","profil","rozetler","ayarlar","gece","maclar","lb","takas"]:[]),"tahmin","sonuclar","ayrisma","puan","uzun","takim","nba"].includes(t)?t:(BETA.on?"bugece":"tahmin");
+  if(S.tab!==t && t && !location.hash.startsWith("#tahmin")) try{ history.replaceState(history.state, "", location.pathname+location.search+"#"+S.tab); }catch(e){}
   render.nbaAt=0; render.tkAt=0; S.boardOpen=null;
   $$("[data-view]").forEach(v=>v.classList.toggle("hide", v.id!=="view-"+S.tab));
   $$(".nav a").forEach(a=>a.dataset.tab===S.tab?a.setAttribute("aria-current","page"):a.removeAttribute("aria-current"));
@@ -7078,10 +7080,10 @@ function trCheck(){
     const outS=go.reduce((s,p)=>s+p.outV,0), inS=come.reduce((s,p)=>s+p.inV,0), after=pay-go.reduce((s,p)=>s+p.sal,0)+come.reduce((s,p)=>s+p.sal,0);
     const nStd=R.filter(p=>!p.two).length-go.filter(p=>!p.two).length+come.filter(p=>!p.two).length;
     let ok=true, why="", max=null;
-    if(!go.length && !come.length){ ok=false; why="Bu takım takasa katılmıyor"; }
+    if(!go.length && !come.length){ ok=false; why="Henüz takasa katılmadı: bu takımdan bir oyuncu gönder ya da bu takıma oyuncu yolla"; }
     else if(after<=TR_CAP.cap+1e5){ why="Takastan sonra cap altında kalıyor; maaş eşleşmesi gerekmez"; }
-    else if(after>=TR_CAP.a2){ max=outS; if(go.length>1 && come.length) { ok=false; why="2. apron üstünde maaş birleştirilemez (her oyuncu yalnızca kendi maaşı kadar getirir)"; } else if(inS>outS){ ok=false; why=`2. apron üstünde gelen maaş gidenden fazla olamaz (en fazla ${trM(outS)})`; } else why="2. apron üstünde %100 eşleşme sağlanıyor"; }
-    else if(after>=TR_CAP.a1){ max=outS; if(inS>outS){ ok=false; why=`1. apron üstünde gelen maaş gidenden fazla olamaz (en fazla ${trM(outS)})`; } else why="1. apron üstünde %100 eşleşme sağlanıyor"; }
+    else if(after>=TR_CAP.a2){ max=outS; if(go.length>1 && come.length) { ok=false; why="Takastan sonra 2. apronu aşıyor: bu durumda birden çok oyuncunun maaşı birleştirilemez, her oyuncu en fazla kendi maaşı kadar getirir"; } else if(inS>outS){ ok=false; why=outS?`Takastan sonra 2. apronu aşıyor: gelen maaş gidenden fazla olamaz (en fazla ${trM(outS)}, şu an ${trM(inS)})`:`Takastan sonra 2. apronu aşıyor: karşılığında en az ${trM(inS)} maaş göndermesi gerekir`; } else why="2. apron üstünde ama gelen maaş gidenden fazla değil"; }
+    else if(after>=TR_CAP.a1){ max=outS; if(inS>outS){ ok=false; why=outS?`Takastan sonra 1. apronu aşıyor: gelen maaş gidenden fazla olamaz (en fazla ${trM(outS)}, şu an ${trM(inS)})`:`Takastan sonra 1. apronu aşıyor: karşılığında en az ${trM(inS)} maaş göndermesi gerekir`; } else why="1. apron üstünde ama gelen maaş gidenden fazla değil"; }
     else { const room=Math.max(0, TR_CAP.cap-pay); max=Math.max(outS<=TR_CAP.t1?outS*2+2.5e5:outS<=TR_CAP.t2?outS+TR_CAP.t1:outS*1.25+2.5e5, room+outS+1e5);
       if(inS>max){ ok=false; why=`Gelen maaş en fazla ${trM(max)} olabilir (şu an ${trM(inS)})`; } else why=`Gelen maaş sınırın içinde (en fazla ${trM(max)})`; }
     // ESPN kadrosunda bazı oyuncuların sözleşmesi görünmüyor; sayı yalnızca takas kadroyu büyütüp 15'i aşıyorsa uyarır
@@ -7110,7 +7112,7 @@ async function betaTrade(){
   const C=trCheck(), a=T.teams[T.view], o=C.out[a], R=T.ros[a]||[];
   const pts=id=>{ const p=S.pstats?.[id]; return p?.gp ? (p.pts/p.gp) : null; }, f1=v=>v.toFixed(1).replace(".",",");
   // üst: takım sekmeleri
-  const tabs=`<div class="tr-tabs">${T.teams.map((b,i)=>{ const ob=C.out[b]; return `<button type="button" class="tr-tab ${i===T.view?"on":""} ${C.any?(ob.ok?"ok":"bad"):""}" data-trview="${i}">${bLogo({abbr:b},22)}<b>${escA(b)}</b>${C.any?`<i class="d">${ob.ok?"✓":"✗"}</i>`:""}</button>`; }).join("")}${T.teams.length<3?`<button type="button" class="tr-tab add" data-tr3 aria-label="Üçüncü takım ekle">＋</button>`:""}</div>`;
+  const tabs=`<div class="tr-tabs">${T.teams.map((b,i)=>{ const ob=C.out[b]; return `<button type="button" class="tr-tab ${i===T.view?"on":""} ${C.any?(ob.ok?"ok":"bad"):""}" data-trview="${i}">${bLogo({abbr:b},22)}<b>${escA(b)}</b>${C.any?(ob.go.length||ob.come.length?`<i class="d">${ob.ok?"✓":"✗"}</i>`:`<i class="d idle">…</i>`):""}</button>`; }).join("")}${T.teams.length<3?`<button type="button" class="tr-tab add" data-tr3 aria-label="Üçüncü takım ekle">＋</button>`:""}</div>`;
   // karar
   const bad=T.teams.filter(b=>!C.out[b].ok);
   const verdict = !C.any ? `<div class="tr-ban idle">👆 <span><b>Bir oyuncuya dokun</b><small>Dokunduğun oyuncu karşı takıma gider. Karşı takımın sekmesine geçip oradan da oyuncu ekle.</small></span></div>`
@@ -7122,7 +7124,7 @@ async function betaTrade(){
   const head=`<div class="b-gr tr-hd" style="--tc:${tcol(a)}"><div class="t">${bLogo({abbr:a},38)}<span class="m"><b>${esc(nm(a))}</b><small>Maaş toplamı ${trM(o.pay)}${o.after!==o.pay?` → <b class="${o.after>o.pay?"up":"dn"}">${trM(o.after)}</b>`:""}</small></span><span class="tr-st ${st[1]}">${st[0]}</span></div>${bar}
     <div class="tr-io"><span><small>Gönderir</small><b>${o.go.length} oyuncu · ${trM(o.outS)}</b></span><span><small>Alır</small><b>${o.come.length} oyuncu · ${trM(o.inS)}</b></span></div>
     ${C.any?`<p class="trs-why ${o.ok?"":"err"}">${o.ok?"✓":"✗"} ${esc(o.why)}</p>${o.roster?`<p class="trs-why warn">${esc(o.roster)}</p>`:""}`:""}
-    ${T.teams.length>2||T.view>0?`<button type="button" class="linkish" data-trdrop="${T.slots.indexOf(a)}">${esc(short(a))} takasdan çıksın</button>`:""}</div>`;
+    ${T.teams.length>2||T.view>0?`<button type="button" class="linkish" data-trdrop="${T.slots.indexOf(a)}">${esc(short(a))} takastan çıksın</button>`:""}</div>`;
   const row=(p,kind)=>{ const pp=pts(p.id), to=T.sel[p.id];
     return `<button type="button" class="tr-r ${kind}" data-trp2="${p.id}" data-tra="${p.t}" ${p.two&&kind==="own"?"disabled":""}><img class="f" src="${FACE(p.id)}" alt="" loading="lazy">
       <span class="m"><b>${esc(p.n)}</b><small>${kind==="in"?`${escA(p.t)}'den geliyor · `:""}${esc(p.pos)}${pp!=null?` · ${f1(pp)} sayı`:""}${p.inj?` · ${p.inj==="Out"?"Oynamıyor":"Belirsiz"}`:""}</small></span>
@@ -7132,6 +7134,7 @@ async function betaTrade(){
     <div class="b-lb"><span>KADRO</span><span>dokun: ${T.teams.length>2?"kime gideceğini seç":esc(short(T.teams.find(b=>b!==a)))+"'a gönder"}</span></div>
     <div class="b-gr tr-ros">${R.map(p=>row(p, T.sel[p.id]?"out":"own")).join("")}</div>`;
   box.innerHTML=`<div class="b-wrap">${tabs}${verdict}${head}${list}
+    ${C.any?`<button type="button" class="btn b-wide primary-ish" data-trshare>📤 Takası paylaş</button>`:""}
     <div class="b-two"><button type="button" class="btn" data-trreset>Seçimleri temizle</button><button type="button" class="btn" data-trnew>Yeni takas</button></div>
     <details class="b-gr bl-how"><summary>Kurallar nasıl hesaplanıyor?</summary><ul>
       <li>Sınırlar (2026-27): cap ${trM(TR_CAP.cap)}, lüks vergi ${trM(TR_CAP.tax)}, 1. apron ${trM(TR_CAP.a1)}, 2. apron ${trM(TR_CAP.a2)}.</li>
@@ -7150,6 +7153,9 @@ document.addEventListener("click", async e=>{
     for(const [id,to] of Object.entries(T.sel)) if(to===a || (T.ros[a]||[]).some(p=>p.id===id) || !T.slots.includes(to)) delete T.sel[id];
     T.view=0; return betaTrade(); }
   if(e.target.closest("[data-trreset]")){ T.sel={}; return betaTrade(); }
+  if(e.target.closest("[data-trshare]")){ const C=trCheck(), nm=a=>(ALLP?.teams.find(t=>t.a===a)?.n||a).split(" ").slice(-1)[0];
+    const txt=`🔁 Takas önerim\n${T.teams.map(a=>{ const o=C.out[a]; return `${nm(a)} alır: ${o.come.map(p=>p.n).join(", ")||"–"} (${trM(o.inS)})`; }).join("\n")}\n${C.valid?"✓ 2026-27 maaş kurallarına uyuyor":"✗ Maaş kurallarına uymuyor"} · NBA Tahmin takas makinesi`;
+    try{ if(navigator.share){ await navigator.share({text:txt}); return; } await navigator.clipboard.writeText(txt); toast("Takas metni kopyalandı; sohbete ya da istediğin yere yapıştırabilirsin."); }catch(x){ if(x?.name!=="AbortError") toast("Paylaşılamadı."); } return; }
   if(e.target.closest("[data-trnew]")){ T.sel={}; T.slots=[]; T.view=0; return betaTrade(); }
   const dest=e.target.closest("[data-trdest]"); if(dest){ closeSheet(); return trSendTo(dest.dataset.id, dest.dataset.own, dest.dataset.trdest); }
   const p=e.target.closest("[data-trp2]"); if(p){ const id=p.dataset.trp2, own=p.dataset.tra, others=T.teams.filter(b=>b!==own);
