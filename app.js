@@ -46,12 +46,13 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.40.5";
+const VERSION = "1.40.6";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.40.6", d:"10 Kasım 2026", quiet:true, items:["Siteye 20 dakikadan uzun aradan sonra girilince hep ana sayfa açılıyor."]},
   {v:"1.40.5", d:"10 Kasım 2026", quiet:true, items:["Yönetici denemesi için hazırlık; oyunculara görünen bir değişiklik yok."]},
   {v:"1.40.4", d:"10 Kasım 2026", quiet:true, items:["Yeni sürüm çıkınca site kendiliğinden ve daha güvenilir biçimde güncelleniyor."]},
   {v:"1.40.3", d:"10 Kasım 2026", quiet:true, items:["Yönetici denemesi için hazırlık; oyunculara görünen bir değişiklik yok."]},
@@ -5641,6 +5642,7 @@ if("serviceWorker" in navigator){ navigator.serviceWorker.getRegistrations?.().t
     $("#foot").innerHTML=`Kazanan +1 (sürprizde +2 / +3) · Fark ±3 +1 (tam fark +2) · En skorer +1 · Banko 2 kat / -1 · Günün oyuncusu +3 · Gecenin sorusu +1 · Haftada 4 gece +2<br><button class="linkish ver" id="pgFoot" type="button">📖 Puanlama rehberi</button><br>Veriler ESPN'den alınır. Maç varken 30 saniyede bir yenilenir.<br><button class="linkish ver" id="verBtn" type="button">Sürüm ${VERSION} · Yenilikler</button> · <button class="linkish ver" id="repBtn" type="button">Sorun bildir</button> · <button class="linkish ver" id="langBtn" type="button">${LANG==="en"?"Türkçe":"English"}</button>`;
     $("#verBtn").onclick=()=>openNews(true); $("#repBtn").onclick=()=>openReport(); $("#langBtn").onclick=()=>setLang(LANG==="en"?"tr":"en");
     if(betaAllowed()) betaBoot(); else if(BETA_TESTERS.includes(S.uid)) setTimeout(betaInvite, 4000);
+    idleHome(true);
     route(); showDay(); Promise.resolve(refresh()).catch(()=>{}).finally(()=>dispatchEvent(new Event("app-ready")));
     if(S.onboard){ if(S.joinP) await S.joinP.catch(()=>{}); await loadPlayers().catch(()=>{}); allPlayers().catch(()=>{}).finally(()=>openOnboard(4)); }
     else checkRecovery();
@@ -6918,3 +6920,21 @@ function betaNews(all){
   setInterval(check, 3*60e3);
   document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) check(); });
 })();
+
+/* ====================================================== 20 dakika sonra ana sayfa (1.40.6) */
+// Siteye 20 dakika içinde geri dönülürse kalınan yer açılır; daha uzun aradan sonra hep Bu gece (eski görünümde Tahmin) açılır.
+const IDLE_MS = 20*60e3;
+const markIdleSeen = () => { if(S.uid) lsSet("lastSeen", String(Date.now())); };
+function idleHome(boot){
+  const last=+(lsGet("lastSeen")||0); markIdleSeen();
+  if(!last || Date.now()-last < IDLE_MS) return false;
+  const home = BETA.on ? "#bugece" : "#tahmin";
+  if(location.hash===home) return false;
+  if(boot){ history.replaceState(null, "", location.pathname+location.search+home); return true; }
+  // arka planda bekleyen sekmeye dönüldüyse: açık pencere, sohbet ya da tahmin destesi yoksa ana sayfaya geç
+  if(!$("#sheet").classList.contains("hide") || S.chatOpen || BETA.deck || BETA.plus) return false;
+  location.hash = home; scrollTo(0,0); return true;
+}
+setInterval(()=>{ if(!document.hidden) markIdleSeen(); }, 60e3);
+document.addEventListener("visibilitychange", ()=>{ if(document.hidden) markIdleSeen(); else if(S.uid) idleHome(false); });
+addEventListener("pagehide", markIdleSeen);
