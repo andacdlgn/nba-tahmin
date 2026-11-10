@@ -745,3 +745,34 @@ body.beta .ell{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-wid
 .tr-row .m{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}.tr-row .m small{font-size:12px;color:var(--muted);line-height:1.35}
 .tr-row .m small.err{color:var(--lose);font-weight:700}.tr-row .m small.warn{color:var(--amber-ink)}
 .tr-row .r{display:flex;flex-direction:column;align-items:flex-end;flex:none;font-size:12px}.tr-row .r small{color:var(--muted)}.tr-row .r .ok{color:var(--win)}.tr-row .r .no{color:var(--lose)}
+
+/* 1.42.2: takas makinesi iki taraflı */
+.tr-v2{padding:12px 14px;display:flex;flex-direction:column;gap:2px}
+.tr-v2 b{font-size:17px}.tr-v2.ok{border-color:color-mix(in srgb,var(--win) 55%,var(--line))}.tr-v2.ok b{color:var(--win)}
+.tr-v2.bad{border-color:color-mix(in srgb,var(--lose) 55%,var(--line))}.tr-v2.bad b{color:var(--lose)}.tr-v2 small{color:var(--muted);font-size:12.5px}
+.trg{display:grid;grid-template-columns:minmax(0,1fr) 22px minmax(0,1fr);gap:6px;align-items:start}
+.trg.three{grid-template-columns:1fr;gap:10px}
+.trg-ic{align-self:start;margin-top:34px;color:var(--muted);display:grid;place-items:center}
+.trs{display:flex;flex-direction:column;gap:6px;padding:10px;border-radius:18px;background:var(--panel);border:1px solid var(--line);min-width:0}
+.trs.ok{border-color:color-mix(in srgb,var(--win) 45%,var(--line))}.trs.bad{border-color:color-mix(in srgb,var(--lose) 45%,var(--line))}
+.trs-h{display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 4px 10px;border-radius:14px;border:0;font:inherit;color:var(--ink);cursor:pointer;text-align:center;
+  background:linear-gradient(170deg,color-mix(in srgb,var(--tc) 30%,var(--panel-2)),var(--panel-2))}
+.trs-h b{font-size:16px}.trs-h small{color:var(--muted);font-size:11.5px}
+.trs-h .tr-st{margin-top:2px}
+.trs.empty{border-style:dashed;align-items:center}
+.trs-pick{display:flex;flex-direction:column;align-items:center;gap:4px;width:100%;padding:22px 6px;border:0;background:none;color:var(--ink);font:inherit;cursor:pointer}
+.trs-pick .pl{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;font-size:22px;background:var(--amber);color:#10161e;font-weight:800}
+.trs-pick small{color:var(--muted);font-size:12px}
+.trs-lb{display:flex;justify-content:space-between;font-size:11px;letter-spacing:.08em;font-weight:800;color:var(--muted);margin-top:4px}
+.trs-lb span{letter-spacing:0;color:var(--ink)}
+.trc{display:flex;align-items:center;gap:6px;padding:7px 8px;border-radius:12px;background:var(--amber-soft);border:1px solid color-mix(in srgb,var(--amber) 40%,var(--line))}
+.trc.in{background:var(--panel-2);border-color:var(--line)}
+.trc .m{flex:1;min-width:0;display:flex;flex-direction:column}.trc .m b{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.trc .m small{color:var(--muted);font-size:11px}
+.trc-x{width:26px;height:26px;border-radius:50%;border:0;background:var(--panel);color:var(--ink);display:grid;place-items:center;cursor:pointer;flex:none}
+.trc-to{border:0;border-radius:999px;padding:3px 7px;font-size:11px;font-weight:800;background:var(--amber);color:#10161e;cursor:pointer;flex:none}
+.trs-add{border:1.5px dashed var(--line);background:none;color:var(--amber-ink);font:inherit;font-weight:800;font-size:13px;border-radius:12px;min-height:38px;cursor:pointer}
+.trs-none{margin:0;font-size:12px;color:var(--muted)}
+.trs-why{margin:4px 0 0;font-size:12px;line-height:1.35;color:var(--win)}.trs-why.err{color:var(--lose);font-weight:700}.trs-why.warn{color:var(--amber-ink)}
+#trList{max-height:58vh;overflow-y:auto;margin-top:8px}
+#trList .ck{width:22px;height:22px;border-radius:50%;border:1.5px solid var(--line);display:grid;place-items:center;font-size:12px;font-weight:800;flex:none}
+#trList .tr-p.on .ck{background:var(--amber);border-color:var(--amber);color:#10161e}
