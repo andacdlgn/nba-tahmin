@@ -45,12 +45,13 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.30.7";
+const VERSION = "1.30.8";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.30.8", d:"10 Kasım 2026", items:["Uzun vade oyuncu seçimi: telefonda sayı, ribaund ve asist sütunları artık üst üste binmiyor."]},
   {v:"1.30.7", d:"9 Kasım 2026", items:["Günün tahminleri: birinin adına dokununca isim şeridi artık en başa dönmüyor, seçilen kişi ortaya kayıyor. ‹ › düğmeleriyle ya da listeyi sağa-sola kaydırarak sıradaki oyuncuya geçebilirsin."]},
   {v:"1.30.6", d:"8 Kasım 2026", items:["Telefonda: canlı ve biten maç kartında skor artık \"Ev sahibi / Deplasman\" yazısıyla çakışmıyor; Sıralama sayfası (kürsü, hafta şeridi, puan tablosu) daha küçük ve derli toplu."]},
   {v:"1.30.5", d:"8 Kasım 2026", items:["En skorer düzeltmesinin ikinci adımı: biten maçta ESPN \"bitti\" demeden alınmış veri hiç gösterilmiyor; puan hesaplayan iş de kutu skoru takım skoruyla tutmadan en skoreri kaydetmiyor."]},
@@ -4021,7 +4022,7 @@ function bindLTPicker(){
       const sm = st ? [def ? `${f1(st.pts)} sayı · ${f1(st.ast)} asist` : `${f1(st.stl)} top çalma · ${f1(st.blk)} blok`, pct(st.fg)&&`${pct(st.fg)} saha içi`, pct(st.tp)&&`${pct(st.tp)} üçlük`, `${st.gp} maç (${st.lab})`].filter(Boolean).join(" · ") : "Bu sezon maçı yok";
       return `<button class="plr lt-pl" data-ltp="${p.id}" data-ltn="${esc(p.n)}"><img src="${FACE(p.id)}" alt="" loading="lazy">
         <span class="pi"><b>${esc(p.n)}</b><small>${esc(p.t)}${tw.w+tw.l?` · <span class="lt-wl">takım ${tw.w}-${tw.l}</span>`:""}</small><small class="lt-sm">${sm}</small>${injTxt(p.id)}</span>
-        <span class="lt-big">${big.map(([l,v],x)=>`<span class="${x===0?"lead":""}">${f1(v)}<small>${l}</small></span>`).join("") || "<span>–</span>"}</span></button>`; }).join("") || `<p class="muted">Oyuncu bulunamadı.</p>`; };
+        <span class="lt-big">${big.map(([l,v],x)=>`<span class="${x===0?"lt-lead":""}">${f1(v)}<small>${l}</small></span>`).join("") || "<span>–</span>"}</span></button>`; }).join("") || `<p class="muted">Oyuncu bulunamadı.</p>`; };
   $("#ltSearch").oninput=paint; $("#ltList").onclick=e=>{ const b=e.target.closest("[data-ltp]"); if(b) choose(b.dataset.ltp, b.dataset.ltn); };
   paint(); $("#ltSearch").focus(); if(!S.inj) loadInj().then(()=>{ if($("#ltList")) paint(); });
 }
