@@ -783,6 +783,75 @@ def save_all_players():
     return save("allplayers.json", {"teams": tl, "players": out})
 
 
+BBR = {"BKN": "BRK", "CHA": "CHO", "GS": "GSW", "NO": "NOP", "NY": "NYK", "PHX": "PHO", "SA": "SAS", "UTAH": "UTA", "WSH": "WAS"}
+
+
+def _norm_name(n):
+    import unicodedata
+    n = unicodedata.normalize("NFKD", n).encode("ascii", "ignore").decode().lower()
+    return re.sub(r"[^a-z]", "", re.sub(r"\b(jr|sr|ii|iii|iv)\b\.?", "", n))
+
+
+def save_payroll(force=False):
+    """Takas makinesi için takım maaş toplamları (Basketball-Reference sözleşme sayfaları) -> data/payroll.json
+    {"at": tarih, "season": "2026-27", "t": {ESPN kısaltması: {"tot": toplam, "p": {normalize ad: maaş}}}}
+    ESPN kadrosunda yeni imzalanan oyuncuların maaşı çoğu zaman boş geliyor; toplam da ölü maaşı içermiyor. Günde bir kez yenilenir."""
+    old = load("payroll.json", {})
+    now = datetime.now(timezone.utc)
+    try:
+        if not force and old.get("at") and (now - datetime.fromisoformat(old["at"])).total_seconds() < 20 * 3600:
+            return False
+    except Exception:
+        pass
+    teams = get(f"{ESPN}/teams")["sports"][0]["leagues"][0]["teams"]
+    out, season = {}, ""
+    for t in teams:
+        a = t["team"]["abbreviation"]
+        url = f"https://www.basketball-reference.com/contracts/{BBR.get(a, a)}.html"
+        h = ""
+        for k in range(2):
+            try:
+                req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (nba-tahmin daily payroll)"})
+                with urllib.request.urlopen(req, timeout=30) as r:
+                    h = r.read().decode("utf-8", "ignore")
+                break
+            except urllib.error.HTTPError as e:
+                print("Maaş sayfası alınamadı:", a, e)
+                if e.code != 429:
+                    break
+                time.sleep(70)
+            except Exception as e:
+                print("Maaş sayfası alınamadı:", a, e)
+                break
+        if not h:
+            if a in old.get("t", {}):
+                out[a] = old["t"][a]   # alınamayan takımın dünkü maaşı kalır
+            time.sleep(6)
+            continue
+        i = h.find('id="contracts"')
+        tb = h[i:h.find("</table>", i)] if i >= 0 else ""
+        if not season:
+            m = re.search(r'data-stat="y1"[^>]*>(\d{4}-\d{2})<', tb)
+            season = m.group(1) if m else ""
+        ps, tot = {}, 0
+        for row in re.findall(r"<tr[^>]*>(.*?)</tr>", tb, re.S):
+            cells = dict((k, re.sub(r"<[^>]+>", "", v).strip()) for k, v in re.findall(r'<t[hd][^>]*data-stat="([^"]+)"[^>]*>(.*?)</t[hd]>', row, re.S))
+            nm, y1 = cells.get("player", ""), cells.get("y1", "")
+            if not nm or nm == "Player":
+                continue
+            v = int(re.sub(r"[^0-9]", "", y1) or 0)
+            if nm == "Team Totals":
+                tot = v
+            elif v:
+                ps[_norm_name(nm)] = v
+        if tot > 50e6 and ps:
+            out[a] = {"tot": tot, "p": ps}
+        time.sleep(6)   # Basketball-Reference dakikada 20 istekten fazlasını engelliyor
+    if len(out) < 25:
+        raise RuntimeError(f"yalnızca {len(out)} takımın maaşı geldi; eski liste korunuyor")
+    return save("payroll.json", {"at": now.isoformat(timespec="seconds"), "season": season, "t": out})
+
+
 def main(full=False):
     games = load("games.json", {})
     pstats = load("players.json", {"counted": [], "p": {}})
@@ -1079,6 +1148,10 @@ def main(full=False):
         changed.append(save_all_players())
     except Exception as e:  # kadro listesi olmasa da puanlar yazılsın
         print("Kadro listesi alınamadı:", e)
+    try:
+        changed.append(save_payroll())
+    except Exception as e:
+        print("Maaş listesi alınamadı:", e)
     print(f"{len(games)} maç, {len(players)} oyuncu. Değişen dosya: {sum(changed)}")
     return 0
 
