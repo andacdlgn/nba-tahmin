@@ -47,12 +47,13 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.41.1";
+const VERSION = "1.41.2";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.41.2", d:"10 Kasım 2026", quiet:true, items:["Düzeltme: bu sezon hiç oynamamış sakat oyuncularda geçen sezonun dakikaları görünüyordu."]},
   {v:"1.41.1", d:"10 Kasım 2026", quiet:true, items:["İngilizce dil seçeneği kaldırıldı; site yalnızca Türkçe."]},
   {v:"1.41.0", d:"10 Kasım 2026", items:["✨ Site yenilendi: Bu gece, Maçlar, Sıralama ve NBA sekmeleri; ortadaki + ile Gece özeti, Uzun vade, Rozetler, Sohbet, LetterBasket ve Ayarlar.","Tahmin yapmak artık maç maç ilerleyen bir deste: kazanan, fark ve skorer tek ekranda, maç önü bilgileri hemen üstte.","Tahminlerin, puanların ve profilin aynı kaldı. Eski görünüme Daha fazla › Eski görünüm ile dönebilir, Profil › Ayarlar'dan yeniye geri geçebilirsin."]},
   {v:"1.40.9", d:"10 Kasım 2026", quiet:true, items:["Sakat oyuncu listelerinde oyuncunun bu sezon maç başına kaç dakika oynadığı ve son maçındaki dakikası da yazıyor."]},
@@ -6788,7 +6789,7 @@ async function ftSaveScore(sc){ const mine=BETA.ftLb.rows.find(x=>x.uid===S.uid)
 const PK = {sort:"avg", hideOut:true};
 function pkLog(gl, opp, skipId){
   const nm=gl?.names||[], ip=nm.indexOf("points"), im=nm.indexOf("minutes");
-  const sts=gl?.seasonTypes||[], st=sts.find(t=>/regular/i.test(t.displayName||""))||sts[0];
+  const st=curSeasonOf(gl);
   const evs=(st?.categories||[]).flatMap(c=>c.events||[]).filter(e=>String(e.eventId)!==String(skipId));
   const pts=e=>+e.stats?.[ip]||0, mn=e=>+e.stats?.[im]||0;
   const l5=evs.slice(0,5), vs=evs.filter(e=>gl.events?.[e.eventId]?.opponent?.abbreviation===opp);
@@ -7022,7 +7023,7 @@ document.addEventListener("keydown", e=>{ if(e.key==="Enter" && e.target.id==="l
 async function fillInjMin(el){
   el.dataset.done="1"; const id=el.dataset.injmn;
   try{ const gl=await gamelogOf(id); const nm=gl.names||[], im=nm.indexOf("minutes"), ip=nm.indexOf("points");
-    const sts=gl.seasonTypes||[], st=sts.find(t=>/regular/i.test(t.displayName||""))||sts[0];
+    const st=curSeasonOf(gl);
     const evs=(st?.categories||[]).flatMap(c=>c.events||[]); if(!evs.length || im<0){ if(el.dataset.injfull) el.textContent="Bu sezon henüz oynamadı"; return; }
     const mins=evs.map(e=>+e.stats?.[im]||0), avg=mins.reduce((a,b)=>a+b,0)/mins.length, last=mins[0];
     const f1=v=>v.toFixed(1).replace(".",",");
@@ -7034,3 +7035,7 @@ async function fillInjMin(el){
 new MutationObserver(ms=>{ for(const m of ms) for(const a of m.addedNodes){ if(a.nodeType!==1) continue;
   const els = a.matches?.("[data-injmn]") ? [a] : a.querySelectorAll ? a.querySelectorAll("[data-injmn]:not([data-done])") : [];
   for(const el of els) if(!el.dataset.done) fillInjMin(el); } }).observe(document.body, {childList:true, subtree:true});
+
+// 1.41.2: ESPN maç kaydında bu sezon yoksa geçen sezonu verir; yalnızca içinde bulunulan sezonun (ör. 2026-27) normal sezonu alınır
+function curSeasonOf(gl){ const y=+S.today.slice(0,4), m=+S.today.slice(4,6), sy=m>=8?y:y-1, lab=`${sy}-${String((sy+1)%100).padStart(2,"0")}`;
+  return (gl?.seasonTypes||[]).find(t=>/regular/i.test(t.displayName||"") && (t.displayName||"").includes(lab)) || null; }
