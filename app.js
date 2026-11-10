@@ -46,12 +46,13 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.32.1";
+const VERSION = "1.32.2";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.32.2", d:"10 Kasım 2026", quiet:true, items:["Küçük düzeltme (yalnızca yönetici denemesi)."]},
   {v:"1.32.1", d:"10 Kasım 2026", quiet:true, items:["Küçük düzeltme (yalnızca yönetici denemesi)."]},
   {v:"1.32.0", d:"10 Kasım 2026", quiet:true, items:["Yönetici denemesi için hazırlık; oyunculara görünen bir değişiklik yok."]},
   {v:"1.31.1", d:"10 Kasım 2026", quiet:true, items:["Küçük düzeltme (yalnızca yönetici denemesi)."]},
@@ -5830,7 +5831,7 @@ function betaClick(e){
   const t=e.target.closest("[data-bptab],[data-brival],[data-bpu],[data-bhist],[data-bwr],[data-bth],[data-blang],[data-b],[data-p],[data-bx],[data-bdeck],[data-bbox],[data-binfo],[data-ft],#bStrip"); if(!t) return;
   const d=t.dataset;
   if(t.id==="bStrip") return betaFillMissing();
-  if(d.bptab){ BETA.prof.tab=d.bptab; BETA.pageKey=""; betaPage(); return; }
+  if(d.bptab){ (BETA.prof ||= {u:S.uid}).tab=d.bptab; BETA.pageKey=""; betaPage(); return; }
   if(d.bpu){ return betaOpenProf(d.bpu, d.bput||"ozet"); }
   if(d.bhist) return openHistory(d.bhist);
   if(d.bwr) return openWrapped(d.bwr);
@@ -5878,7 +5879,11 @@ function betaEnsurePages(){
 }
 function betaPage(){
   betaEnsurePages(); $("#view-"+S.tab)?.classList.remove("hide");
-  const u=betaProfU(), key=S.tab+"|"+u+"|"+(BETA.prof?.tab||"")+"|"+(S.tab==="profil"?"":"");
+  BETA.prof ||= {u:S.uid, tab:"ozet"};
+  const u=betaProfU(), ptab=BETA.prof.tab||"ozet";
+  // Özet ve Rozetler veri gelince yenilenir; Düzenle ve Ayarlar yazılırken bozulmasın diye yalnızca sayfaya girişte çizilir
+  const live = (S.tab==="profil" && ptab!=="duz") || S.tab==="rozetler" ? `${S.days[S.today]?.fsAt||0}|${Object.keys(S.arch.games||{}).length}|${ALLP?1:0}` : "";
+  const key=S.tab+"|"+u+"|"+ptab+"|"+live;
   if(S.tab==="profil") betaProfHead(u);
   if(BETA.pageKey===key) return;
   BETA.pageKey=key;
@@ -5890,16 +5895,17 @@ function betaPage(){
 }
 function betaProfHead(u){
   const box=$("#bpf"); if(!box) return;
+  if(!ALLP && !betaProfHead.w){ betaProfHead.w=1; allPlayers().then(()=>{ if(S.tab==="profil") betaProfHead(betaProfU()); }).catch(()=>{}); }
   if(!box.querySelector("#bpHead")) box.innerHTML=`<div id="bpHead"></div><div id="bpBody"></div>`;
   const me=u===S.uid, p=S.players[u]||{}, st=profStats(u), inv=invitedBy(u);
   const fav=p.favTeam && ALLP?.teams.find(t=>t.a===p.favTeam);
   const daysIn=Math.max(1, Math.floor((Date.now()-(p.joined||Date.now()))/864e5)+1);
   const tab=BETA.prof?.tab||"ozet", tabs=[["ozet","Özet"],["ist","İstatistik"], ...(me?[["duz","Düzenle"]]:[])];
   const rival=S.players[S.uid]?.rival===u;
-  $("#bpHead").innerHTML = `<div class="b-gr bp-card" style="--pc:${col(u)}">
-      <div class="bp-top">${avatar(u,"lg")}<span class="bp-id"><b style="color:${col(u)}">${esc(pname(u))}</b>${p.club?`<small>${esc(p.club)}</small>`:""}${p.bio?`<i>“${esc(p.bio)}”</i>`:""}</span></div>
+  $("#bpHead").innerHTML = `<div class="b-gr bq-card" style="--pc:${col(u)}">
+      <div class="bq-top">${avatar(u,"lg")}<span class="bq-id"><b style="color:${col(u)}">${esc(pname(u))}</b>${p.club?`<small>${esc(p.club)}</small>`:""}${p.bio?`<i>“${esc(p.bio)}”</i>`:""}</span></div>
       <div class="b-bx"><div><small>Sıra</small><b>${st.rank}.</b><i>${S.order.length} kişi</i></div><div><small>Puan</small><b>${st.tot}</b><i>sezon</i></div><button type="button" data-bpu="${u}" data-bput="roz"><small>Rozet</small><b>${st.badges}</b><i>hepsini gör ›</i></button></div>
-      <p class="bp-meta">${p.favTeam?`<button class="linkish" type="button" data-tp="${safeId(p.favTeam)}">${esc(fav?.n||p.favTeam)}</button> taraftarı · `:""}Ligde ${daysIn}. günü${inv.length?` · Lige getirdiği: ${inv.map(x=>`<b style="color:${col(x)}">${esc(pname(x))}</b>`).join(", ")}`:""}</p>
+      <p class="bq-meta">${p.favTeam?`<button class="linkish" type="button" data-tp="${safeId(p.favTeam)}">${esc(fav?.n||p.favTeam)}</button> taraftarı · `:""}Ligde ${daysIn}. günü${inv.length?` · Lige getirdiği: ${inv.map(x=>`<b style="color:${col(x)}">${esc(pname(x))}</b>`).join(", ")}`:""}</p>
       ${!me?`<div class="b-two"><button class="btn" type="button" data-dmto="${u}">✉️ Mesaj gönder</button><button class="btn ${rival?"on":""}" type="button" data-brival="${u}">${rival?"✓ Rakibim":"Rakibim yap"}</button></div>`:""}
     </div>
     <div class="b-seg" style="grid-template-columns:repeat(${tabs.length},1fr)">${tabs.map(([k,l])=>`<button type="button" data-bptab="${k}" aria-pressed="${tab===k}">${l}</button>`).join("")}</div>`;
@@ -5922,14 +5928,14 @@ function betaProfBody(u){
   if(last.length){
     const mx=Math.max(3,...last.map(x=>x.p[u]?.pts??0));
     h += `<div class="b-lb"><span>SON ${last.length} GECE</span><span>Renkli: geceyi kazandığı</span></div>
-      <div class="b-gr bp-chart">${last.map(x=>{ const v=x.p[u]?.pts??0, w=x.w.st==="w"&&x.w.u===u;
+      <div class="b-gr bq-chart" style="grid-template-columns:repeat(${Math.max(5,last.length)},minmax(0,1fr))">${last.map(x=>{ const v=x.p[u]?.pts??0, w=x.w.st==="w"&&x.w.u===u;
         return `<span title="${dayNice(x.d,{day:"numeric",month:"short"})}: ${v} puan"><b class="tnum">${v}</b><i class="${w?"win":""}" style="height:${Math.max(4,Math.max(0,v)/mx*64)}px"></i><small>${dayNice(x.d,{day:"numeric"})}</small></span>`; }).join("")}</div>`;
   }
   const D=S.days[S.today];
   if(D?.games.length){
     const locked=D.games.some(started), canSee=locked||me;
     h += `<div class="b-lb"><span>BU GECENİN TAHMİNLERİ</span><span>${D.games.length} maç</span></div>`;
-    if(!canSee){ const k=D.progress?.[u]?.size||0; h += `<div class="b-gr bp-note">Seçimler ilk kilitte (${timeTR(D.games[0].lock)}) açılır. Şu an ${k}/${D.games.length} maça tahmin yaptı.</div>`; }
+    if(!canSee){ const k=D.progress?.[u]?.size||0; h += `<div class="b-gr bq-note">Seçimler ilk kilitte (${timeTR(D.games[0].lock)}) açılır. Şu an ${k}/${D.games.length} maça tahmin yaptı.</div>`; }
     else h += `<div class="b-gr">${D.games.map(g=>{ const pk=D.picks[g.id]?.[u], conf=D.daily[u]?.confGame===g.id;
       const teams=`<span class="teams">${[g.away,g.home].map(t=>`<span class="t">${bLogo(t)}<b>${esc(t.abbr)}</b></span>`).join("")}</span>`;
       let right;
@@ -5937,7 +5943,7 @@ function betaProfBody(u){
       else if(!pk) right=`<small class="muted">Tahmin yok</small>`;
       else { const r=started(g)?scorePick(g,pk,conf):null; const w=pk.winner===g.home.abbr?g.home:g.away;
         right=`<span class="pk">${bLogo(w,20)}<small class="muted ell">${esc(pk.margin)} · ${esc(bSur(pk.scorerName))}</small><b class="amb">${conf?"★":""}</b><span>${r?bPts(r.pts):""}</span></span>`; }
-      return `<div class="b-row bp-row">${teams}<span class="mid"><b class="cond tm">${timeTR(g.start)}</b></span><span class="right">${right}</span></div>`; }).join("")}</div>`;
+      return `<div class="b-row bq-row">${teams}<span class="mid"><b class="cond tm">${timeTR(g.start)}</b></span><span class="right">${right}</span></div>`; }).join("")}</div>`;
   }
   const tm={}; for(const x of st.recs) for(const t of [x.home.abbr,x.away.abbr]){ tm[t] ||= {n:0,ok:0}; tm[t].n++; if(x.r.w>0) tm[t].ok++; }
   const bestT=Object.entries(tm).filter(([,v])=>v.n>=2).sort((a,b)=>b[1].ok/b[1].n-a[1].ok/a[1].n||b[1].n-a[1].n).slice(0,3);
