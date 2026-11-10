@@ -46,12 +46,13 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.32.0";
+const VERSION = "1.32.1";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.32.1", d:"10 Kasım 2026", quiet:true, items:["Küçük düzeltme (yalnızca yönetici denemesi)."]},
   {v:"1.32.0", d:"10 Kasım 2026", quiet:true, items:["Yönetici denemesi için hazırlık; oyunculara görünen bir değişiklik yok."]},
   {v:"1.31.1", d:"10 Kasım 2026", quiet:true, items:["Küçük düzeltme (yalnızca yönetici denemesi)."]},
   {v:"1.31.0", d:"10 Kasım 2026", quiet:true, items:["Arka planda hazırlık: yönetici için deneme altyapısı. Oyunculara görünen bir değişiklik yok."]},
@@ -5621,6 +5622,7 @@ function betaBoot(){
   document.body.classList.add("beta");
   $("#app .wrap").insertAdjacentHTML("afterbegin", `<header class="b-head" id="bHead"></header>`);
   $("#view-tahmin").insertAdjacentHTML("beforebegin", `<section id="view-bugece" data-view class="hide"><div id="bg"></div></section>`);
+  betaEnsurePages();
   document.body.insertAdjacentHTML("beforeend", `<button class="b-strip hide" id="bStrip" type="button"></button><nav class="b-nav" id="bNav" aria-label="Sekmeler"></nav><div class="b-plus hide" id="bPlus" role="dialog" aria-modal="true" aria-label="Daha fazla"></div>`);
   document.addEventListener("click", betaClick);
   document.addEventListener("keydown", e=>{ if(e.key==="Escape" && BETA.plus){ betaPlus(false); } if(BETA.ft?.on && !BETA.ft.done && S.tab==="bugece" && (e.key===" "||e.key==="Enter") && document.activeElement?.dataset?.ft==="shoot"){ e.preventDefault(); ftShoot(); } });
@@ -5665,9 +5667,10 @@ function betaMissing(){
   const games=open.filter(g=>!D.picks[g.id]?.[S.uid]);
   const nightOpen=Date.now()<D.games[0].nightLock.getTime(), d=D.daily[S.uid]||{};
   const extras = nightOpen ? [!d.confGame&&["banko","Banko"], !d.dayPlayerId&&["dp","Günün oyuncusu"], !d.q&&["q","Gecenin sorusu"]].filter(Boolean) : [];
-  if(!games.length && !extras.length) return null;
+  const inj = injuryAlerts(D);
+  if(!games.length && !extras.length && !inj.length) return null;
   const lockAt = games.length ? new Date(Math.min(...games.map(g=>g.lock.getTime()))) : D.games[0].nightLock;
-  return {games, extras, lockAt};
+  return {games, extras, lockAt, inj};
 }
 function betaLeft(t){ const ms=t.getTime()-Date.now(); if(ms<=0) return "kilitlendi"; const h=Math.floor(ms/36e5), m=Math.floor(ms%36e5/6e4); return `${h?h+" sa ":""}${m} dk`; }
 const trJoin = a => a.length<2 ? (a[0]||"") : a.slice(0,-1).join(", ")+" ve "+a[a.length-1];
@@ -5676,16 +5679,18 @@ function betaStrip(){
   const el=$("#bStrip"); const M = $("#sheet").classList.contains("hide") ? betaMissing() : null;
   document.body.classList.toggle("b-hasstrip", !!M); el.classList.toggle("hide", !M); if(!M) return;
   const n=M.games.length, ex=M.extras.map(x=>({banko:"banko", dp:"günün oyuncusu", q:"gecenin sorusu"})[x[0]]);
-  const title = n ? `${n} maçın tahmini eksik` : `${trCap(trJoin(ex))} eksik`;
+  let title = n ? `${n} maçın tahmini eksik` : `${trCap(trJoin(ex))} eksik`;
   const lock = `İlk kilit ${timeTR(M.lockAt)}, ${betaLeft(M.lockAt)} sonra.`;
-  const sub = n && ex.length ? `${trCap(trJoin(ex))} da eksik. ${lock}` : lock;
+  let sub = n && ex.length ? `${trCap(trJoin(ex))} da eksik. ${lock}` : lock;
+  if(M.inj.length && !n && !ex.length){ title = M.inj.length>1 ? "Seçtiğin oyuncular oynamayacak" : "Seçtiğin oyuncu oynamayacak"; sub = `${trJoin(M.inj)}. Değiştirmek için dokun.`; }
+  else if(M.inj.length) sub = `⚠ ${trJoin(M.inj)} oynamayacak. ` + sub;
   el.setAttribute("aria-label", `${title}. ${sub} Tamamlamak için dokun.`);
   el.innerHTML = `<span class="n" aria-hidden="true">${n||ex.length}</span><span class="tx"><b>${title}</b><small>${sub}</small></span>${bic("next",22,2.6)}`;
 }
 function betaFillMissing(){
   const M=betaMissing(); if(!M) return;
   S.day=S.today;
-  if(M.games.length){ openSwipe(); return; }
+  if(M.games.length || !M.extras.length){ openSwipe(); return; }
   betaExtra(M.extras[0][0]);
 }
 function betaExtra(k){
@@ -5872,7 +5877,7 @@ function betaEnsurePages(){
     <section id="view-ayarlar" data-view class="hide"><div id="bst" class="b-page"></div></section>`);
 }
 function betaPage(){
-  betaEnsurePages();
+  betaEnsurePages(); $("#view-"+S.tab)?.classList.remove("hide");
   const u=betaProfU(), key=S.tab+"|"+u+"|"+(BETA.prof?.tab||"")+"|"+(S.tab==="profil"?"":"");
   if(S.tab==="profil") betaProfHead(u);
   if(BETA.pageKey===key) return;

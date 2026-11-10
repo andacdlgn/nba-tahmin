@@ -2,7 +2,7 @@
 body.beta{padding-bottom:calc(96px + env(safe-area-inset-bottom))}
 body.beta.b-hasstrip{padding-bottom:calc(170px + env(safe-area-inset-bottom))}
 body.beta.b-noscroll{overflow:hidden}
-body.beta .topbar, body.beta .nav, body.beta #board, body.beta #boardStrip, body.beta #ticker, body.beta #chatFab, body.beta #foot{display:none!important}
+body.beta .topbar, body.beta .nav, body.beta #alert, body.beta #board, body.beta #boardStrip, body.beta #ticker, body.beta #chatFab, body.beta #foot{display:none!important}
 body.beta #app>.wrap{max-width:600px}
 body.beta .toast{bottom:calc(180px + env(safe-area-inset-bottom))}
 
