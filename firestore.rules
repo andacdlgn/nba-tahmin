@@ -497,6 +497,29 @@ service cloud.firestore {
         && request.resource.data.at == request.time;
       allow delete: if signedIn() && resource.data.uid == request.auth.uid;
     }
+    // LetterBasket (1.38.0): maç günlüğü. lb/{gid}_{uid}: puan (0,5–5), nasıl izlendi, tekrar, izlenen gün, MVP, yorum, etiketler, spoiler.
+    // Herkes okur; herkes yalnızca kendi kaydını yazar ve siler.
+    match /lb/{id} {
+      allow read: if isPlayer();
+      allow create, update: if isPlayer()
+        && request.resource.data.keys().hasOnly(['uid', 'gid', 'day', 'a', 'h', 'r', 'how', 're', 'wd', 'mvp', 'mvpN', 'txt', 'tags', 'sp', 'at'])
+        && request.resource.data.keys().hasAll(['uid', 'gid', 'day', 'a', 'h', 'r', 'how', 'at'])
+        && request.resource.data.uid == request.auth.uid
+        && id == request.resource.data.gid + '_' + request.auth.uid
+        && numId(request.resource.data.gid) && request.resource.data.day is string && request.resource.data.day.matches('^[0-9]{8}$')
+        && teamAbbr(request.resource.data.a) && teamAbbr(request.resource.data.h)
+        && request.resource.data.r is number && request.resource.data.r >= 0.5 && request.resource.data.r <= 5
+        && request.resource.data.how in ['canli', 'ozet', 'ceyrek']
+        && (!('re' in request.resource.data) || request.resource.data.re is bool)
+        && (!('sp' in request.resource.data) || request.resource.data.sp is bool)
+        && (!('wd' in request.resource.data) || (request.resource.data.wd is string && request.resource.data.wd.matches('^[0-9]{8}$')))
+        && (!('mvp' in request.resource.data) || request.resource.data.mvp == '' || numId(request.resource.data.mvp))
+        && (!('mvpN' in request.resource.data) || (request.resource.data.mvpN is string && request.resource.data.mvpN.size() <= 60))
+        && (!('txt' in request.resource.data) || (request.resource.data.txt is string && request.resource.data.txt.size() <= 280 && cleanChat(request.resource.data.txt)))
+        && (!('tags' in request.resource.data) || (request.resource.data.tags is list && request.resource.data.tags.size() <= 5))
+        && request.resource.data.at == request.time;
+      allow delete: if signedIn() && resource.data.uid == request.auth.uid;
+    }
     // Anket (1.30.0): polls/{id} = {yes, no} sayaç; polls/{id}/votes/{uid} = {v, at}. Oy anonim: herkes yalnızca kendi oyunu okur.
     // Sayaç yalnızca aynı yazımda oy belgesi oluşturulurken ve önceden oy yoksa 1 artabilir; oy değiştirilemez, silinemez.
     function pollPath(pid) { return /databases/$(database)/documents/polls/$(pid); }
