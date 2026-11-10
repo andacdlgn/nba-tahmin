@@ -176,3 +176,47 @@ body.beta{overflow-x:hidden}
 /* destedeki maç önü */
 .sw-info{display:block;width:100%;text-align:left;margin:4px 0 6px;cursor:default}
 .sw-more{margin:2px 0 8px;min-height:44px;font-size:13.5px}
+
+/* 1.33.0: Sıralama listesi */
+.b-rank{margin:10px 0}
+.b-rk{display:flex;align-items:center;gap:10px;width:100%;min-height:60px;padding:8px 14px;border:0;border-bottom:1px solid var(--line);background:none;color:var(--ink);font:inherit;text-align:left;cursor:pointer}
+.b-rank>.b-rk:last-child,.b-rank>.b-rk-x:last-child{border-bottom:0}
+.b-rk.me{background:var(--amber-soft)}
+.b-rk .pl{width:24px;flex:none;text-align:center;font-family:"Barlow Condensed";font-weight:800;font-size:18px;color:var(--muted)}
+.b-rk .av{width:34px;height:34px;font-size:13px;flex:none}
+.b-rk .av .av-team,.b-rk .av .av-crown,.b-rk .av .av-star{display:none}
+.b-rk .nm{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.2}
+.b-rk .nm b{font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.b-rk .nm small{color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.b-rk .pt{display:flex;flex-direction:column;align-items:flex-end;flex:none}
+.b-rk .pt b{font-family:"Barlow Condensed";font-weight:800;font-size:22px}
+.b-rk .pt small{font-size:11px}
+.b-rk .ch{width:14px;color:var(--muted);flex:none}
+.b-rk-x{padding:4px 14px 14px;border-bottom:1px solid var(--line);background:var(--panel-2)}
+.b-rk-x .g{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:8px 0 10px}
+.b-rk-x .g span{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:7px 6px;display:flex;flex-direction:column;align-items:center;text-align:center;min-width:0}
+.b-rk-x .g small{font-size:11px;color:var(--muted);font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.b-rk-x .g b{font-size:16px}
+body.beta #puan .pv-seg{margin-top:4px}
+/* Gece özeti */
+.b-dnav{display:flex;align-items:center;gap:10px}
+.b-dnav b{flex:1;text-align:center;font-size:15px}
+.b-dnav .b-ib[disabled]{opacity:.35}
+.b-ntop{display:flex;gap:12px;align-items:center;padding:14px}
+.b-ntop .ic{font-size:30px}
+.b-ntop small{color:var(--muted);font-size:12px;font-weight:700;display:block}
+.b-ntop b{font-size:18px}
+.primary-ish{background:var(--amber);color:#10161e;border:0;font-weight:800}
+/* sahip olunan rozetler */
+.b-own{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px;margin-bottom:6px}
+.b-own .ob{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:10px 6px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:3px;min-width:0}
+.b-own .ob i{font-style:normal;font-size:26px}
+.b-own .ob b{font-size:12.5px;line-height:1.2;overflow-wrap:anywhere}
+.b-own .ob small{font-size:11px;color:var(--muted);font-weight:700}
+.b-own .t-b{border-color:#b07a4a}.b-own .t-g{border-color:#9aa6b2}.b-own .t-a{border-color:#e0b53a}.b-own .t-p{border-color:#62c6d6}.b-own .t-o{border-color:var(--p6)}
+/* kutu skoru ve tablolar: hücreler bölünmez, tablo kendi içinde kayar, oyuncu sütunu sabit */
+body.beta #shBody table{font-size:13px;border-collapse:collapse}
+body.beta #shBody th,body.beta #shBody td{white-space:nowrap;padding:7px 7px}
+body.beta #shBody table th:first-child,body.beta #shBody table td:first-child{position:sticky;left:0;z-index:1;background:var(--panel);max-width:150px;overflow:hidden;text-overflow:ellipsis}
+body.beta #shBody table tr.top td:first-child,body.beta #shBody table tr[class*="hi"] td:first-child{background:inherit}
+body.beta #shBody div:has(>table){overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%}
