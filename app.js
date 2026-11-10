@@ -46,12 +46,13 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.40.9";
+const VERSION = "1.41.0";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.41.0", d:"10 Kasım 2026", items:["✨ Site yenilendi: Bu gece, Maçlar, Sıralama ve NBA sekmeleri; ortadaki + ile Gece özeti, Uzun vade, Rozetler, Sohbet, LetterBasket ve Ayarlar.","Tahmin yapmak artık maç maç ilerleyen bir deste: kazanan, fark ve skorer tek ekranda, maç önü bilgileri hemen üstte.","Tahminlerin, puanların ve profilin aynı kaldı. Eski görünüme Daha fazla › Eski görünüm ile dönebilir, Profil › Ayarlar'dan yeniye geri geçebilirsin."]},
   {v:"1.40.9", d:"10 Kasım 2026", quiet:true, items:["Sakat oyuncu listelerinde oyuncunun bu sezon maç başına kaç dakika oynadığı ve son maçındaki dakikası da yazıyor."]},
   {v:"1.40.8", d:"10 Kasım 2026", quiet:true, items:["Yönetici denemesi için hazırlık; oyunculara görünen bir değişiklik yok."]},
   {v:"1.40.7", d:"10 Kasım 2026", quiet:true, items:["Yönetici denemesi için hazırlık; oyunculara görünen bir değişiklik yok."]},
@@ -216,7 +217,8 @@ function maybeNews(){
   const seen=lsGet("newsSeen");
   if(!seen){ lsSet("newsSeen", VERSION); return; }   // ilk kez gelen için gösterme
   if(seen===VERSION) return;
-  if(CHANGELOG[0]?.v===VERSION && CHANGELOG[0].quiet){ lsSet("newsSeen", VERSION); return; }   // sessiz sürüm: pencere açılmaz, Yenilikler listesinde durur
+  if(CHANGELOG[0]?.v===VERSION && CHANGELOG[0].quiet){ lsSet("newsSeen", VERSION); return; }
+  if(BETA.on && !lsGet("bIntroSeen")){ lsSet("newsSeen", VERSION); return; }   // yeni görünümün tanıtımı açılacak; aynı anda yenilikler penceresi çıkmasın   // sessiz sürüm: pencere açılmaz, Yenilikler listesinde durur
   autoPop(5, ()=>lsGet("newsSeen")!==VERSION, ()=>{ lsSet("newsSeen", VERSION); openNews(); });
 }
 // 1.30.1 güvenlik: kullanıcıdan gelen takım kısaltması / oyuncu numarası adrese girmeden temizlenir
@@ -5286,7 +5288,8 @@ function paintProfile(){
   const usedBy = c => S.order.filter(u=>u!==S.uid && S.players[u]?.color===c).map(pname);
   const teams = ALLP?.teams || Object.keys(TEAM_COL).map(a=>({a,n:a}));
   const myInv=invitedBy(S.uid);
-  box.innerHTML = `<div class="pf-sec pf-auto"><h4>🤖 Otomatik tahmin <span class="pf-st ${me.autoPick?"on":""}">${me.autoPick?"Açık":"Kapalı"}</span></h4><small class="muted" style="margin:0 0 8px;display:block">Bir gece hiç tahmin yapmazsan (maç, banko, günün oyuncusu, soru) her maçta ESPN'in favorisi senin yerine seçilir; doğru çıkan her 2 kazanan 1 puan. Fark, skorer ve banko yoktur.</small>
+  box.innerHTML = `${!BETA.on && !UI_EN?`<div class="pf-sec"><h4>✨ Yeni görünüm</h4><small class="muted" style="display:block;margin:0 0 8px">Sitenin yeni tasarımına geçebilirsin. Tahminlerin, puanların, her şey aynı kalır; istediğin zaman Daha fazla › Eski görünüm ile geri dönersin.</small><button class="btn" id="pfNewUI" type="button" style="width:100%">Yeni görünüme geç</button></div>`:""}
+    <div class="pf-sec pf-auto"><h4>🤖 Otomatik tahmin <span class="pf-st ${me.autoPick?"on":""}">${me.autoPick?"Açık":"Kapalı"}</span></h4><small class="muted" style="margin:0 0 8px;display:block">Bir gece hiç tahmin yapmazsan (maç, banko, günün oyuncusu, soru) her maçta ESPN'in favorisi senin yerine seçilir; doğru çıkan her 2 kazanan 1 puan. Fark, skorer ve banko yoktur.</small>
       <div class="seg2"><button data-ap="1" aria-pressed="${!!me.autoPick}">Açık</button><button data-ap="0" aria-pressed="${!me.autoPick}">Kapalı</button></div></div>
     <div class="pf-sec"><h4>Arkadaşını davet et</h4><small class="muted">Linkinle katılan herkes profilinde "Lige getirdiği" olarak görünür.${myInv.length?` Şimdiye kadar ${myInv.length} kişi getirdin: ${myInv.map(x=>esc(pname(x))).join(", ")}.`:""}</small>
       <button class="btn" id="pfInvite" type="button" style="margin-top:8px">${ICON.link}Davet linkimi paylaş</button><small class="muted" id="pfInvMsg"></small></div>
@@ -5342,6 +5345,7 @@ function paintProfile(){
   $("#pfAvQ")?.addEventListener("input", e=>{ const q=slug(e.target.value||""); const box2=$("#pfAvs"); if(!box2) return;
     const list = q.length<2 ? STARS : (ALLP?.players||[]).filter(x=>slug(x.n).includes(q)).slice(0,30).map(x=>[x.id,x.n]);
     box2.innerHTML = list.map(([id,n])=>`<button class="pf-av" data-av="p:${id}" title="${esc(n)}"><img src="${HEADSHOT(id)}" alt="" loading="lazy"><small>${esc(surname(n))}</small></button>`).join("") || '<p class="muted">Oyuncu bulunamadı.</p>'; });
+  $("#pfNewUI")?.addEventListener("click", ()=>{ betaSet(true); location.hash="#bugece"; location.reload(); });
   $("#secChange").onclick=()=>openRecoverySheet(false);
   $("#adminBtn")?.addEventListener("click", openAdmin);
   $("#histBtn").onclick = () => openHistory();
@@ -5449,7 +5453,7 @@ function confirmBtn(btn, label, fn){
 async function openAdmin(){
   S.sheetLocked=false;
   openSheet(`<h3 id="shTitle">Yönetim paneli</h3><p class="muted">Bu bölümü yalnızca sen görüyorsun.</p><button class="btn" id="admBeta" type="button" style="width:100%;margin:4px 0 10px">Yeni görünüm (kapalı beta): <b>${betaAllowed()?"Açık":"Kapalı"}</b> · ${betaAllowed()?"kapat":"aç"}</button><div id="adm"><p class="muted">Yükleniyor…</p></div>`);
-  $("#admBeta").onclick=()=>{ lsSet("beta", betaAllowed()?"0":"1"); location.hash = betaAllowed() ? "#bugece" : "#tahmin"; location.reload(); };
+  $("#admBeta").onclick=()=>{ betaSet(!betaAllowed()); location.hash = betaAllowed() ? "#bugece" : "#tahmin"; location.reload(); };
   let banned=[];
   try{ const snap=await getDocs(collection(S.db,"banned")); snap.forEach(x=>banned.push({uid:x.id,...x.data()})); }catch(e){}
   await loadLeague();
@@ -5654,7 +5658,7 @@ if("serviceWorker" in navigator){ navigator.serviceWorker.getRegistrations?.().t
     loadLT(); setTimeout(installBanner, 6000); later(markSeen, 3000);
     // bilgilendirme pencereleri sıraya girer; açılıştan ~3 sn sonra en önemlisi (varsa) bir tane açılır
     setTimeout(()=>{ maybeNews(); maybeCeremony(); markVisit(); maybePoll(); maybeLeaguePop(); maybeWeekPop(); maybeSelfPlay(); maybeScoringGuide(); maybeInvitePop(); maybeInstallPop(); maybeAskAuto(); maybeRealName(); }, 600);
-    later(()=>{ getDoc(doc(S.db,"config","admin")).then(()=>{ S.isAdmin=true; maybeArchiveTrial(); }).catch(e=>{ S.isAdmin=false; if(BETA.on && e?.code==="permission-denied" && !BETA_TESTERS.includes(S.uid)) betaRevoke(); });
+    later(()=>{ getDoc(doc(S.db,"config","admin")).then(()=>{ S.isAdmin=true; maybeArchiveTrial(); }).catch(e=>{ S.isAdmin=false; });
       getDoc(doc(S.db,"config","secret")).then(r=>{ S.invite=r.data()?.invite||""; }).catch(()=>{});
       allPlayers().catch(()=>{}); }, 2000);
     getDoc(doc(S.db,"contacts",S.uid)).then(r=>{ S.contact = r.exists() ? r.data() : {email:"",remind:false}; }).catch(()=>{}).finally(()=>{ S.contactLoaded=true; renderBanners(); maybeAskMail(); });
@@ -5688,7 +5692,9 @@ const bLogo = (t, s=22) => `<img class="b-logo" src="${t.logo||LOGO_SMALL(t.abbr
 const bPts = v => `<b class="b-pts ${v>0?"pos":v<0?"neg":""}">${v>0?"+":""}${v}</b>`;
 const BX2 = items => `<div class="b-bx">${items.map(([l,v,s,warn,act])=>`<${act?"button":"div"} ${act?`data-bx="${act}"`:""} class="${warn?"warn":""}"><small>${l}</small><b>${v}</b>${s?`<i>${s}</i>`:""}</${act?"button":"div"}>`).join("")}</div>`;
 
-function betaAllowed(){ return lsGet("beta")==="1"; }
+// 1.41.0: yeni görünüm herkeste varsayılan. Yalnızca kendisi "Eski görünüm"ü seçen (betaOff=1) ya da dili İngilizce olan eski görünümde kalır.
+function betaAllowed(){ return lsGet("betaOff")!=="1" && !UI_EN; }
+const betaSet = on => { lsSet("betaOff", on?"0":"1"); lsSet("beta", on?"1":"0"); };
 // 1.40.4: kapalı betayı deneyen oyuncular (yönetici dışında). Yalnızca bu hesaplar eski görünümde "Yeni görünümü dene" kartını görür.
 const BETA_TESTERS = ["PPpe7UMqnHeLIHbFZabWRABWFOL2" /* Mustafa Eren */, "hHZvBcumlxSgNSu0s4ZyMgiQ1vh2" /* Aral */];
 function betaInvite(){
@@ -5699,7 +5705,7 @@ function betaInvite(){
     <small>Sitenin yeni tasarımı hazırlanıyor ve şimdilik yalnızca sana açık. Tahminlerin, puanların ve her şey aynı kalır; istediğin an Daha fazla › Eski görünüm ile geri dönebilirsin. Gördüğün sorunları İstek / sorun'dan yazarsan çok iyi olur.</small>
     <div class="bi-b"><button class="btn" type="button" id="betaInvNo">Sonra</button><button class="btn-primary" type="button" id="betaInvGo">Yeni görünüme geç</button></div></div></div>`);
   $("#betaInvNo").onclick=()=>{ lsSet("betaInvLater", S.today); $("#betaInv").remove(); };
-  $("#betaInvGo").onclick=()=>{ lsSet("beta","1"); lsSet("bIntroSeen",""); location.hash="#bugece"; location.reload(); };
+  $("#betaInvGo").onclick=()=>{ betaSet(true); lsSet("bIntroSeen",""); location.hash="#bugece"; location.reload(); };
 }
 function betaBoot(){
   if(BETA.on) return; BETA.on=true; BETA.intro = lsGet("bIntroSeen") ? null : 0;
@@ -5716,7 +5722,7 @@ function betaBoot(){
   // beta açılmadan önce çizilmiş yazılar (sabit pencereler, gizli sayfalar) da bir kere taranır
   setTimeout(()=>betaCap(document.body), 0); setTimeout(()=>betaCap(document.body), 2500);
 }
-function betaRevoke(){ lsSet("beta","0"); if(BETA.on) location.reload(); }
+function betaRevoke(){ betaSet(false); if(BETA.on) location.reload(); }
 function betaRender(){
   if(!BETA.on || !S.uid) return;
   const tab=BTABS[S.tab] ?? "";
@@ -5919,7 +5925,7 @@ function betaPlusGo(k){
     else if(k==="lb"){ BETA.navDepth++; location.hash="#lb"; }
     else if(k==="set") betaOpenProf(S.uid,"ayar");
     else if(k==="theme") $("#theme").click();
-    else if(k==="old"){ lsSet("beta","0"); location.reload(); }
+    else if(k==="old"){ betaSet(false); location.hash="#tahmin"; location.reload(); }
   }, 80);
 }
 function betaClick(e){
