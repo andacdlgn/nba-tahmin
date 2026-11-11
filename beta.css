@@ -1087,6 +1087,8 @@ body.beta tr[data-ath],tr[data-ath]{cursor:pointer}
 .h2-box{padding:12px 14px}
 .h2-sc{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:10px}
 .h2-sc b{font-family:"Barlow Condensed";font-weight:800;font-size:34px;line-height:1}.h2-sc small{color:var(--muted);text-align:center;font-size:12px}
-.h2-bar{display:flex;height:8px;border-radius:99px;overflow:hidden;background:var(--panel-2);margin-top:8px}
+.h2-bar{display:flex;gap:3px;height:8px;border-radius:99px;overflow:hidden;background:var(--panel-2);margin-top:8px}
 .h2-bar i:first-child{background:var(--a)}.h2-bar i:last-child{background:var(--b)}
 .h2-tv{font-family:"Barlow Condensed";font-size:20px}.h2-t .right{width:auto}
+.nl-c{position:relative}.nl-vals{position:absolute;inset:0;pointer-events:none}
+.nl-vals b{position:absolute;transform:translate(-50%,-150%);font-size:11px;font-weight:700;color:var(--ink)}

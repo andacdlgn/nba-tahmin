@@ -47,7 +47,7 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.51.0";
+const VERSION = "1.51.1";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
@@ -6168,10 +6168,11 @@ function nightLineHTML(u, nights){
   const path=(f)=>{ let d="", on=false; pts.forEach((p,i)=>{ const v=f(p); if(v==null){ on=false; return; } d+=`${on?"L":"M"}${x(i)},${y(v)}`; on=true; }); return d; };
   const c=col(u);
   return `<div class="b-lb"><span>SEZON BOYU GECELER</span><span>${pts.length} gece</span></div>
-    <div class="b-gr nl"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-label="Gece puanları ve lig ortalaması">
+    <div class="b-gr nl"><div class="nl-c"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-label="Gece puanları ve lig ortalaması">
       ${lo<0?`<line x1="0" x2="${W}" y1="${y(0)}" y2="${y(0)}" class="z"/>`:""}
       <path d="${path(p=>p.a)}" class="avg"/><path d="${path(p=>p.v)}" style="stroke:${c}" class="me"/>
       ${pts.map((p,i)=>p.v==null?"":`<circle cx="${x(i)}" cy="${y(p.v)}" r="${p.w?4:2.6}" style="fill:${p.w?"var(--amber)":c}"><title>${dayNice(p.d,{day:"numeric",month:"short"})}: ${p.v} puan · lig ort. ${d1(p.a)}</title></circle>`).join("")}</svg>
+      ${pts.length<=14?`<div class="nl-vals">${pts.map((p,i)=>p.v==null?"":`<b class="tnum" style="left:${(x(i)/W*100).toFixed(1)}%;top:${(y(p.v)/H*100).toFixed(1)}%">${p.v}</b>`).join("")}</div>`:""}</div>
       <div class="nl-ax"><small>${dayNice(pts[0].d,{day:"numeric",month:"short"})}</small><small>${dayNice(pts[pts.length-1].d,{day:"numeric",month:"short"})}</small></div>
       <div class="nl-k"><span><i style="background:${c}"></i>Gece puanı · ort. <b>${d1(myAvg)}</b></span><span><i class="d"></i>Lig ortalaması · <b>${d1(lgAvg)}</b></span><span><i style="background:var(--amber);border-radius:50%"></i>Kazandığı gece</span></div>
       <p class="cl-hint" style="margin:6px 0 0">Lig ortalamasının üstünde kaldığı gece: <b>${above}/${mine.length}</b>.</p></div>`;
@@ -6313,7 +6314,8 @@ function h2hHTML(a, b){
     for(const t of [x.home?.abbr, x.away?.abbr].filter(Boolean)){ tm[t] ||= {n:0,a:0,b:0}; tm[t].n++; if(okA) tm[t].a++; if(okB) tm[t].b++; } }
   const top=Object.entries(tm).sort((x,y)=>y[1].n-x[1].n||(y[1].a+y[1].b)-(x[1].a+x[1].b)).slice(0,5);
   const nm=u=>`<b style="color:${col(u)}">${esc(S.players[u]?.club||pname(u))}</b>`;
-  const bar=(x,y)=>{ const t=x+y||1; return `<div class="h2-bar" style="--a:${col(a)};--b:${col(b)}"><i style="width:${x/t*100}%"></i><i style="width:${y/t*100}%"></i></div>`; };
+  const cb=col(b)===col(a)?"var(--muted)":col(b);
+  const bar=(x,y)=>{ const t=x+y||1; return `<div class="h2-bar" style="--a:${col(a)};--b:${cb}"><i style="width:${x/t*100}%"></i><i style="width:${y/t*100}%"></i></div>`; };
   return `<div class="h2"><div class="h2-hd"><span>${avatar(a,"lg")}${nm(a)}</span><b class="vs">VS</b><span>${avatar(b,"lg")}${nm(b)}</span></div>
     <div class="b-lb"><span>GECE GECE</span><span>${nights.length} ortak gece</span></div>
     <div class="b-gr h2-box">${nights.length?`<div class="h2-sc"><b class="tnum" style="color:${col(a)}">${wa}</b><small>${eq?`${eq} eşit`:"önde bitirdiği gece"}</small><b class="tnum" style="color:${col(b)}">${wb}</b></div>${bar(wa,wb)}`:`<p class="b-note" style="margin:0">Henüz ikinizin de puan aldığı bir gece yok.</p>`}</div>
