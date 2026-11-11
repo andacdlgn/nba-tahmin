@@ -1035,7 +1035,7 @@ body.beta tr[data-ath],tr[data-ath]{cursor:pointer}
 .cl-pf button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}.cl-pf button[aria-pressed="true"] small{color:var(--bg);opacity:.7}
 @media (max-width:420px){.ts-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 /* 1.50.0: kazanma ihtimali, en verimliler, maç bilgisi */
-.cl-wp{margin-top:10px}.cl-wp svg{height:88px}
+.cl-wp{margin-top:0}.cl-wp svg{height:88px}
 .cl-wp .mk{fill:var(--amber);stroke:var(--panel);stroke-width:1.5;vector-effect:non-scaling-stroke}
 .cl-sw span{grid-template-columns:18px minmax(0,1fr) auto auto auto}
 .cl-eff{display:flex;flex-direction:column;gap:6px}

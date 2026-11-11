@@ -47,7 +47,7 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.50.0";
+const VERSION = "1.50.1";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
@@ -7537,15 +7537,15 @@ function clWP(g, s, n=3){
   const kind=v=>v===3?"üçlük":v===1?"serbest atış":"2 sayı";
   const top=sw.sort((a,b)=>Math.abs(b.d)-Math.abs(a.d)).slice(0,n).filter(m=>Math.abs(m.d)>=4).sort((a,b)=>a.t-b.t);
   const lw=Math.round(last.w), lead=lw>=50?g.home:g.away, lp=lw>=50?lw:100-lw;
-  const head=g.state==="post"?"":`<small>Şu an: ${esc(lead.name)} %${lp}</small>`;
-  return `<figure class="cl-flow cl-wp" role="img" aria-label="Kazanma ihtimali grafiği">
+  const head=g.state==="post"?`<small>Maç sonu</small>`:`<small>Şu an: ${esc(lead.name)} %${lp}</small>`;
+  return `<div class="cl-sec">KAZANMA İHTİMALİ <small>ESPN, her oyunda</small></div><figure class="cl-flow cl-wp" role="img" aria-label="Kazanma ihtimali grafiği">
     <div class="cl-chl"><span>${bLogo(g.home,16)} ${escA(g.home.abbr)} %100</span>${head}</div>
     <svg viewBox="0 0 ${X} ${Y}" preserveAspectRatio="none" aria-hidden="true"><defs><clipPath id="${id}t"><rect x="0" y="0" width="${X}" height="${Y/2}"/></clipPath><clipPath id="${id}b"><rect x="0" y="${Y/2}" width="${X}" height="${Y/2}"/></clipPath></defs>
       ${bounds.map(t=>`<line x1="${x(t)}" x2="${x(t)}" y1="0" y2="${Y}" class="q"/>`).join("")}<line x1="0" x2="${X}" y1="${Y/2}" y2="${Y/2}" class="z"/>
       <path d="${area}" clip-path="url(#${id}t)" class="fh"/><path d="${area}" clip-path="url(#${id}b)" class="fa"/>
       <path d="${line}" fill="none" stroke="var(--ink)" stroke-width="1.4" vector-effect="non-scaling-stroke"/>
       ${top.map(m=>`<circle cx="${x(m.t)}" cy="${y(m.to)}" r="3" class="mk"/>`).join("")}</svg>
-    <div class="cl-chl"><span>${bLogo(g.away,16)} ${escA(g.away.abbr)} %100</span><small>ESPN kazanma ihtimali</small></div></figure>
+    <div class="cl-chl"><span>${bLogo(g.away,16)} ${escA(g.away.abbr)} %100</span><small>${top.length?"Noktalar: maçı çeviren sayılar":"Çizgiler: periyotlar"}</small></div></figure>
     ${top.length?`<div class="cl-sec">MAÇI ÇEVİREN SAYILAR</div><div class="cl-last cl-sw">${top.map(m=>{ const t=byTeam[String(m.p.team?.id)], who=surname(names[String(m.p.participants?.[0]?.athlete?.id)]||""), tw=t===g.home?m.to:100-m.to, fw=t===g.home?m.from:100-m.from;
       return `<span>${t?bLogo(t,16):""}<b>${esc(who)}</b><small>${kind(m.p.scoreValue)} · %${Math.round(fw)} → %${Math.round(tw)}</small><i class="tnum">${clAt(m.p.period.number,m.p.clock?.displayValue)}</i><b class="tnum">${m.p.awayScore}-${m.p.homeScore}</b></span>`; }).join("")}</div>`:""}`;
 }
