@@ -368,11 +368,11 @@ def award_month(day):
 
 
 WEEK_AWARD_FROM = "20261109"            # haftalık ilk 3 ödülü asıl ligle başlar
-WEEK_PRIZE = {1: 10, 2: 7, 3: 5}
+WEEK_PRIZE = {1: 5, 2: 3, 3: 1}
 
 
 def week_awards(sc, games, players, nights, cur_week):
-    """Biten her haftanın ilk 3'üne ek puan (10 / 7 / 5).
+    """Biten her haftanın ilk 3'üne ek puan (5 / 3 / 1).
     Sıralama yalnızca o haftanın gece puanlarıyla (devamlılık bonusu, playoff serisi, aylık ödül ve uzun vade hariç).
     Eşitlikte sırayla: haftadaki gece birincilikleri, kazanan puanı, fark, en skorer, haftanın en iyi gecesi.
     Bunlar da eşitse sıra paylaşılır (ikisi de o sıranın puanını alır, ardından gelen bir sıra atlar)."""
@@ -1122,7 +1122,7 @@ def main(full=False):
         winners = [u for u, p in row.items() if p == best]
         if len(winners) == 1 and winners[0] in tot:
             tot[winners[0]]["weekWins"] += 1
-    # haftalık ilk 3 ödülü (10 / 7 / 5)
+    # haftalık ilk 3 ödülü (5 / 3 / 1)
     sc["weekAwards"] = week_awards(sc, games, players, nights, cur_week)
     for lst in sc["weekAwards"].values():
         for x in lst:
