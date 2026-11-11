@@ -47,12 +47,13 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.48.0";
+const VERSION = "1.48.1";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.48.1", d:"12 Kasım 2026", quiet:true, items:["Maç penceresinde sekmeler kaydırınca kapatma düğmesinin üstüne binmiyor."]},
   {v:"1.48.0", d:"12 Kasım 2026", items:["Maçlar sayfasında bir maça dokununca açılan pencere de sekmeli: Box score, Özet (oyun akışı ve önemli anlar), Periyotlar (bir ya da birkaç periyot seçip istatistik, oyuncu tablosu ve şut haritası), İstatistik (bütün takım istatistikleri ve maçın şut haritası) ve Tahminler (ligde kim ne dedi ve yorumlar). Biten maçlarda da çalışır."]},
   {v:"1.47.1", d:"12 Kasım 2026", quiet:true, items:["Açılışta tekrar tekrar çıkan pencereler azaltıldı: Yenilikler en fazla günde bir kez ve arada çıkan sürümler tek pencerede; aynı rozet artık tekrar \"Yeni rozet!\" diye çıkmıyor."]},
   {v:"1.47.0", d:"12 Kasım 2026", items:["Canlı maç kartında sekmeler: Özet, Periyotlar, İstatistik, Tahminler.","Periyotlar: birden fazla periyot birlikte seçilebilir (ör. 1. ve 3. çeyrek); skor, akış grafiği, takım istatistikleri, oyuncu tablosu, şut haritası, önemli anlar ve bütün sayılar seçtiğin periyotlara göre hesaplanır.","İstatistik: ESPN takım istatistiklerinin tamamı (hızlı hücum, boyalı alan, top kaybından sayı, önde geçen süre…), bütün oyuncuların tablosu ve maçın şut haritası.","Skor değişince sayı kısa bir an parlıyor. \"Kutu skoru\" artık \"Box score\"."]},
