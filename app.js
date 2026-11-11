@@ -47,12 +47,13 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.48.2";
+const VERSION = "1.48.3";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.48.3", d:"12 Kasım 2026", items:["Haftalık ilk 3'te sıra artık atlanmıyor: bütün eşitlik bozucular da eşitse iki kişi birinciyse ikisi de +5 alır, sonraki kişi ikinci olur ve +3 alır."]},
   {v:"1.48.2", d:"12 Kasım 2026", quiet:true, items:["Canlı sayfasının deneme modu kaldırıldı. Eski görünümde üstteki Kurallar ve Puanlama simgelerinin yerine \"Yeni görünüme dön\" düğmesi var."]},
   {v:"1.48.1", d:"12 Kasım 2026", quiet:true, items:["Maç penceresinde sekmeler kaydırınca kapatma düğmesinin üstüne binmiyor."]},
   {v:"1.48.0", d:"12 Kasım 2026", items:["Maçlar sayfasında bir maça dokununca açılan pencere de sekmeli: Box score, Özet (oyun akışı ve önemli anlar), Periyotlar (bir ya da birkaç periyot seçip istatistik, oyuncu tablosu ve şut haritası), İstatistik (bütün takım istatistikleri ve maçın şut haritası) ve Tahminler (ligde kim ne dedi ve yorumlar). Biten maçlarda da çalışır."]},
@@ -860,7 +861,7 @@ const digitsHTML = (u, v) => `<div class="digits tnum" data-u="${u}" data-v="${v
 const WEEK_FROM = "20261109", WEEK_PRIZE = {1:5, 2:3, 3:1};
 const weekAwardPts = u => Object.values(S.arch.scores.weekAwards||{}).reduce((t,l)=>t+l.filter(x=>x.u===u).reduce((s,x)=>s+x.pts,0),0);
 // Haftanın canlı sıralaması: yalnızca gece puanları (devamlılık bonusu, playoff serisi, ödüller ve uzun vade hariç)
-// Eşitlikte: haftadaki gece birincilikleri, kazanan, fark, en skorer, haftanın en iyi gecesi; o da eşitse sıra paylaşılır
+// Eşitlikte: haftadaki gece birincilikleri, kazanan, fark, en skorer, haftanın en iyi gecesi; o da eşitse sıra paylaşılır (sıra atlanmaz)
 function weekStandings(wk){
   const st={}; for(const u of S.order) st[u]={p:0, nw:0, w:0, m:0, s:0, bn:0, n:0, dp:0, q:0, auto:0};
   const ds=allDays().filter(d=>weekKey(d)===wk);
@@ -871,7 +872,8 @@ function weekStandings(wk){
   const key=u=>[st[u].p, st[u].nw, st[u].w, st[u].m, st[u].s, st[u].bn];
   const cmp=(a,b)=>{ const A=key(a), B=key(b); for(let i=0;i<A.length;i++) if(A[i]!==B[i]) return B[i]-A[i]; return 0; };
   const order=[...S.order].sort((a,b)=>cmp(a,b)||pname(a).localeCompare(pname(b),"tr"));
-  let place=0; const rows=order.map((u,i)=>{ if(i===0 || cmp(u,order[i-1])!==0) place=i+1; return {u, place, ...st[u]}; });
+  // 1.48.3: sıra atlanmaz. İki kişi birinciyse ikisi de 1., sonraki 2. olur (ve 2.lik ödülünü alır)
+  let place=0; const rows=order.map((u,i)=>{ if(i===0 || cmp(u,order[i-1])!==0) place++; return {u, place, ...st[u]}; });
   return {rows, days:ds.length};
 }
 const awardPts = u => Object.values(S.arch.scores.awards||{}).reduce((t,a)=>t+(a.list||[]).filter(x=>x.u?.includes(u)).reduce((s,x)=>s+x.pts,0),0);
@@ -2118,7 +2120,7 @@ function openScoringGuide(){
 
 <h4>Haftalık ilk 3</h4>
 <div class="pg-t"><span>Haftanın 1.si</span><b>+5</b><span>Haftanın 2.si</span><b>+3</b><span>Haftanın 3.sü</span><b>+1</b></div>
-<p>Hafta pazartesi başlar, pazar gecesinin son maçıyla biter; puan pazartesi sabahı sezon puanına eklenir. Yalnızca o haftanın gece puanları sayılır (devamlılık bonusu, playoff serileri, aylık ödüller ve uzun vade hariç). Eşitlikte sırayla: haftadaki gece birincilikleri, kazanan puanı, fark, en skorer ve haftanın en iyi gecesi bakılır; o da eşitse sıra paylaşılır. 9 Kasım haftasından itibaren.</p>
+<p>Hafta pazartesi başlar, pazar gecesinin son maçıyla biter; puan pazartesi sabahı sezon puanına eklenir. Yalnızca o haftanın gece puanları sayılır (devamlılık bonusu, playoff serileri, aylık ödüller ve uzun vade hariç). Eşitlikte sırayla: haftadaki gece birincilikleri, kazanan puanı, fark, en skorer ve haftanın en iyi gecesi bakılır; o da eşitse sıra paylaşılır ve ikisi de o sıranın puanını alır; sıra atlanmaz, sonraki kişi bir sonraki sıranın puanını alır (ör. iki kişi birinciyse ikisi +5, sonraki ikinci olur ve +3 alır). 9 Kasım haftasından itibaren.</p>
 
 <h4>7. Aylık lig ödülleri</h4>
 <div class="pg-t"><span>Ayın tahmincisi (ayın en çok puanı)</span><b>+1</b><span>Banko ustası, Sürpriz avcısı, Skorer ustası, Fark ustası</span><b>+2'şer</b></div>
@@ -2324,7 +2326,7 @@ function openRules(){
     <h4>Uzun vade</h4>
     <p>Haftanın oyuncusu, ayın ödülleri, konferans sıralaması, NBA Kupası ve sezon ödülleri için önceden tahmin yaparsın. Puanlar ve kilit tarihleri Uzun Vade sekmesinde ve Puanlama rehberinde yazar. Doğru tahminler ana sıralamaya eklenir.</p>
     <h4>Haftalık ilk 3</h4>
-    <p>Her haftanın (pazartesi–pazar) ilk 3'üne sezon puanına <b>+5 / +3 / +1</b> eklenir. Yalnızca o haftanın gece puanları sayılır. Eşitlikte sırayla haftadaki gece birincilikleri, kazanan puanı, fark, en skorer ve haftanın en iyi gecesine bakılır; o da eşitse sıra paylaşılır. Sıralama sekmesinde "Bu hafta" ve "Geçen hafta" tabloları var. 9 Kasım haftasından itibaren geçerli.</p>
+    <p>Her haftanın (pazartesi–pazar) ilk 3'üne sezon puanına <b>+5 / +3 / +1</b> eklenir. Yalnızca o haftanın gece puanları sayılır. Eşitlikte sırayla haftadaki gece birincilikleri, kazanan puanı, fark, en skorer ve haftanın en iyi gecesine bakılır; o da eşitse sıra paylaşılır ve ikisi de o sıranın puanını alır; sıra atlanmaz, sonraki kişi bir sonraki sıranın puanını alır (ör. iki kişi birinciyse ikisi +5, sonraki ikinci olur ve +3 alır). Sıralama sekmesinde "Bu hafta" ve "Geçen hafta" tabloları var. 9 Kasım haftasından itibaren geçerli.</p>
     <h4>Aylık lig ödülleri</h4>
     <p>Her ay sonunda <b>Ayın tahmincisi +1</b>; <b>Banko ustası, Sürpriz avcısı, Skorer ustası ve Fark ustası +2</b>'şer puan alır. Fark ustasında tam bilinen fark (nokta atışı) 2 sayılır. Eşitlikte ödülü paylaşanların hepsi puanı alır.</p>
     <h4>Deneme haftası</h4>
@@ -2899,7 +2901,7 @@ function renderPuan(){
       <tbody>${W.rows.map(r=>{ const pz=prize(r); return `<tr class="${r.u===S.uid?"me ":""}${pz?"wk-p"+r.place:""}" data-pu="${r.u}"><td class="st-rk">${pz?medal[r.place]:r.place}</td><td class="st-pl"><span class="pn"><i style="background:${col(r.u)}"></i><span>${S.players[r.u]?.club?`<b class="pn-club">${esc(S.players[r.u].club)}</b><small class="pn-name">${esc(pname(r.u))}</small>`:`<b class="pn-solo">${esc(pname(r.u))}</b>`}</span></span></td><td class="st-tot tnum">${r.p}</td>${wc.map(([,f])=>{ const v=f(r)||0; return `<td class="tnum${v?"":" z"}">${v}</td>`; }).join("")}<td class="st-pz">${pz?`<b class="wk-prize">+${pz}</b>`:`<span class="z">–</span>`}</td></tr>`; }).join("")}</tbody>
     </table></div>`
       : emptyBox("chart", live ? "Bu haftanın ilk gecesi bitince sıralama burada başlar." : "Bu hafta oynanmış gece yok.")}
-    <p class="muted" style="font-size:13px;margin:6px 2px">Hafta toplamı yalnızca gece puanlarıdır (devamlılık bonusu, playoff serileri, aylık ödüller ve uzun vade hariç). Eşitlikte sırayla: haftadaki gece birincilikleri, galip, fark, maçın skoreri ve haftanın en iyi gecesi; o da eşitse sıra paylaşılır.</p>`;
+    <p class="muted" style="font-size:13px;margin:6px 2px">Hafta toplamı yalnızca gece puanlarıdır (devamlılık bonusu, playoff serileri, aylık ödüller ve uzun vade hariç). Eşitlikte sırayla: haftadaki gece birincilikleri, galip, fark, maçın skoreri ve haftanın en iyi gecesi; o da eşitse sıra paylaşılır ve ikisi de o sıranın puanını alır; sıra atlanmaz, sonraki kişi bir sonraki sıranın puanını alır (ör. iki kişi birinciyse ikisi +5, sonraki ikinci olur ve +3 alır).</p>`;
   }
   let wkStrip="";
   if(S.pv==="sezon"){ const W=weekStandings(curWk), top=W.rows.filter(r=>r.p>0 && r.place<=3), on=curWk>=WEEK_FROM, medal={1:"🥇",2:"🥈",3:"🥉"};

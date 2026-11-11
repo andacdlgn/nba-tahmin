@@ -375,7 +375,7 @@ def week_awards(sc, games, players, nights, cur_week):
     """Biten her haftanın ilk 3'üne ek puan (5 / 3 / 1).
     Sıralama yalnızca o haftanın gece puanlarıyla (devamlılık bonusu, playoff serisi, aylık ödül ve uzun vade hariç).
     Eşitlikte sırayla: haftadaki gece birincilikleri, kazanan puanı, fark, en skorer, haftanın en iyi gecesi.
-    Bunlar da eşitse sıra paylaşılır (ikisi de o sıranın puanını alır, ardından gelen bir sıra atlar)."""
+    Bunlar da eşitse sıra paylaşılır (ikisi de o sıranın puanını alır); sıra atlanmaz, ardından gelen bir sonraki sıranın puanını alır."""
     out = {}
     by_wk = {}
     for d in sc["days"]:
@@ -412,7 +412,7 @@ def week_awards(sc, games, players, nights, cur_week):
         lst, place = [], 0
         for i, u in enumerate(order):
             if i == 0 or key(u) != key(order[i - 1]):
-                place = i + 1
+                place += 1   # sıra atlanmaz: iki birinciden sonraki ikinci olur
             if place > 3:
                 break
             lst.append({"u": u, "place": place, "pts": WEEK_PRIZE[place], "wp": st[u]["p"]})
