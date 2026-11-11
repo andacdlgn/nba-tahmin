@@ -951,3 +951,7 @@ body.beta tr[data-ath],tr[data-ath]{cursor:pointer}
 .cl-demo{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;padding:12px 14px;border-radius:16px;background:var(--amber-soft);color:var(--ink);font-size:13px;line-height:1.4}
 .cl-demo>b{background:var(--amber);color:#10161e;border-radius:8px;padding:2px 8px;font-size:12px;letter-spacing:.08em}
 .cl-demo>span{flex:1 1 220px}
+.cl-flow .fh{fill:color-mix(in srgb,var(--ch) 70%,#fff);opacity:.6}.cl-flow .fa{fill:color-mix(in srgb,var(--ca) 70%,#fff);opacity:.6}
+:root[data-theme="light"] .cl-flow .fh{fill:var(--ch);opacity:.45}:root[data-theme="light"] .cl-flow .fa{fill:var(--ca);opacity:.45}
+.cl-p .av,.cl-br .av,.cl-sr .who .av{flex:none;width:32px;height:32px;min-width:32px}
+.cl-sr .who .av{width:26px;height:26px;min-width:26px}

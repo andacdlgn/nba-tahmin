@@ -47,7 +47,7 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.45.1";
+const VERSION = "1.45.2";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
@@ -7294,15 +7294,15 @@ function clChart(g, s){
   const id="clc"+g.id, wp=(s?.winprobability||[]).slice(-1)[0], hw=wp?Math.round(wp.homeWinPercentage*100):null;
   const fav = hw==null ? "" : hw>=50 ? `ESPN'e göre ${esc(g.home.name)} %${hw}` : `ESPN'e göre ${esc(g.away.name)} %${100-hw}`;
   return `<figure class="cl-flow" role="img" aria-label="Maçın akışı: ${esc(g.home.name)} en fazla ${hiH}, ${esc(g.away.name)} en fazla ${hiA} sayı önde">
-    <div class="cl-chl"><span style="color:var(--ch)">${bLogo(g.home,16)} ${escA(g.home.abbr)} önde</span><small>${fav}</small></div>
+    <div class="cl-chl"><span>${bLogo(g.home,16)} ${escA(g.home.abbr)} önde</span><small>${fav}</small></div>
     <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><defs>
       <clipPath id="${id}t"><rect x="0" y="0" width="${W}" height="${mid}"/></clipPath><clipPath id="${id}b"><rect x="0" y="${mid}" width="${W}" height="${mid}"/></clipPath></defs>
       ${qs.map(t=>`<line x1="${x(t)}" x2="${x(t)}" y1="0" y2="${H}" class="q"/>`).join("")}
       <line x1="0" x2="${W}" y1="${mid}" y2="${mid}" class="z"/>
-      <path d="${area}" clip-path="url(#${id}t)" fill="var(--ch)" opacity=".55"/><path d="${area}" clip-path="url(#${id}b)" fill="var(--ca)" opacity=".55"/>
+      <path d="${area}" clip-path="url(#${id}t)" class="fh"/><path d="${area}" clip-path="url(#${id}b)" class="fa"/>
       <path d="${line}" fill="none" stroke="var(--ink)" stroke-width="1.4" vector-effect="non-scaling-stroke"/>
       ${g.state==="in"?`<circle cx="${x(last.t)}" cy="${y(last.m)}" r="3.5" class="now"/>`:""}</svg>
-    <div class="cl-chl"><span style="color:var(--ca)">${bLogo(g.away,16)} ${escA(g.away.abbr)} önde</span><small>Dikey çizgiler: çeyrekler</small></div>
+    <div class="cl-chl"><span>${bLogo(g.away,16)} ${escA(g.away.abbr)} önde</span><small>Dikey çizgiler: çeyrekler</small></div>
     <figcaption>En büyük fark: ${escA(g.home.abbr)} +${hiH} · ${escA(g.away.abbr)} +${hiA}</figcaption></figure>`;
 }
 // önemli anlar: liderlik değişimi, eşitlik, 8+ sayılık seri, oyuncunun 20/30/40/50 sayıya ulaşması
