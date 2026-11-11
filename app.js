@@ -47,7 +47,7 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.49.0";
+const VERSION = "1.49.1";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
@@ -7418,7 +7418,7 @@ function clPlayerTable(g, s, rows, sd, full){
   const head=full?COLS.map(([k,l])=>{ const st=BETA.cl.bsort?.[g.id]||{k:"pts",d:-1}; return `<td><button type="button" class="cl-sort ${st.k===k?"on":""}" data-clsort="${k}" data-g="${g.id}" aria-label="${l} sütununa göre sırala">${l}${st.k===k?(st.d<0?" ↓":" ↑"):""}</button></td>`; }).join(""):["SAY","RİB","AST","SA","3S","SA%"].map(h=>`<td>${h}</td>`).join("");
   const dv=r=>{ const a=avg(r.id); if(a==null) return "–"; const x=r.pts-a; return `<span class="${x>=3?"up":x<=-3?"dn":""}">${x>0?"+":""}${x.toFixed(1).replace(".",",")}</span>`; };
   const body=list.map(r=>`<tr data-ath="${r.id}" data-athn="${esc(names[r.id]||r.name||"")}"><th>${esc(surname(names[r.id]||r.name||""))}</th>${full
-    ? `<td>${esc(r.min)}</td><td><b>${r.pts}</b></td><td>${r.reb}</td><td>${r.ast}</td><td>${esc(r.fg)}</td><td>${esc(r.tp)}</td><td>${esc(r.ft)}</td><td>${esc(r.pm)}</td><td class="av">${dv(r)}</td>`
+    ? `<td>${esc(r.min)}</td><td><b>${r.pts}</b></td><td>${r.reb}</td><td>${r.ast}</td><td>${esc(r.fg)}</td><td>${esc(r.tp)}</td><td>${esc(r.ft)}</td><td>${esc(r.pm)}</td><td class="ortd">${dv(r)}</td>`
     : `<td><b>${r.pts}</b></td><td>${r.or+r.dr}</td><td>${r.ast}</td><td>${r.fgm}/${r.fga}</td><td>${r.tpm}/${r.tpa}</td><td>${clPct(r.fgm,r.fga)}</td>`}</tr>`).join("");
   return `<div class="cl-tbl"><table><thead><tr><th>${bLogo(t,16)} ${escA(t.abbr)}</th>${head}</tr></thead><tbody>${body||`<tr><th colspan="10" class="cl-none">Bu aralıkta oynamadı.</th></tr>`}</tbody></table></div>${full?`<p class="cl-hint">Sütun başlığına dokununca sıralanır. ORT±: bu maçtaki sayısının sezon ortalamasından farkı.</p>`:""}`;
 }
