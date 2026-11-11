@@ -1,0 +1,67 @@
+name: Site açılıyor mu
+
+# 12 Kasım 2026'da sürüm numarası elle değişince güvenlik ayarı (CSP) satır içi betiği engelledi ve site
+# ~10 dakika açılış ekranında kaldı. Bu görev iki şey yapar:
+#   1. index.html her değiştiğinde CSP özetlerini kontrol eder; tutmuyorsa kendisi düzeltip kaydeder.
+#   2. Saatte bir (ve her yayından sonra) canlı siteyi gerçek tarayıcıyla açar; açılmıyorsa GMAIL_USER'a mail atar.
+on:
+  push:
+    branches: [main]
+    paths: ["index.html", "app.js", "style.css", "beta.css", "sw.js"]
+  schedule:
+    - cron: "41 * * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: site-check
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: CSP özetleri
+        run: |
+          python scripts/sitecheck.py csp --fix
+          if ! git diff --quiet -- index.html; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add index.html
+            git commit -m "CSP özetleri otomatik düzeltildi"
+            git pull --rebase origin main
+            git push
+            echo "CSP düzeltildi; GitHub Pages'in yeniden yayınlaması bekleniyor."
+            sleep 120
+          fi
+
+      - name: Yayının oturmasını bekle
+        if: github.event_name == 'push'
+        run: sleep 120
+
+      - name: Tarayıcıyı kur
+        run: |
+          pip install playwright firebase-admin==7.7.0
+          python -m playwright install --with-deps chromium
+
+      - name: Canlı siteyi aç
+        env:
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          export PREV_CONCLUSION=$(gh run list --workflow site-check.yml --status completed -L 1 --json conclusion -q '.[0].conclusion' 2>/dev/null || true)
+          python scripts/sitecheck.py live
