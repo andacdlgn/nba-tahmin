@@ -979,3 +979,33 @@ body.beta tr[data-ath],tr[data-ath]{cursor:pointer}
 .cl-ptop .cl-lp>b{display:flex;align-items:center;gap:5px}
 .cl-all{max-height:320px;overflow-y:auto;padding-right:2px}
 .cl-all span{padding:4px 0;border-bottom:1px solid var(--line)}
+/* 1.47.0: çoklu periyot, istatistik tabloları, şut haritası */
+.cl-flow .dim{fill:var(--panel);opacity:.72}
+.cl-pers button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.cl-pers button:first-child{flex:0 0 auto;padding:0 14px}
+.cl-hint{margin:-4px 0 0;font-size:12px;color:var(--muted)}
+.cl-segm{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;padding:3px;border-radius:12px;background:var(--panel-2)}
+.cl-segm button{display:flex;align-items:center;justify-content:center;gap:6px;border:0;background:none;color:var(--muted);font:inherit;font-weight:700;font-size:13px;min-height:36px;border-radius:9px;cursor:pointer}
+.cl-segm button[aria-selected="true"]{background:var(--panel);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.25)}
+.cl-tbl{overflow-x:auto;border-radius:12px;border:1px solid var(--line)}
+.cl-tbl table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+.cl-tbl th{text-align:left;font-weight:700;padding:7px 8px;white-space:nowrap;position:sticky;left:0;background:var(--panel)}
+.cl-tbl thead th,.cl-tbl thead td{font-size:11.5px;color:var(--muted);font-weight:700;background:var(--panel-2)}
+.cl-tbl thead th{display:flex;align-items:center;gap:5px}
+.cl-tbl td{text-align:center;padding:7px 6px;white-space:nowrap}
+.cl-tbl tbody tr{border-top:1px solid var(--line);cursor:pointer}.cl-tbl tbody tr:hover{background:var(--panel-2)}
+.cl-shot{display:flex;flex-direction:column;gap:8px}
+.cl-shot svg{width:100%;max-width:420px;align-self:center;aspect-ratio:50/35;border-radius:12px;display:block}
+.cl-shot .ct{fill:var(--panel-2)}.cl-shot .ln{fill:none;stroke:var(--line);stroke-width:.25}
+.cl-shot .mk{fill:var(--tc);stroke:#fff;stroke-width:.18}.cl-shot .ms{fill:none;stroke:var(--muted);stroke-width:.25}
+:root:not([data-theme="light"]) .cl-shot .mk{fill:color-mix(in srgb,var(--tc) 65%,#fff)}
+.cl-zn{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.cl-zn span{display:flex;flex-direction:column;align-items:center;padding:6px;border-radius:10px;background:var(--panel-2)}
+.cl-zn small{font-size:11.5px;color:var(--muted)}.cl-zn b{font-variant-numeric:tabular-nums}
+.cl-zn .lg{grid-column:1/-1;flex-direction:row;justify-content:center;gap:6px;background:none;font-size:12px;color:var(--muted);padding:0}
+.cl-zn .lg i{width:10px;height:10px;border-radius:50%;display:inline-block}.cl-zn .lg i.mk{background:var(--amber)}.cl-zn .lg i.ms{border:1.5px solid var(--muted)}
+.cl-sc b.bump{animation:clbump .9s ease}
+@keyframes clbump{0%{color:var(--amber);transform:scale(1.18)}100%{color:inherit;transform:none}}
+@media (prefers-reduced-motion:reduce){.cl-sc b.bump{animation:none}}
+.cl-tabs{position:sticky;top:calc(var(--b-head,0px) + 4px);z-index:2}
+.cl-tr{grid-template-columns:76px 1fr 76px}.cl-tr>b{font-size:13px;line-height:1.25}
