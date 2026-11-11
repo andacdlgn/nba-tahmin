@@ -2417,3 +2417,6 @@ body:has(#auth:not(.hide)) .topbar{display:none}
 .tm-inj .inj-st{display:block;color:var(--muted);font-size:12px;font-weight:500;margin-top:1px}
 .tm-inj .inj-st:empty,.tm-inj .inj-mn:empty{display:none}
 #langBtn,#authLang{display:none!important}
+/* 1.48.2: eski görünümde yeni görünüme dönüş */
+.new-ui-btn{border:0;border-radius:999px;background:var(--amber);color:#10161e;font:inherit;font-weight:800;font-size:13px;padding:7px 12px;cursor:pointer;white-space:nowrap}
+body.beta .new-ui-btn{display:none!important}
