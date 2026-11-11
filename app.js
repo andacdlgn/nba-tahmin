@@ -47,7 +47,7 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.51.1";
+const VERSION = "1.51.2";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
@@ -2938,9 +2938,9 @@ function renderPuan(){
   // rozet sıralaması (ana puandan ayrı)
   const bb=badgeBoard();
   html += `<div class="sec-title"><h2>🏅 Rozet sıralaması</h2><span class="aside">ana puandan ayrı · ${BLIST.length} rozet</span></div>
-    <div class="bb">${bb.map((x,i)=>`<div class="bb-row${x.u===S.uid?" me":""}" data-pb="${x.u}" role="button" tabindex="0" style="--pc:${col(x.u)}"><span class="rk">${i+1}</span>${avatar(x.u,"sm")}
+    <div class="bb">${((bpl)=>bb.map((x,i)=>`<div class="bb-row${x.u===S.uid?" me":""}" data-pb="${x.u}" role="button" tabindex="0" style="--pc:${col(x.u)}"><span class="rk">${bpl[i]}</span>${avatar(x.u,"sm")}
       <span class="bb-nm"><b style="color:${col(x.u)}">${esc(S.players[x.u]?.club||pname(x.u))}</b><small>${x.n} rozet${x.top.length?" · "+x.top.map(b=>`<i class="bt t-${b.tier}" title="${esc(b.name)}">${b.ico}</i>`).join(""):""}</small></span>
-      <span class="bb-p">${x.pts}<small>puan</small></span></div>`).join("")}</div>
+      <span class="bb-p">${x.pts}<small>puan</small></span></div>`).join(""))(sharedPlaces(bb,x=>x.pts+"/"+x.n))}</div>
     <p class="muted" style="font-size:13px;margin:6px 2px">Rozet puanı: Bronz 1 · Gümüş 2 · Altın 4 · Platin 7 · Özel (tek seferlik) 3. Satıra dokunarak rozetleri gör.</p>`;
   // aylık şampiyonlar duvarı
   const mt=monthTable(), curM=monthKey(S.today), mks=Object.keys(mt).sort().reverse();
@@ -6001,7 +6001,7 @@ function ftCard(){
   const dots=`<div class="ft-dots">${Array.from({length:10},(_,k)=>`<i class="${F.hist[k]==null?"":F.hist[k]?"ok":"no"}"></i>`).join("")}</div>`;
   if(BETA.ftLb.day!==S.today && !ftCard.l){ ftCard.l=1; ftLoad().then(()=>{ ftCard.l=0; if(S.tab==="bugece") betaTonight(); }); }
   const R=BETA.ftLb.rows||[], lead=R[0];
-  const board = R.length ? `<div class="b-lb"><span>LİGDE BUGÜN</span><span>${R.length} kişi oynadı</span></div><div class="b-gr b-rank">${R.slice(0,8).map((x,i)=>`<div class="b-rk ${x.uid===S.uid?"me":""}"><span class="pl">${i<3?MEDAL[i+1]:i+1}</span>${avatar(x.uid,"sm")}<span class="nm"><b style="color:${col(x.uid)}">${esc(S.players[x.uid]?.club||pname(x.uid))}</b></span><span class="pt"><b class="tnum">${x.s}</b></span></div>`).join("")}</div>` : "";
+  const board = R.length ? `<div class="b-lb"><span>LİGDE BUGÜN</span><span>${R.length} kişi oynadı</span></div><div class="b-gr b-rank">${((pl)=>R.slice(0,8).map((x,i)=>`<div class="b-rk ${x.uid===S.uid?"me":""}"><span class="pl">${pl[i]<=3?MEDAL[pl[i]]:pl[i]}</span>${avatar(x.uid,"sm")}<span class="nm"><b style="color:${col(x.uid)}">${esc(S.players[x.uid]?.club||pname(x.uid))}</b></span><span class="pt"><b class="tnum">${x.s}</b></span></div>`).join(""))(sharedPlaces(R,x=>x.s))}</div>` : "";
   if(!F.on) return `<div class="b-gr ft">${head}${BX2([["En iyin",F.best?String(F.best):"–","40 üzerinden"],["Ligde bugün",lead?esc(S.players[lead.uid]?.club||pname(lead.uid))+" "+lead.s:"–",lead?"en iyi skor":"henüz kimse"],["Puan","Etkilemez","sadece eğlence"]])}<button class="btn primary ft-go" type="button" data-ft="start">Oyna · 10 atış</button>${board}</div>`;
   if(F.done) return `<div class="b-gr ft">${head}${dots}<div class="ft-res"><b class="cond tnum">${F.score}</b><small class="${F.newBest?"amb":"muted"}">${F.newBest?"Yeni rekorun!":"En iyin "+F.best}</small></div><button class="btn primary ft-go" type="button" data-ft="start">Tekrar oyna</button>${board}</div>`;
   const [l,w]=F.zone, c=l+w/2;
@@ -6304,6 +6304,8 @@ function betaCap(root){
 
 // 1.33.0 (beta): Sıralama yeni liste (dokununca açılır), Gece özeti ayrı sayfa (paylaşma isteğe bağlı), Rozetler'de "Sahip olduğun rozetler" en üstte.
 const MEDAL={1:"🥇",2:"🥈",3:"🥉"};
+// 1.51.2: eşit değerler aynı sırayı paylaşır (sıralı dizi ve değer fonksiyonu → her eleman için sıra)
+const sharedPlaces=(arr,val)=>{ let place=0, last; return arr.map((x,i)=>{ const v=val(x); if(i===0 || v!==last){ place=i+1; last=v; } return place; }); };
 // 1.51.0: Sıralama › kafa kafaya: sen ve seçtiğin oyuncu (gece gece kim önde, ayrıştığınız maçlar, takımlar)
 function h2hHTML(a, b){
   const nights=nightsOf().filter(x=>x.p[a] && x.p[b]);
@@ -6376,9 +6378,10 @@ function betaNight(){
   const head = `<div class="b-gr b-ntop"><span class="ic">${done?"🏆":"⏱"}</span><span class="tx"><small>${done?"Gecenin kazananı":"Şu an gece lideri"}</small><b>${leaders.map(u=>`<span style="color:${col(u)}">${esc(S.players[u]?.club||pname(u))}</span>`).join(", ")} · ${best>0?"+":""}${best}</b></span></div>
     <div class="b-bx"><div><small>Gecenin en skoreri</small><b>${tp?esc(bSur(tp.name))+" "+tp.pts:"–"}</b><i>${tp?"günün oyuncusu":""}</i></div><div><small>Gecenin sorusu</small><b>${qr?.final?(qr.ans==="y"?"Evet":"Hayır"):"Bekleniyor"}</b><i>${S.order.filter(u=>D.daily[u]?.q).length} kişi cevapladı</i></div><div><small>Maç</small><b>${D.games.filter(g=>g.state==="post").length}/${D.games.length}</b><i>${done?"hepsi bitti":"sürüyor"}</i></div></div>
     <p class="b-q"><b>Soru:</b> ${q.t}</p>`;
-  const list = `<div class="b-lb"><span>GECENİN PUANLARI</span><span>${done?"kesin":"canlı"}</span></div><div class="b-gr b-rank">${us.map((u,i)=>{ const x=pts[u], p=S.players[u]||{};
+  const npl=sharedPlaces(us, u=>pts[u].pts||0);
+  const list = `<div class="b-lb"><span>GECENİN PUANLARI</span><span>${done?"kesin":"canlı"}</span></div><div class="b-gr b-rank">${us.map((u,i)=>{ const x=pts[u], p=S.players[u]||{}, pl=npl[i];
     const br=[["Galip",x.w],["Fark",x.m],["Skorer",x.s],["Günün oyuncusu",x.dp],["Soru",x.q]].filter(([,v])=>v).map(([l,v])=>`${l} ${v>0?"+":""}${v}`).join(" · ")||"Puan yok";
-    return `<button type="button" class="b-rk ${u===S.uid?"me":""}" data-bpu="${u}"><span class="pl">${i<3&&x.pts>0?MEDAL[i+1]:i+1}</span>${avatar(u,"sm")}<span class="nm"><b style="color:${col(u)}">${esc(p.club||pname(u))}</b><small>${br}</small></span><span class="pt"><b class="tnum">${x.pts>0?"+":""}${x.pts}</b></span></button>`; }).join("")}</div>`;
+    return `<button type="button" class="b-rk ${u===S.uid?"me":""}" data-bpu="${u}"><span class="pl">${pl<=3&&x.pts>0?MEDAL[pl]:pl}</span>${avatar(u,"sm")}<span class="nm"><b style="color:${col(u)}">${esc(p.club||pname(u))}</b><small>${br}</small></span><span class="pt"><b class="tnum">${x.pts>0?"+":""}${x.pts}</b></span></button>`; }).join("")}</div>`;
   const games = `<div class="b-lb"><span>MAÇLAR</span><span>Kaç kişi kazananı bildi</span></div><div class="b-gr">${D.games.map(g=>{ const live=g.state!=="pre", lead=(g.home.score??0)-(g.away.score??0), w=lead>0?g.home.abbr:lead<0?g.away.abbr:null;
     const ps=S.order.map(u=>D.picks[g.id]?.[u]).filter(Boolean), ok=w?ps.filter(p=>p.winner===w).length:0;
     return `<button class="b-row" type="button" data-bbox="${g.id}" data-bday="${d}"><span class="teams">${[g.away,g.home].map((t,i)=>`<span class="t ${g.state==="post"&&((i===0&&lead>0)||(i===1&&lead<0))?"lose":""}">${bLogo(t)}<b>${esc(t.name)}</b>${live&&t.score!=null?`<b class="sc tnum">${t.score}</b>`:""}</span>`).join("")}</span>
