@@ -47,12 +47,13 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.49.2";
+const VERSION = "1.50.0";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.50.0", d:"12 Kasım 2026", items:["Maç penceresi ve Canlı › Özet: kazanma ihtimali grafiği (ESPN, her oyunda) ve maçı en çok çeviren sayılar, kimin attığı ve ihtimali yüzde kaçtan kaça taşıdığıyla.","İstatistik sekmesi: Dört faktör (etkili isabet, top kaybı oranı, hücum ribaundu oranı, serbest atış oranı), 100 hücumda sayı ve maçın temposu.","Maçın en verimli üç oyuncusu: Game Score ve gerçek isabet (TS) ile. Oyuncuya dokununca kartı açılıyor.","Maç bilgisi: salon, seyirci sayısı ve hakemler."]},
   {v:"1.49.0", d:"12 Kasım 2026", items:["Takım sayfası: Form (son 15 maçın skor farkı) ve Sezon istatistikleri (sayı, isabet, üçlük, ribaund, asist, top çalma, blok, top kaybı…) ligdeki sırasıyla; ilk 8 yeşil, son 8 kırmızı.","Oyuncu kartı: Ayrımlar tablosu (iç saha / deplasman, galibiyet / mağlubiyet, aylara göre) ve en çok / en az sayı attığı rakip.","Maç penceresi ve Canlı › İstatistik: oyuncu tablosu sütuna dokununca sıralanıyor; yeni ORT± sütunu oyuncunun bu maçta sezon ortalamasının ne kadar üstünde ya da altında attığını gösteriyor. Şut haritası oyuncuya göre de süzülebiliyor."]},
   {v:"1.48.3", d:"12 Kasım 2026", items:["Haftalık ilk 3'te sıra artık atlanmıyor: bütün eşitlik bozucular da eşitse iki kişi birinciyse ikisi de +5 alır, sonraki kişi ikinci olur ve +3 alır."]},
   {v:"1.48.2", d:"12 Kasım 2026", quiet:true, items:["Canlı sayfasının deneme modu kaldırıldı. Eski görünümde üstteki Kurallar ve Puanlama simgelerinin yerine \"Yeni görünüme dön\" düğmesi var."]},
@@ -514,7 +515,8 @@ function boxPlayers(sum){
         out.push({ id:String(a.athlete.id), name:a.athlete.displayName, team:team.team.abbreviation, starter:a.starter,
           pts:+r.points||0, reb:+r.rebounds||0, ast:+r.assists||0, min:r.minutes||"0",
           fg:r["fieldGoalsMade-fieldGoalsAttempted"]||"", tp:r["threePointFieldGoalsMade-threePointFieldGoalsAttempted"]||"",
-          ft:r["freeThrowsMade-freeThrowsAttempted"]||"", pm:r.plusMinus||"" });
+          ft:r["freeThrowsMade-freeThrowsAttempted"]||"", pm:r.plusMinus||"",
+          stl:+r.steals||0, blk:+r.blocks||0, to:+r.turnovers||0, oreb:+r.offensiveRebounds||0, dreb:+r.defensiveRebounds||0, pf:+r.fouls||0 });
       }
     }
   }
@@ -6612,7 +6614,7 @@ function betaBoxPaint(){
   let body="";
   if(tab==="box") body=`${lbBtn}${box}${qs}`;
   else if(!hasPlays) body=`<p class="cl-none">Bu maçın oyun akışı henüz yok.</p>`;
-  else if(tab==="ozet"){ const fl=clFlow(gg,s); body=`${clChart(gg,s)}${clMomentsHTML(gg,s,6)}${fl.last.length?`<div class="cl-sec">SON SAYILAR</div><div class="cl-last">${fl.last.map(p=>`<span>${p.t?bLogo(p.t,16):""}<b>${esc(p.who)}</b><small>${p.k}</small><i class="tnum">${p.at}</i><b class="tnum">${p.sc}</b></span>`).join("")}</div>`:""}`; }
+  else if(tab==="ozet"){ const fl=clFlow(gg,s); body=`${clChart(gg,s)}${clWP(gg,s,3)}${clMomentsHTML(gg,s,6)}${fl.last.length?`<div class="cl-sec">SON SAYILAR</div><div class="cl-last">${fl.last.map(p=>`<span>${p.t?bLogo(p.t,16):""}<b>${esc(p.who)}</b><small>${p.k}</small><i class="tnum">${p.at}</i><b class="tnum">${p.sc}</b></span>`).join("")}</div>`:""}`; }
   else if(tab==="per") body=`<div class="cl-pers" role="group" aria-label="Periyot seç (birden fazla seçilebilir)"><button type="button" aria-pressed="${pers.length===np}" data-clper="all" data-g="${g.id}">Tümü</button>${Array.from({length:np},(_,i)=>i+1).map(p=>`<button type="button" aria-pressed="${pers.includes(p)}" data-clper="${p}" data-g="${g.id}">${p<=4?p+". Ç":p===5?"UZ":(p-4)+". UZ"}</button>`).join("")}</div><p class="cl-hint">Birden fazla periyot seçebilirsin; istatistikler seçtiklerinin toplamı.</p>${clPeriod(gg,s,pers)}`;
   else if(tab==="ist") body=clStats(gg,s);
   else body=`${who||`<p class="cl-none">Ligde bu maça tahmin yapan yok.</p>`}${talk}`;
@@ -7472,11 +7474,80 @@ function clStats(g, s){
     row("Top çalma","steals"), row("Blok","blocks"), row("Top kaybı","totalTurnovers",true), row("Top kaybından sayı","turnoverPoints"), row("Hızlı hücum sayısı","fastBreakPoints"),
     row("Boyalı alan sayısı","pointsInPaint"), row("Faul","fouls",true), row("En büyük fark","largestLead"), row("Önde geçen süre %","leadPercentage")].filter(Boolean);
   const sd=BETA.cl.btab?.[g.id]||"a", bp=boxPlayers(s).map(p=>({...p, sd:p.team===A?"a":"h"})).sort((x,y)=>y.pts-x.pts);
-  return `<div class="cl-sec">TAKIM İSTATİSTİKLERİ <small>bütün maç</small></div>${clStatRows(g,rows)}
-    <div class="cl-sec">OYUNCULAR <small>bütün maç</small></div>
+  return `${clFour(g,s)}<div class="cl-sec">TAKIM İSTATİSTİKLERİ <small>bütün maç</small></div>${clStatRows(g,rows)}
+    ${clEff(g,s)}<div class="cl-sec">OYUNCULAR <small>bütün maç</small></div>
     <div class="cl-segm" role="tablist" aria-label="Takım">${["a","h"].map(k=>{ const tt=k==="a"?g.away:g.home; return `<button type="button" role="tab" aria-selected="${sd===k}" data-clbt="${k}" data-g="${g.id}">${bLogo(tt,16)} ${esc(tt.name)}</button>`; }).join("")}</div>
     ${clPlayerTable(g,s,bp,sd,true)}
-    <div class="cl-sec">ŞUT HARİTASI <small>bütün maç</small></div>${clShots(g,s,null,g.id+"s")}`;
+    <div class="cl-sec">ŞUT HARİTASI <small>bütün maç</small></div>${clShots(g,s,null,g.id+"s")}${clInfo(s)}`;
+}
+// 1.50.0: Dean Oliver'ın dört faktörü + tempo ve hücum verimi (takım box score'undan)
+function clFour(g, s){
+  const T=s?.boxscore?.teams||[]; if(T.length<2) return "";
+  const v=(abbr,n,i=0)=>{ const t=T.find(x=>x.team?.abbreviation===abbr); const d=t?.statistics?.find(x=>x.name===n)?.displayValue; return d==null?NaN:+String(d).split("-")[i]; };
+  const st=ab=>({fgm:v(ab,"fieldGoalsMade-fieldGoalsAttempted"), fga:v(ab,"fieldGoalsMade-fieldGoalsAttempted",1), tpm:v(ab,"threePointFieldGoalsMade-threePointFieldGoalsAttempted"),
+    ftm:v(ab,"freeThrowsMade-freeThrowsAttempted"), fta:v(ab,"freeThrowsMade-freeThrowsAttempted",1), or:v(ab,"offensiveRebounds"), dr:v(ab,"defensiveRebounds"), to:v(ab,"totalTurnovers")});
+  const A=st(g.away.abbr), H=st(g.home.abbr); if(!(A.fga>0 && H.fga>0) || [A,H].some(x=>Object.values(x).some(isNaN))) return "";
+  const pos=x=>x.fga-x.or+x.to+0.44*x.fta, P=(pos(A)+pos(H))/2; if(P<20) return "";
+  const pa=g.away.score??0, ph=g.home.score??0;
+  const f=(x,o)=>({efg:(x.fgm+0.5*x.tpm)/x.fga*100, tov:x.to/pos(x)*100, orb:x.or/((x.or+o.dr)||1)*100, ftr:x.ftm/x.fga*100});
+  const a=f(A,H), h=f(H,A), d1=n=>n.toFixed(1).replace(".",","), pc=n=>"%"+d1(n);
+  const mins=Math.max(48, g.period>4?48+(g.period-4)*5:48), pace=P*48/mins;
+  const rows=[["Etkili isabet (eFG)",pc(a.efg),pc(h.efg),a.efg,h.efg],["Top kaybı oranı",pc(a.tov),pc(h.tov),a.tov,h.tov,true],
+    ["Hücum ribaundu oranı",pc(a.orb),pc(h.orb),a.orb,h.orb],["Serbest atış oranı",d1(a.ftr),d1(h.ftr),a.ftr,h.ftr],
+    ["100 hücumda sayı",d1(pa/P*100),d1(ph/P*100),pa/P*100,ph/P*100]];
+  return `<div class="cl-sec">DÖRT FAKTÖR <small>${g.state==="in"?"şu ana kadar":"bütün maç"}</small></div>${clStatRows(g,rows)}
+    <p class="cl-hint">Maçı en çok belirleyen dört şey: isabet (üçlük 1,5 sayılır), topu kaybetmemek, hücum ribaundu ve çizgiye gitmek. Serbest atış oranı: 100 şut denemesine düşen isabetli serbest atış. Tempo ${d1(pace)} hücum (48 dakikaya göre).</p>`;
+}
+// maçın en verimlileri: Game Score (Hollinger) ve gerçek isabet (TS)
+function clEff(g, s){
+  const bp=boxPlayers(s).filter(p=>p.min && p.min!=="0"); if(bp.length<4) return "";
+  const n=(v,i)=>+String(v||"0-0").split("-")[i]||0;
+  const gs=p=>p.pts+0.4*n(p.fg,0)-0.7*n(p.fg,1)-0.4*(n(p.ft,1)-n(p.ft,0))+0.7*p.oreb+0.3*p.dreb+p.stl+0.7*p.ast+0.7*p.blk-0.4*p.pf-p.to;
+  const ts=p=>{ const d=2*(n(p.fg,1)+0.44*n(p.ft,1)); return d?p.pts/d*100:null; };
+  const top=bp.map(p=>({...p, gs:gs(p), ts:ts(p)})).sort((x,y)=>y.gs-x.gs).slice(0,3);
+  const d1=x=>x.toFixed(1).replace(".",",");
+  return `<div class="cl-sec">EN VERİMLİLER <small>Game Score</small></div><div class="cl-eff">${top.map((p,i)=>{ const t=p.team===g.away.abbr?g.away:g.home;
+    return `<button type="button" class="cl-ef" data-ath="${escA(p.id)}"><i class="tnum">${i+1}</i>${bLogo(t,18)}<span><b>${esc(p.name)}</b><small>${p.pts} sayı · ${p.reb} rib · ${p.ast} ast${p.blk?` · ${p.blk} blok`:""}${p.stl?` · ${p.stl} top çalma`:""}${p.to?` · ${p.to} top kaybı`:""}</small></span><span class="v"><b class="tnum">${d1(p.gs)}</b><small>${p.ts!=null?"TS %"+Math.round(p.ts):""}</small></span></button>`; }).join("")}</div>
+    <p class="cl-hint">Game Score; sayı, isabet, ribaund, asist, top çalma, blok, faul ve top kaybını tek sayıda toplar (10 iyi, 20 çok iyi, 30+ olağanüstü). TS: serbest atışlar dahil gerçek isabet.</p>`;
+}
+// maç bilgisi: salon, seyirci, hakemler
+function clInfo(s){
+  const gi=s?.gameInfo; if(!gi) return "";
+  const v=gi.venue, refs=(gi.officials||[]).map(o=>o.displayName||o.fullName).filter(Boolean);
+  const parts=[v?.fullName?`<span><small>Salon</small><b>${esc(v.fullName)}${v.address?.city?`, ${esc(v.address.city)}`:""}</b></span>`:"",
+    gi.attendance?`<span><small>Seyirci</small><b class="tnum">${(+gi.attendance).toLocaleString("tr-TR")}</b></span>`:"",
+    refs.length?`<span><small>Hakemler</small><b>${refs.map(esc).join(", ")}</b></span>`:""].filter(Boolean);
+  return parts.length?`<div class="cl-sec">MAÇ BİLGİSİ</div><div class="cl-info">${parts.join("")}</div>`:"";
+}
+// 1.50.0: kazanma ihtimali grafiği (ESPN, her oyunda) ve maçı en çok çeviren sayılar
+function clWP(g, s, n=3){
+  const W=s?.winprobability||[]; if(W.length<10) return "";
+  const byId=new Map((s.plays||[]).map(p=>[String(p.id),p]));
+  const pts=[]; let prev=null; const sw=[];
+  for(const w of W){ const p=byId.get(String(w.playId)); if(!p?.period?.number) continue;
+    const t=clMin(p.period.number,p.clock?.displayValue), hw=w.homeWinPercentage*100;
+    if(prev!=null && p.scoringPlay && p.scoreValue>0) sw.push({p, t, from:prev, to:hw, d:hw-prev});
+    if(!pts.length || t>=pts[pts.length-1].t) pts.push({t, w:hw}); prev=hw; }
+  if(pts.length<5) return "";
+  const full=Math.max(48, g.period>4?48+(g.period-4)*5:48), X=320, Y=80, x=t=>(t/full*X).toFixed(1), y=w=>(Y-w/100*Y).toFixed(1);
+  const line=pts.map((p,i)=>`${i?"L":"M"}${x(p.t)},${y(p.w)}`).join(""), last=pts[pts.length-1];
+  const area=`${line}L${x(last.t)},${Y/2}L${x(pts[0].t)},${Y/2}Z`, id="wp"+g.id;
+  const bounds=Array.from({length:Math.max(4,g.period)-1},(_,i)=>clPerRange(i+2)[0]);
+  const byTeam={[String(g.away.id)]:g.away, [String(g.home.id)]:g.home}, names=Object.fromEntries(boxPlayers(s).map(p=>[p.id,p.name]));
+  const kind=v=>v===3?"üçlük":v===1?"serbest atış":"2 sayı";
+  const top=sw.sort((a,b)=>Math.abs(b.d)-Math.abs(a.d)).slice(0,n).filter(m=>Math.abs(m.d)>=4).sort((a,b)=>a.t-b.t);
+  const lw=Math.round(last.w), lead=lw>=50?g.home:g.away, lp=lw>=50?lw:100-lw;
+  const head=g.state==="post"?"":`<small>Şu an: ${esc(lead.name)} %${lp}</small>`;
+  return `<figure class="cl-flow cl-wp" role="img" aria-label="Kazanma ihtimali grafiği">
+    <div class="cl-chl"><span>${bLogo(g.home,16)} ${escA(g.home.abbr)} %100</span>${head}</div>
+    <svg viewBox="0 0 ${X} ${Y}" preserveAspectRatio="none" aria-hidden="true"><defs><clipPath id="${id}t"><rect x="0" y="0" width="${X}" height="${Y/2}"/></clipPath><clipPath id="${id}b"><rect x="0" y="${Y/2}" width="${X}" height="${Y/2}"/></clipPath></defs>
+      ${bounds.map(t=>`<line x1="${x(t)}" x2="${x(t)}" y1="0" y2="${Y}" class="q"/>`).join("")}<line x1="0" x2="${X}" y1="${Y/2}" y2="${Y/2}" class="z"/>
+      <path d="${area}" clip-path="url(#${id}t)" class="fh"/><path d="${area}" clip-path="url(#${id}b)" class="fa"/>
+      <path d="${line}" fill="none" stroke="var(--ink)" stroke-width="1.4" vector-effect="non-scaling-stroke"/>
+      ${top.map(m=>`<circle cx="${x(m.t)}" cy="${y(m.to)}" r="3" class="mk"/>`).join("")}</svg>
+    <div class="cl-chl"><span>${bLogo(g.away,16)} ${escA(g.away.abbr)} %100</span><small>ESPN kazanma ihtimali</small></div></figure>
+    ${top.length?`<div class="cl-sec">MAÇI ÇEVİREN SAYILAR</div><div class="cl-last cl-sw">${top.map(m=>{ const t=byTeam[String(m.p.team?.id)], who=surname(names[String(m.p.participants?.[0]?.athlete?.id)]||""), tw=t===g.home?m.to:100-m.to, fw=t===g.home?m.from:100-m.from;
+      return `<span>${t?bLogo(t,16):""}<b>${esc(who)}</b><small>${kind(m.p.scoreValue)} · %${Math.round(fw)} → %${Math.round(tw)}</small><i class="tnum">${clAt(m.p.period.number,m.p.clock?.displayValue)}</i><b class="tnum">${m.p.awayScore}-${m.p.homeScore}</b></span>`; }).join("")}</div>`:""}`;
 }
 
 // maç şeridi: canlı maçlar yan yana küçük kartlar; dokunulan maç aşağıda açılır
@@ -7500,7 +7571,7 @@ function clCard(x){
   const tabs=[["ozet","Özet"],["per","Periyotlar"],["ist","İstatistik"],["lig","Tahminler"]];
   let body="";
   if(!s) body=`<p class="cl-none">Maç verisi yükleniyor…</p>`;
-  else if(tab==="ozet") body=`${clChart(g,s)}${fl.run?`<div class="cl-run">${bLogo(fl.run.t,18)} <b>${esc(fl.run.t.name)} ${fl.run.pts}-0 seri yakaladı</b></div>`:""}${clMomentsHTML(g,s,3)}
+  else if(tab==="ozet") body=`${clChart(g,s)}${clWP(g,s,2)}${fl.run?`<div class="cl-run">${bLogo(fl.run.t,18)} <b>${esc(fl.run.t.name)} ${fl.run.pts}-0 seri yakaladı</b></div>`:""}${clMomentsHTML(g,s,3)}
       ${fl.last.length?`<div class="cl-sec">SON SAYILAR</div><div class="cl-last">${fl.last.slice(0,3).map(p=>`<span>${p.t?bLogo(p.t,16):""}<b>${esc(p.who)}</b><small>${p.k}</small><i class="tnum">${p.at}</i><b class="tnum">${p.sc}</b></span>`).join("")}</div>`:""}`;
   else if(tab==="per") body=`${lineScore(g)}<div class="cl-pers" role="group" aria-label="Periyot seç (birden fazla seçilebilir)"><button type="button" aria-pressed="${pers.length===np}" data-clper="all" data-g="${g.id}">Tümü</button>${Array.from({length:np},(_,i)=>i+1).map(p=>`<button type="button" aria-pressed="${pers.includes(p)}" data-clper="${p}" data-g="${g.id}">${p<=4?p+". Ç":p===5?"UZ":(p-4)+". UZ"}</button>`).join("")}</div><p class="cl-hint">Birden fazla periyot seçebilirsin; istatistikler seçtiklerinin toplamı.</p>${clPeriod(g,s,pers)}`;
   else if(tab==="lig") body=`<div class="cl-sec">LİGİN TAHMİNLERİ <small>maç şu an bitse</small></div>${clPicks({...g, id:oid},D)}`;

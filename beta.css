@@ -1034,3 +1034,16 @@ body.beta tr[data-ath],tr[data-ath]{cursor:pointer}
 .cl-pf button small{color:var(--muted);font-weight:600}
 .cl-pf button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}.cl-pf button[aria-pressed="true"] small{color:var(--bg);opacity:.7}
 @media (max-width:420px){.ts-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+/* 1.50.0: kazanma ihtimali, en verimliler, maç bilgisi */
+.cl-wp{margin-top:10px}.cl-wp svg{height:88px}
+.cl-wp .mk{fill:var(--amber);stroke:var(--panel);stroke-width:1.5;vector-effect:non-scaling-stroke}
+.cl-sw span{grid-template-columns:18px minmax(0,1fr) auto auto auto}
+.cl-eff{display:flex;flex-direction:column;gap:6px}
+.cl-ef{display:grid;grid-template-columns:16px 18px minmax(0,1fr) auto;align-items:center;gap:8px;padding:8px 10px;border-radius:12px;border:1px solid var(--line);background:var(--panel-2);color:var(--ink);font:inherit;text-align:left;cursor:pointer;width:100%}
+.cl-ef>i{font-style:normal;color:var(--muted);font-size:12px;font-weight:700}
+.cl-ef span{display:flex;flex-direction:column;min-width:0}
+.cl-ef span b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:14px}
+.cl-ef span small{color:var(--muted);font-size:12px}
+.cl-ef .v{align-items:flex-end}.cl-ef .v b{font-size:17px}
+.cl-info{display:flex;flex-direction:column;gap:6px;font-size:13px}
+.cl-info span{display:grid;grid-template-columns:72px 1fr;gap:8px}.cl-info small{color:var(--muted)}
