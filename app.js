@@ -47,12 +47,13 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.47.0";
+const VERSION = "1.47.1";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.47.1", d:"12 Kasım 2026", quiet:true, items:["Açılışta tekrar tekrar çıkan pencereler azaltıldı: Yenilikler en fazla günde bir kez ve arada çıkan sürümler tek pencerede; aynı rozet artık tekrar \"Yeni rozet!\" diye çıkmıyor."]},
   {v:"1.47.0", d:"12 Kasım 2026", items:["Canlı maç kartında sekmeler: Özet, Periyotlar, İstatistik, Tahminler.","Periyotlar: birden fazla periyot birlikte seçilebilir (ör. 1. ve 3. çeyrek); skor, akış grafiği, takım istatistikleri, oyuncu tablosu, şut haritası, önemli anlar ve bütün sayılar seçtiğin periyotlara göre hesaplanır.","İstatistik: ESPN takım istatistiklerinin tamamı (hızlı hücum, boyalı alan, top kaybından sayı, önde geçen süre…), bütün oyuncuların tablosu ve maçın şut haritası.","Skor değişince sayı kısa bir an parlıyor. \"Kutu skoru\" artık \"Box score\"."]},
   {v:"1.46.1", d:"12 Kasım 2026", quiet:true, items:["Canlı: süren periyotta \"periyodu aldı\" yerine \"bu periyotta önde\" yazıyor; demo, kutu skoru açıkken kendini yenilemiyor."]},
   {v:"1.46.0", d:"12 Kasım 2026", items:["Canlı sayfası sadeleşti: birden fazla maç varken üstte küçük maç kartları, dokunduğun maç aşağıda tek kart olarak açılır.","Maç kartı sekmeli: Özet, Periyotlar, Lig ve İstatistik. Periyotlar sekmesinde her çeyreği ayrı inceleyebilirsin: çeyrek skoru, akış grafiği, o çeyreğin skorerleri, önemli anları ve bütün sayıları."]},
@@ -222,9 +223,10 @@ function openReport(kind){
       S.repKind=""; closeSheet(); toast("Teşekkürler, mesajın yöneticiye iletildi."); }
     catch(e){ $("#repErr").textContent="Gönderilemedi, tekrar dene."; $("#repSend").disabled=false; } };
 }
-function openNews(all=false){
-  if(BETA.on) return betaNews(all);
-  const list = all ? CHANGELOG : CHANGELOG.slice(0,1);
+function openNews(all=false, since=null){
+  if(BETA.on) return betaNews(all, since);
+  const nw = since ? CHANGELOG.filter(c=>!c.quiet && verNum(c.v)>verNum(since)) : [];
+  const list = all ? CHANGELOG : nw.length ? nw : CHANGELOG.slice(0,1);
   openSheet(`<h3 id="shTitle">Yenilikler</h3>${list.map(c=>`<div class="news"><div class="news-h"><b>Sürüm ${c.v}</b><small>${c.d}</small></div><ul>${c.items.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>`).join("")}
     ${all?"":`<button class="linkish" id="newsAll" type="button">Önceki sürümler</button>`}<button class="btn-primary" id="newsOk" type="button" style="margin-top:10px">Tamam</button>`);
   $("#newsOk").onclick=()=>closeSheet(); $("#newsAll")?.addEventListener("click", ()=>openNews(true));
@@ -235,8 +237,11 @@ function maybeNews(){
   if(seen===VERSION) return;
   if(CHANGELOG[0]?.v===VERSION && CHANGELOG[0].quiet){ lsSet("newsSeen", VERSION); return; }
   if(BETA.on && !lsGet("bIntroSeen")){ lsSet("newsSeen", VERSION); return; }   // yeni görünümün tanıtımı açılacak; aynı anda yenilikler penceresi çıkmasın   // sessiz sürüm: pencere açılmaz, Yenilikler listesinde durur
-  autoPop(5, ()=>lsGet("newsSeen")!==VERSION, ()=>{ lsSet("newsSeen", VERSION); openNews(); });
+  // 1.47.1: Yenilikler kendiliğinden en fazla 20 saatte bir açılır; arada çıkan bütün sürümler tek pencerede birlikte gösterilir
+  if(Date.now() - +(lsGet("newsPopAt")||0) < 20*36e5) return;
+  autoPop(5, ()=>lsGet("newsSeen")!==VERSION, ()=>{ lsSet("newsSeen", VERSION); lsSet("newsPopAt", String(Date.now())); openNews(false, seen); });
 }
+const verNum = v => String(v||"0").split(".").reduce((t,x)=>t*1000+(+x||0),0);
 // 1.30.1 güvenlik: kullanıcıdan gelen takım kısaltması / oyuncu numarası adrese girmeden temizlenir
 const safeId = v => String(v??"").replace(/[^0-9A-Za-z_-]/g,"");
 const LOGO_SMALL = a => `logos/${safeId(a).toLowerCase()}.png`;
@@ -4180,8 +4185,10 @@ document.addEventListener("click", e=>{ const b=e.target.closest("[data-lt]"); i
 function checkNewBadges(){
   if(!S.uid || checkNewBadges.busy || !S.arch?.scores?.games) return;
   const list=badgesOf(S.uid), cur=list.filter(b=>b.n).map(b=>b.id);
+  // 1.47.1: görülen rozetler yalnızca eklenir, hiç silinmez. Veri tam yüklenmeden yapılan bir kontrolde eksik görünen rozet
+  // (ör. profil bilgisi gelmeden "Kimlik kartı") listeden düşüp her girişte yeniden "Yeni rozet!" diye çıkıyordu.
   const key="badges2:"+S.uid; let old=null; try{ old=JSON.parse(localStorage.getItem(key)||"null"); }catch(e){}
-  try{ localStorage.setItem(key, JSON.stringify(cur)); }catch(e){}
+  try{ localStorage.setItem(key, JSON.stringify([...new Set([...(old||[]), ...cur])])); }catch(e){}
   if(!lsGet("bIntro1") && !checkNewBadges.intro){ checkNewBadges.intro=true; autoPop(3.5, ()=>!lsGet("bIntro1"), showBadgeIntro); }
   if(!old) return;
   const fresh=list.filter(b=>b.n && !old.includes(b.id)).sort((a,b)=>BTIER[b.tier].p-BTIER[a.tier].p);
@@ -6955,8 +6962,9 @@ function betaIst(u, st){
 
 /* ====================================================== beta: yenilikler (1.40.1) */
 // Oyunculara görünen değişiklik içermeyen sessiz sürümler tek satırda toplanır
-function betaNews(all){
-  const list = all ? CHANGELOG : CHANGELOG.filter(c=>!c.quiet).slice(0,1);
+function betaNews(all, since=null){
+  const nw = since ? CHANGELOG.filter(c=>!c.quiet && verNum(c.v)>verNum(since)) : [];
+  const list = all ? CHANGELOG : nw.length ? nw : CHANGELOG.filter(c=>!c.quiet).slice(0,1);
   let h="", q=[];
   const flush=()=>{ if(!q.length) return; h+=`<div class="bn-q">${q.length===1?`Sürüm ${q[0].v}`:`Sürüm ${q[q.length-1].v} – ${q[0].v}`} · küçük hazırlık ve düzeltmeler</div>`; q=[]; };
   for(const c of list){ if(c.quiet && c.items.length===1 && /Yönetici denemesi|yalnızca yönetici/i.test(c.items[0])){ q.push(c); continue; } flush();
