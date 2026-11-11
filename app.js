@@ -47,12 +47,13 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.46.0";
+const VERSION = "1.46.1";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.46.1", d:"12 Kasım 2026", quiet:true, items:["Canlı: süren periyotta \"periyodu aldı\" yerine \"bu periyotta önde\" yazıyor; demo, kutu skoru açıkken kendini yenilemiyor."]},
   {v:"1.46.0", d:"12 Kasım 2026", items:["Canlı sayfası sadeleşti: birden fazla maç varken üstte küçük maç kartları, dokunduğun maç aşağıda tek kart olarak açılır.","Maç kartı sekmeli: Özet, Periyotlar, Lig ve İstatistik. Periyotlar sekmesinde her çeyreği ayrı inceleyebilirsin: çeyrek skoru, akış grafiği, o çeyreğin skorerleri, önemli anları ve bütün sayıları."]},
   {v:"1.45.1", d:"12 Kasım 2026", quiet:true, items:["Canlı sayfasına deneme modu: adrese ?demo=canli eklenince dün geceki maçlar canlıymış gibi baştan oynatılır."]},
   {v:"1.45.0", d:"12 Kasım 2026", items:["Canlı sayfası maçlar başlamadan önce artık bir yayın öncesi ekranı: ilk maça geri sayım, gecenin vitrini (en dengeli maç, sürpriz adayı, en net favori) ve saat saat program. Kilitlenen maçta ligin seçimleri açılır.","Canlı maç kartlarında oyun akışı grafiği (kim, ne zaman, kaç sayı öndeydi), önemli anlar (liderlik değişimleri, seriler, 20-30-40 sayıya ulaşan oyuncular) ve gecenin günün oyuncusu yarışı."]},
@@ -7293,7 +7294,7 @@ function clPeriod(g, s, per){
   const tops=Object.values(by).sort((x,y)=>y.pts-x.pts).slice(0,4);
   const M=clMoments(g,s).list.filter(m=>{ const [t0,t1]=clPerRange(per); return m.t>t0 && m.t<=t1; });
   const kind=v=>v===3?"Üçlük":v===1?"Serbest atış":"2 sayı";
-  return `<div class="cl-psc"><span>${bLogo(g.away,22)}<b>${escA(g.away.abbr)}</b></span><b class="tnum">${a}<i>–</i>${h}</b><span><b>${escA(g.home.abbr)}</b>${bLogo(g.home,22)}</span><small>${clPerName(per)}${g.state==="in"&&per===g.period?" · sürüyor":""} · ${a===h?"berabere":`${esc((a>h?g.away:g.home).name)} periyodu ${Math.abs(a-h)} farkla aldı`}</small></div>
+  return `<div class="cl-psc"><span>${bLogo(g.away,22)}<b>${escA(g.away.abbr)}</b></span><b class="tnum">${a}<i>–</i>${h}</b><span><b>${escA(g.home.abbr)}</b>${bLogo(g.home,22)}</span><small>${clPerName(per)}${g.state==="in"&&per===g.period?" · sürüyor":""} · ${a===h?"berabere":g.state==="in"&&per===g.period?`${esc((a>h?g.away:g.home).name)} bu periyotta ${Math.abs(a-h)} sayı önde`:`${esc((a>h?g.away:g.home).name)} periyodu ${Math.abs(a-h)} farkla aldı`}</small></div>
     ${clChart(g,s,per)}
     ${tops.length?`<div class="cl-sec">BU PERİYODUN SKORERLERİ</div><div class="cl-ptop">${tops.map(t=>`<button type="button" class="cl-lp" data-ath="${t.id}" data-athn="${esc(names[t.id]||"")}"><b>${t.t?bLogo(t.t,14):""} ${esc(surname(names[t.id]||""))}</b><span><b>${t.pts}</b> sayı</span></button>`).join("")}</div>`:""}
     ${M.length?`<div class="cl-sec">ÖNEMLİ ANLAR</div><ol class="cl-mo">${M.map(m=>`<li><span class="ic" aria-hidden="true">${m.ic}</span><span>${m.txt}</span><i class="tnum">${m.at}</i></li>`).join("")}</ol>`:""}
@@ -7453,7 +7454,7 @@ function clDemo(){
   return `<div class="cl-demo"><b>DEMO</b><span>Dün geceki maçlar baştan oynatılıyor (1 maç dakikası = 4 saniye). Oyuncu istatistikleri maç sonundaki hali. Hiçbir şey kaydedilmez.</span><button type="button" class="btn" data-cldemo>Baştan başlat</button></div>`
     + clLive(cards, "CANLI MAÇLAR (DEMO)");
 }
-setInterval(()=>{ if(BETA.demo && S.tab==="canli" && !S.touching && $("#bcl")) betaCanli(); }, 3000);
+setInterval(()=>{ if(BETA.demo && S.tab==="canli" && !S.touching && $("#bcl") && $("#sheet")?.classList.contains("hide")) betaCanli(); }, 3000);
 document.addEventListener("click", e=>{ if(e.target.closest("[data-cldemo]")){ BETA.demoAt=Date.now(); betaCanli(); } });
 function betaCanli(){
   betaEnsurePages(); $("#view-canli")?.classList.remove("hide"); const el=$("#bcl"); if(!el) return;
