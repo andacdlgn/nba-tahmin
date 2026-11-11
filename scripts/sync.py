@@ -852,6 +852,41 @@ def save_payroll(force=False):
     return save("payroll.json", {"at": now.isoformat(timespec="seconds"), "season": season, "t": out})
 
 
+
+TS_KEYS = ["avgPoints", "fieldGoalPct", "threePointPct", "avgThreePointFieldGoalsMade", "freeThrowPct", "avgRebounds", "avgOffensiveRebounds",
+           "avgDefensiveRebounds", "avgAssists", "avgSteals", "avgBlocks", "avgTurnovers", "assistTurnoverRatio", "avgFouls", "twoPointFieldGoalPct"]
+
+
+def save_teamstats(force=False):
+    """Takım sezon istatistikleri (ESPN) -> data/teamstats.json; sitede lig sıralaması hesaplanır. Günde bir kez."""
+    old = load("teamstats.json", {})
+    now = datetime.now(timezone.utc)
+    try:
+        if not force and old.get("at") and (now - datetime.fromisoformat(old["at"])).total_seconds() < 20 * 3600:
+            return False
+    except Exception:
+        pass
+    teams = get(f"{ESPN}/teams")["sports"][0]["leagues"][0]["teams"]
+    out = {}
+    for t in teams:
+        a, tid = t["team"]["abbreviation"], t["team"]["id"]
+        try:
+            d = get(f"{ESPN}/teams/{tid}/statistics")
+            vals = {}
+            for c in d.get("results", {}).get("stats", {}).get("categories", []):
+                for x in c.get("stats", []):
+                    if x.get("name") in TS_KEYS and x.get("value") is not None:
+                        vals[x["name"]] = round(float(x["value"]), 3)
+            if vals:
+                out[a] = vals
+        except Exception as e:
+            print("Takım istatistiği alınamadı:", a, e)
+            if a in old.get("t", {}):
+                out[a] = old["t"][a]
+    if len(out) < 25:
+        raise RuntimeError(f"yalnızca {len(out)} takımın istatistiği geldi")
+    return save("teamstats.json", {"at": now.isoformat(timespec="seconds"), "t": out})
+
 def main(full=False):
     games = load("games.json", {})
     pstats = load("players.json", {"counted": [], "p": {}})
@@ -1152,6 +1187,10 @@ def main(full=False):
         changed.append(save_payroll())
     except Exception as e:
         print("Maaş listesi alınamadı:", e)
+    try:
+        changed.append(save_teamstats())
+    except Exception as e:
+        print("Takım istatistikleri alınamadı:", e)
     print(f"{len(games)} maç, {len(players)} oyuncu. Değişen dosya: {sum(changed)}")
     return 0
 

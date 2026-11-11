@@ -1014,3 +1014,23 @@ body.beta tr[data-ath],tr[data-ath]{cursor:pointer}
 .bb-tabs button{font-size:12.5px;padding:0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bb .cl-body{gap:12px}
 .bb-tabs{position:static}
+/* 1.49.0: takım sezon istatistikleri, form, sıralanabilir tablo, şut haritasında oyuncu, ayrımlar */
+.ts-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.ts-c{display:flex;flex-direction:column;gap:2px;padding:10px;border-radius:12px;background:var(--panel-2);border:1px solid var(--line)}
+.ts-c small{font-size:12px;color:var(--muted)}.ts-c b{font-family:"Barlow Condensed";font-weight:800;font-size:22px}.ts-c i{font-style:normal;font-size:12px;font-weight:700;color:var(--muted)}
+.ts-c.good{border-color:color-mix(in srgb,var(--win) 45%,transparent)}.ts-c.good i{color:var(--win)}
+.ts-c.bad{border-color:color-mix(in srgb,var(--lose) 45%,transparent)}.ts-c.bad i{color:var(--lose)}
+.tf-bars{display:flex;align-items:center;gap:3px;height:120px;padding:6px;border-radius:12px;background:var(--panel-2)}
+.tf-bars span{flex:1;height:100%;position:relative}
+.tf-bars span::before{content:"";position:absolute;left:0;right:0;top:50%;border-top:1px dashed var(--line)}
+.tf-bars i{position:absolute;left:18%;right:18%;border-radius:3px;max-width:18px;margin:0 auto}
+.tf-bars i.w{background:var(--win);bottom:50%}.tf-bars i.l{background:var(--lose);top:50%}
+.tf-bars img{position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:12px;height:12px;opacity:.75}
+.cl-sort{border:0;background:none;color:inherit;font:inherit;font-weight:700;cursor:pointer;padding:2px 0;white-space:nowrap}
+.cl-sort.on{color:var(--amber-ink)}
+.cl-tbl td.av .up{color:var(--win);font-weight:700}.cl-tbl td.av .dn{color:var(--lose);font-weight:700}
+.cl-pf{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
+.cl-pf button{flex:none;border:1px solid var(--line);background:var(--panel);color:var(--ink);font:inherit;font-size:12.5px;font-weight:700;border-radius:999px;padding:6px 10px;cursor:pointer;min-height:34px}
+.cl-pf button small{color:var(--muted);font-weight:600}
+.cl-pf button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}.cl-pf button[aria-pressed="true"] small{color:var(--bg);opacity:.7}
+@media (max-width:420px){.ts-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
