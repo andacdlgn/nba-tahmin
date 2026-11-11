@@ -1009,3 +1009,7 @@ body.beta tr[data-ath],tr[data-ath]{cursor:pointer}
 @media (prefers-reduced-motion:reduce){.cl-sc b.bump{animation:none}}
 .cl-tabs{position:sticky;top:calc(var(--b-head,0px) + 4px);z-index:2}
 .cl-tr{grid-template-columns:76px 1fr 76px}.cl-tr>b{font-size:13px;line-height:1.25}
+/* 1.48.0: maç penceresinde sekmeler */
+.bb-tabs{grid-template-columns:repeat(5,minmax(0,1fr));top:0;margin:10px 0 12px}
+.bb-tabs button{font-size:12.5px;padding:0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bb .cl-body{gap:12px}

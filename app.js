@@ -47,12 +47,13 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.47.1";
+const VERSION = "1.48.0";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.48.0", d:"12 Kasım 2026", items:["Maçlar sayfasında bir maça dokununca açılan pencere de sekmeli: Box score, Özet (oyun akışı ve önemli anlar), Periyotlar (bir ya da birkaç periyot seçip istatistik, oyuncu tablosu ve şut haritası), İstatistik (bütün takım istatistikleri ve maçın şut haritası) ve Tahminler (ligde kim ne dedi ve yorumlar). Biten maçlarda da çalışır."]},
   {v:"1.47.1", d:"12 Kasım 2026", quiet:true, items:["Açılışta tekrar tekrar çıkan pencereler azaltıldı: Yenilikler en fazla günde bir kez ve arada çıkan sürümler tek pencerede; aynı rozet artık tekrar \"Yeni rozet!\" diye çıkmıyor."]},
   {v:"1.47.0", d:"12 Kasım 2026", items:["Canlı maç kartında sekmeler: Özet, Periyotlar, İstatistik, Tahminler.","Periyotlar: birden fazla periyot birlikte seçilebilir (ör. 1. ve 3. çeyrek); skor, akış grafiği, takım istatistikleri, oyuncu tablosu, şut haritası, önemli anlar ve bütün sayılar seçtiğin periyotlara göre hesaplanır.","İstatistik: ESPN takım istatistiklerinin tamamı (hızlı hücum, boyalı alan, top kaybından sayı, önde geçen süre…), bütün oyuncuların tablosu ve maçın şut haritası.","Skor değişince sayı kısa bir an parlıyor. \"Kutu skoru\" artık \"Box score\"."]},
   {v:"1.46.1", d:"12 Kasım 2026", quiet:true, items:["Canlı: süren periyotta \"periyodu aldı\" yerine \"bu periyotta önde\" yazıyor; demo, kutu skoru açıkken kendini yenilemiyor."]},
@@ -6554,12 +6555,28 @@ function betaBoxPaint(){
       <div class="b-chips">${TALK_EMOJI.map(e=>`<button class="chip" type="button" data-btk="${e}" aria-pressed="${me.e===e}">${e}</button>`).join("")}<button class="chip" type="button" data-btkw>${me.t?"Yorumunu değiştir":"✍ Yorum yaz"}</button></div></div>` : "";
   const lbBtn = g.state==="post" ? `<button class="btn b-wide" type="button" data-lbl="${g.id}">🏀 LetterBasket'te logla${lbMine(g.id)?" · "+lbFmt(lbMine(g.id).r)+" top":""}</button>` : "";
   const flow = flowChart(g); const flowH = flow ? `<div class="b-lb"><span>SKOR AKIŞI</span><span></span></div><div class="b-gr bb-flow">${flow}</div>` : "";
-  $("#shBody").innerHTML = `<div class="bb">${head}${lbBtn}${box}${flowH}${stats}${qs}${who}${talk}</div>`;
+  // 1.48.0: Canlı sayfasındaki ayrıntılar maç penceresinde de: Box score · Özet · Periyotlar · İstatistik · Tahminler
+  const tab=B.tab||"box", np=Math.max(1, nq||g.period||4), gg={...g, period:Math.max(g.period||0, np)};
+  const pers=(BETA.cl.pers?.[g.id]||[g.state==="in"?np:np]).filter(p=>p<=np).sort((a,b)=>a-b); if(!pers.length) pers.push(np);
+  const tabs=[["box","Box score"],["ozet","Özet"],["per","Periyotlar"],["ist","İstatistik"],["tah","Tahminler"]];
+  const hasPlays=(s?.plays||[]).length>0;
+  let body="";
+  if(tab==="box") body=`${lbBtn}${box}${qs}`;
+  else if(!hasPlays) body=`<p class="cl-none">Bu maçın oyun akışı henüz yok.</p>`;
+  else if(tab==="ozet"){ const fl=clFlow(gg,s); body=`${clChart(gg,s)}${clMomentsHTML(gg,s,6)}${fl.last.length?`<div class="cl-sec">SON SAYILAR</div><div class="cl-last">${fl.last.map(p=>`<span>${p.t?bLogo(p.t,16):""}<b>${esc(p.who)}</b><small>${p.k}</small><i class="tnum">${p.at}</i><b class="tnum">${p.sc}</b></span>`).join("")}</div>`:""}`; }
+  else if(tab==="per") body=`<div class="cl-pers" role="group" aria-label="Periyot seç (birden fazla seçilebilir)"><button type="button" aria-pressed="${pers.length===np}" data-clper="all" data-g="${g.id}">Tümü</button>${Array.from({length:np},(_,i)=>i+1).map(p=>`<button type="button" aria-pressed="${pers.includes(p)}" data-clper="${p}" data-g="${g.id}">${p<=4?p+". Ç":p===5?"UZ":(p-4)+". UZ"}</button>`).join("")}</div><p class="cl-hint">Birden fazla periyot seçebilirsin; istatistikler seçtiklerinin toplamı.</p>${clPeriod(gg,s,pers)}`;
+  else if(tab==="ist") body=clStats(gg,s);
+  else body=`${who||`<p class="cl-none">Ligde bu maça tahmin yapan yok.</p>`}${talk}`;
+  if(tab==="ist" && !hasPlays) body=stats;
+  $("#shBody").innerHTML = `<div class="bb" style="--ca:${tcol(g.away.abbr)};--ch:${tcol(g.home.abbr)}">${head}
+    <div class="cl-tabs bb-tabs" role="tablist" aria-label="Maç ayrıntısı">${tabs.map(([k,l])=>`<button type="button" role="tab" aria-selected="${tab===k}" data-bxt="${k}">${l}</button>`).join("")}</div>
+    <div class="cl-body">${body}</div></div>`;
 }
 document.addEventListener("click", e=>{
   if(!BETA.on || !BETA.box) return;
-  const b=e.target.closest("[data-bxs],[data-bxall],[data-btk],[data-btkw]"); if(!b || !$("#shBody").contains(b)) return;
+  const b=e.target.closest("[data-bxs],[data-bxall],[data-btk],[data-btkw],[data-bxt]"); if(!b || !$("#shBody").contains(b)) return;
   const B=BETA.box, g=B.g;
+  if(b.dataset.bxt){ B.tab=b.dataset.bxt; betaBoxPaint(); $("#shBody")?.scrollTo?.({top:0}); return; }
   if(b.dataset.bxs){ B.side=b.dataset.bxs; B.all=false; return betaBoxPaint(); }
   if(b.hasAttribute("data-bxall")){ B.all=!B.all; return betaBoxPaint(); }
   if(b.dataset.btk){ S.day=betaDayOf(g); const cur=S.days[S.day]?.talk?.[g.id]?.[S.uid]?.e; saveTalk(g,{e: cur===b.dataset.btk?"":b.dataset.btk}).then(betaBoxPaint); setTimeout(betaBoxPaint,50); return; }
@@ -7527,12 +7544,13 @@ document.addEventListener("click", e=>{
   const t=e.target.closest("[data-clsel],[data-cltab],[data-clper],[data-clshot],[data-clpt],[data-clbt]"); if(!t || !BETA.on) return;
   if(t.dataset.clsel){ BETA.cl.sel=t.dataset.clsel; }
   else if(t.dataset.cltab){ BETA.cl.tab=t.dataset.cltab; }
-  else if(t.dataset.clper){ const P=(BETA.cl.pers ||= {}), gid=t.dataset.g, g=clGames().map(x=>x.g).find(x=>x.id===gid) || BETA.cl.demoG?.[gid], np=Math.max(1,g?.period||4);
+  else if(t.dataset.clper){ const P=(BETA.cl.pers ||= {}), gid=t.dataset.g, g=clGames().map(x=>x.g).find(x=>x.id===gid) || BETA.cl.demoG?.[gid] || (BETA.box?.g?.id===gid?BETA.box.g:null), np=Math.max(1,g?.period||4,g?.away?.ls?.length||0);
     if(t.dataset.clper==="all") P[gid]=Array.from({length:np},(_,i)=>i+1);
     else { const v=+t.dataset.clper, cur=new Set(P[gid]||[np]); if(cur.has(v) && cur.size>1) cur.delete(v); else cur.add(v); P[gid]=[...cur]; } }
   else if(t.dataset.clshot){ (BETA.cl.shot ||= {})[t.dataset.key]=t.dataset.clshot; }
   else if(t.dataset.clpt){ (BETA.cl.ptab ||= {})[t.dataset.g]=t.dataset.clpt; }
   else if(t.dataset.clbt){ (BETA.cl.btab ||= {})[t.dataset.g]=t.dataset.clbt; }
+  if($("#shBody")?.contains(t)) return betaBoxPaint();
   betaCanli();
 });
 // 1.45.0: Canlı demo (?demo=canli). Dün geceki biten maçlar, oyun akışı baştan oynatılarak canlıymış gibi gösterilir.
