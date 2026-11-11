@@ -47,12 +47,13 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.45.0";
+const VERSION = "1.45.1";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.45.1", d:"12 Kasım 2026", quiet:true, items:["Canlı sayfasına deneme modu: adrese ?demo=canli eklenince dün geceki maçlar canlıymış gibi baştan oynatılır."]},
   {v:"1.45.0", d:"12 Kasım 2026", items:["Canlı sayfası maçlar başlamadan önce artık bir yayın öncesi ekranı: ilk maça geri sayım, gecenin vitrini (en dengeli maç, sürpriz adayı, en net favori) ve saat saat program. Kilitlenen maçta ligin seçimleri açılır.","Canlı maç kartlarında oyun akışı grafiği (kim, ne zaman, kaç sayı öndeydi), önemli anlar (liderlik değişimleri, seriler, 20-30-40 sayıya ulaşan oyuncular) ve gecenin günün oyuncusu yarışı."]},
   {v:"1.44.0", d:"11 Kasım 2026", items:["Alt menü yenilendi: Bu gece, Canlı, Maçlar, Tahminler, Sıralama ve NBA. Tahminler artık kendi sayfasında.","Yeni Canlı sayfası: süren maçlarda skor, çeyrek ve süre, kazanma ihtimali, seriler, son sayılar, öne çıkan oyuncular, takım istatistikleri ve ligin o maçtaki tahminleri. Üstte gecenin canlı puan tablosu.","Haftalık ilk 3 ödülü artık +5 / +3 / +1."]},
   {v:"1.43.0", d:"11 Kasım 2026", items:["Avatar listesine kupalarıyla Efes formalı Vasilije Mićić eklendi."]},
@@ -7245,7 +7246,7 @@ function clCard(x){
   const my=D.picks[g.id]?.[S.uid], myR=my?scorePick(g,my,D.daily[S.uid]?.confGame===g.id):null;
   const team=(t,sc,other)=>`<span class="cl-tm ${sc<other?"behind":""}">${bLogo(t,40)}<b>${esc(t.name)}</b><small>${esc(t.rec||"")}</small></span>`;
   return `<article class="cl-g" style="--ca:${tcol(g.away.abbr)};--ch:${tcol(g.home.abbr)}">
-    <div class="cl-top"><span class="cl-st"><i class="cl-dot"></i>${clStatus(g)}</span>${myR?`<span class="cl-me">Sen: ${escA(my.winner)} +${my.margin} · ${bPts(myR.pts)}</span>`:`<span class="cl-me muted">Tahminin yok</span>`}</div>
+    <div class="cl-top"><span class="cl-st">${g.state==="post"?"Maç bitti":`<i class="cl-dot"></i>${clStatus(g)}`}</span>${myR?`<span class="cl-me">Sen: ${escA(my.winner)} +${my.margin} · ${bPts(myR.pts)}</span>`:`<span class="cl-me muted">Tahminin yok</span>`}</div>
     <div class="cl-sb">${team(g.away,g.away.score??0,g.home.score??0)}<span class="cl-sc tnum"><b>${g.away.score??0}</b><i>–</i><b>${g.home.score??0}</b><small>${lead}</small></span>${team(g.home,g.home.score??0,g.away.score??0)}</div>
     ${s?clChart(g,s):""}
     ${fl.run?`<div class="cl-run">${bLogo(fl.run.t,18)} <b>${esc(fl.run.t.name)} ${fl.run.pts}-0 seri yakaladı</b></div>`:""}
@@ -7373,12 +7374,40 @@ function clPreview(today, pre){
 }
 function clCount(t){ const ms=Math.max(0, t.getTime()-Date.now()), h=Math.floor(ms/36e5), m=Math.floor(ms%36e5/6e4), s=Math.floor(ms%6e4/1e3); return `${h}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`; }
 setInterval(()=>{ const el=document.getElementById("clCd"); if(!el || S.tab!=="canli") return; const t=new Date(+el.dataset.t); el.textContent=clCount(t); if(t.getTime()<=Date.now()) render(); }, 1000);
+// 1.45.0: Canlı demo (?demo=canli). Dün geceki biten maçlar, oyun akışı baştan oynatılarak canlıymış gibi gösterilir.
+// Yalnızca açan kişinin ekranında; hiçbir şey kaydedilmez. 1 maç dakikası = 4 saniye.
+BETA.demo = (()=>{ try{ return new URLSearchParams(location.search).get("demo")==="canli"; }catch(e){ return false; } })();
+function clDemo(){
+  const yd=shiftDay(S.today,-1), D=S.days[yd];
+  if(!D){ if(!BETA.demoL){ BETA.demoL=1; loadDay(yd).then(()=>{ if(S.tab==="canli") betaCanli(); }).catch(()=>{}); } return `<div class="b-gr cl-empty"><b>Demo hazırlanıyor…</b></div>`; }
+  const games=D.games.filter(g=>g.state==="post").slice(0,2);
+  const need=games.filter(g=>!S.sums[g.id]?.data?.plays?.length);
+  if(need.length){ need.forEach(g=>{ if(!(BETA.cl.w ||= {})[g.id]){ BETA.cl.w[g.id]=1; loadSummary(g,true).then(()=>{ if(S.tab==="canli") betaCanli(); }).catch(()=>{}).finally(()=>{ delete BETA.cl.w[g.id]; }); } }); return `<div class="b-gr cl-empty"><b>Demo hazırlanıyor…</b><small>Dün geceki maçların oyun akışı yükleniyor.</small></div>`; }
+  BETA.demoAt ||= Date.now();
+  const gm=(Date.now()-BETA.demoAt)/4000;
+  const cards=games.map(g=>{
+    const s=S.sums[g.id].data, plays=s.plays.filter(p=>p.period?.number && clMin(p.period.number, p.clock?.displayValue)<=gm);
+    const last=plays[plays.length-1]; const end=48+Math.max(0,(g.ls?.length||4)-4)*5; const done=gm>=end+0.5 || plays.length===s.plays.length;
+    const per=last?.period?.number||1, ls=side=>{ const out=[]; let prev=0; for(let q=1;q<=per;q++){ const lp=[...plays].reverse().find(p=>p.period.number===q); const v=lp?+(side==="a"?lp.awayScore:lp.homeScore):prev; out.push(v-prev); prev=v; } return out; };
+    const id="demo"+g.id, ids=new Set(plays.map(p=>String(p.id)));
+    const g2={...g, id, state:done?"post":"in", period:per, clock:last?.clock?.displayValue||"12:00", typeName:"STATUS_IN_PROGRESS", detail:"",
+      away:{...g.away, score:last?+last.awayScore:0, ls:ls("a")}, home:{...g.home, score:last?+last.homeScore:0, ls:ls("h")}};
+    S.sums[id]={at:Date.now(), data:{...s, plays, winprobability:(s.winprobability||[]).filter(w=>ids.has(String(w.playId)))}};
+    const D2={picks:{[id]:D.picks[g.id]||{}}, daily:Object.fromEntries(S.order.map(u=>[u,{...(D.daily[u]||{}), confGame:D.daily[u]?.confGame===g.id?id:""}]))};
+    return clCard({g:g2, d:yd, D:D2});
+  });
+  return `<div class="cl-demo"><b>DEMO</b><span>Dün geceki maçlar baştan oynatılıyor (1 maç dakikası = 4 saniye). Oyuncu istatistikleri maç sonundaki hali. Hiçbir şey kaydedilmez.</span><button type="button" class="btn" data-cldemo>Baştan başlat</button></div>`
+    + `<div class="b-lb"><span>CANLI MAÇLAR (DEMO)</span><span>${games.length} maç</span></div>` + cards.join("");
+}
+setInterval(()=>{ if(BETA.demo && S.tab==="canli" && !S.touching && $("#bcl")) betaCanli(); }, 3000);
+document.addEventListener("click", e=>{ if(e.target.closest("[data-cldemo]")){ BETA.demoAt=Date.now(); betaCanli(); } });
 function betaCanli(){
   betaEnsurePages(); $("#view-canli")?.classList.remove("hide"); const el=$("#bcl"); if(!el) return;
   const all=clGames(), live=all.filter(x=>x.g.state==="in"), today=all.filter(x=>x.d===S.today);
   const pre=today.filter(x=>x.g.state==="pre"), post=today.filter(x=>x.g.state==="post");
   BETA.clSub = live.length ? `${live.length} maç canlı${post.length?` · ${post.length} bitti`:""}${pre.length?` · ${pre.length} sırada`:""}` : pre.length ? `Yayın öncesi · ilk maç ${timeTR(pre[0].g.start)}` : today.length ? "Bu gecenin maçları bitti" : "Bu gece maç yok";
   let html="";
+  if(BETA.demo){ el.innerHTML=clDemo(); BETA.clSub="Demo · dün geceki maçlar"; return; }
   if(!live.length && !pre.length){
     html+=`<div class="b-gr cl-empty"><b>${today.length?"Bu gecenin maçları bitti":"Bu gece NBA'de maç yok"}</b>
       <small>${today.length?"Gecenin özetine ya da skorlara bakabilirsin.":"Sıradaki geceye Bu gece sayfasından tahmin yapabilirsin."}</small>
