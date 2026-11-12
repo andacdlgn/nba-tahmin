@@ -47,12 +47,13 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.51.3";
+const VERSION = "1.52.0";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.52.0", d:"12 Kasım 2026", items:["Tahminler: gecenin ilk kilidinden sonra en üstte Günün oyuncusu ve Gecenin sorusu bölümleri. Kim hangi oyuncuyu seçti, kim Evet / Hayır dedi, doğrusu ne ve kim puan aldı; gece sürerken şu an önde olan skorer görünür. Oyuncu filtresiyle birlikte çalışır.","Duyurular varsayılan olarak 2 gün görünür."]},
   {v:"1.51.0", d:"12 Kasım 2026", items:["Sıralama: sezon tablosunda her oyuncunun yanında son geceye göre sıra değişimi (▲ / ▼). Bir oyuncuya dokununca yeni \"Kafa kafaya\" düğmesi: kaç gece kim önde bitirdi, ayrıştığınız maçlarda kim haklı çıktı, en çok hangi takımların maçlarında ayrıştınız.","Canlı: en üstte \"gece şu an bitse\" kutusu; gecedeki sıran, puanın, lidere farkın ve sezon sırana etkisi.","Bu gece: kilitlenen maçların satırında ligin dağılımı (kaç kişi hangi takımı seçti).","Maç önü penceresi: iki takımın sezon istatistikleri lig sıralarıyla yan yana ve iki takımın son maçlarının formu.","Profil: sezon boyu gece puanı çizgisi ve aynı gecelerin lig ortalaması. En iyi bildiği takımlar için en az 5 maç şartı; yanında en çok yanıldığı takım.","Oyuncu kartı: sezonluk verim (gerçek isabet, etkili isabet, serbest atış oranı).","Duyurular artık süreli (varsayılan 2 gün); süresi dolan duyuru kendiliğinden kalkar."]},
   {v:"1.50.0", d:"12 Kasım 2026", items:["Maç penceresi ve Canlı › Özet: kazanma ihtimali grafiği (ESPN, her oyunda) ve maçı en çok çeviren sayılar, kimin attığı ve ihtimali yüzde kaçtan kaça taşıdığıyla.","İstatistik sekmesi: Dört faktör (etkili isabet, top kaybı oranı, hücum ribaundu oranı, serbest atış oranı), 100 hücumda sayı ve maçın temposu.","Maçın en verimli üç oyuncusu: Game Score ve gerçek isabet (TS) ile. Oyuncuya dokununca kartı açılıyor.","Maç bilgisi: salon, seyirci sayısı ve hakemler."]},
   {v:"1.49.0", d:"12 Kasım 2026", items:["Takım sayfası: Form (son 15 maçın skor farkı) ve Sezon istatistikleri (sayı, isabet, üçlük, ribaund, asist, top çalma, blok, top kaybı…) ligdeki sırasıyla; ilk 8 yeşil, son 8 kırmızı.","Oyuncu kartı: Ayrımlar tablosu (iç saha / deplasman, galibiyet / mağlubiyet, aylara göre) ve en çok / en az sayı attığı rakip.","Maç penceresi ve Canlı › İstatistik: oyuncu tablosu sütuna dokununca sıralanıyor; yeni ORT± sütunu oyuncunun bu maçta sezon ortalamasının ne kadar üstünde ya da altında attığını gösteriyor. Şut haritası oyuncuya göre de süzülebiliyor."]},
@@ -2421,6 +2422,35 @@ $("#rdNext").onclick=()=>{ S.rday=shiftDay(resDay(),1); renderResults(); };
 // ilk maçı kilitlenene kadar burada kalır.
 function tahDefault(){ const T=S.days[S.today]; return T && T.games.length && T.games.some(started) ? S.today : shiftDay(S.today,-1); }
 function tahDay(){ const d=tahDefault(); return S.thDay && S.thDay<d ? S.thDay : d; }
+// 1.52.0: Tahminler › gecenin sorusu ve günün oyuncusu: kim ne dedi, doğrusu ne (ilk kilitten sonra görünür)
+function nightExtrasHTML(day, D, fu){
+  if(!D?.games.some(started)) return "";
+  const us=S.order.filter(u=>!fu || u===fu), nm=u=>`<b style="color:${col(u)}">${esc(pname(u))}</b>`;
+  const who=list=>list.map(u=>`<span class="nx-u" data-hsu="${u}">${avatar(u,"sm")}${nm(u)}</span>`).join("");
+  // gecenin sorusu
+  const q=questionOf(day), r=questionResult(day), lbl=v=>v==="y"?"Evet":"Hayır";
+  const qCol=a=>{ const l=us.filter(u=>D.daily[u]?.q===a), ok=r?.final ? a===r.ans : null;
+    return `<div class="nx-col ${ok===true?"ok":ok===false?"no":""}"><div class="nx-ch"><b>${lbl(a)}</b><small>${l.length} kişi${ok===true?" · +1":ok===false?" · 0":""}</small></div><div class="nx-us">${who(l)||'<small class="muted">kimse</small>'}</div></div>`; };
+  const qNo=us.filter(u=>!D.daily[u]?.q);
+  const qHTML=`<div class="b-lb"><span>GECENİN SORUSU</span><span>${r?.final?(r.early?"erken kesinleşti":"kesin"):"gece sürüyor"}</span></div>
+    <div class="b-gr nx"><p class="nx-q">${q.t}</p>
+      <div class="nx-res ${r?.final?"on":""}">${r?.final?`Doğru cevap: <b>${lbl(r.ans)}</b>`:"Doğru cevap gece bitince belli olacak."}</div>
+      <div class="nx-two">${qCol("y")}${qCol("n")}</div>${qNo.length?`<small class="muted nx-none">Cevaplamayan: ${qNo.map(u=>esc(pname(u))).join(", ")}</small>`:""}</div>`;
+  // günün oyuncusu: gecenin en skoreri (bitmemişse şu an önde olan)
+  const allFinal=D.games.every(g=>g.state==="post"); let best=-1, tops=[];
+  for(const g of D.games){ if(!started(g)) continue; const t=g.state==="post"?topsOf(g):liveTops(g); if(!t) continue;
+    for(const x of t){ if(x.pts>best){ best=x.pts; tops=[x]; } else if(x.pts===best && !tops.some(y=>y.id===x.id)) tops.push(x); } }
+  const topIds=new Set(tops.map(x=>String(x.id))), v=dpValue(day);
+  const groups={}; for(const u of us){ const d=D.daily[u]; if(!d?.dayPlayerId) continue; (groups[d.dayPlayerId] ||= {id:d.dayPlayerId, name:d.dayPlayerName, us:[]}).us.push(u); }
+  const gl=Object.values(groups).sort((a,b)=>topIds.has(String(b.id))-topIds.has(String(a.id)) || b.us.length-a.us.length);
+  const dpNo=us.filter(u=>!D.daily[u]?.dayPlayerId);
+  const dpHTML=`<div class="b-lb"><span>GÜNÜN OYUNCUSU</span><span>bilen +${v}</span></div>
+    <div class="b-gr nx"><div class="nx-res ${tops.length?"on":""}">${tops.length?`${allFinal?"Gecenin en skoreri":"Şu an önde"}: ${tops.map(x=>`<span class="nx-top">${faceImg(x.id,"nx-face")}<b>${esc(x.name)}</b></span>`).join(" ")} <small>${best} sayı</small>`:"Maçlar başlayınca gecenin en skoreri burada görünür."}</div>
+      ${gl.map(x=>{ const hit=topIds.has(String(x.id)); const st=hit?(allFinal?`<span class="nx-st ok">+${v}</span>`:`<span class="nx-st now">şu an önde</span>`):(allFinal?`<span class="nx-st no">0</span>`:"");
+        return `<div class="nx-row ${hit?"hit":""}">${faceImg(x.id,"nx-face")}<span class="nx-pn"><b>${esc(x.name)}</b><span class="nx-us">${who(x.us)}</span></span>${st}</div>`; }).join("")}
+      ${dpNo.length?`<small class="muted nx-none">Seçmeyen: ${dpNo.map(u=>esc(pname(u))).join(", ")}</small>`:""}</div>`;
+  return `<div class="nx-wrap">${dpHTML}${qHTML}</div>`;
+}
 function renderAyrisma(){
   const day=tahDay(), D=S.days[day];
   const isDef = day===tahDefault();
@@ -2491,7 +2521,7 @@ function renderAyrisma(){
   const html = grp("Canlı", games.filter(g=>g.state==="in")) + grp("Biten", games.filter(g=>g.state==="post"))
     + grp("Kilitte / başlamadı", games.filter(g=>g.state==="pre"), !games.some(g=>g.state!=="pre"));
   const next = day!==S.today && S.days[S.today]?.games.length ? `<div class="note" style="margin-top:12px">Bu gecenin seçimleri ilk maçın kilidiyle (${timeTR(S.days[S.today].games[0].lock)}) burada görünmeye başlar.</div>` : "";
-  $("#ayrisma").innerHTML = board + chips + html + next;
+  $("#ayrisma").innerHTML = board + (BETA.on ? nightExtrasHTML(day, D, fu) : "") + chips + html + next;
   $("#ayrisma").onclick = e => { const bx=e.target.closest("[data-box]"); if(bx){ const g=D.games.find(x=>x.id===bx.dataset.box); if(g) openBox(g); return; }
     const h=e.target.closest("[data-hsu]"); if(h) openHistory(h.dataset.hsu); };
   $("#ayrisma .th-f").onclick = e => { const b=e.target.closest("[data-thf]"); if(!b) return; S.thFilter=b.dataset.thf||null; renderAyrisma(); };
