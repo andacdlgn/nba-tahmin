@@ -47,13 +47,13 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.51.2";
+const VERSION = "1.51.3";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
-  {v:"1.51.0", d:"12 Kasım 2026", items:["Sıralama: sezon tablosunda her oyuncunun yanında son geceye göre sıra değişimi (▲ / ▼). Bir oyuncuya dokununca yeni \"Kafa kafaya\" düğmesi: kaç gece kim önde bitirdi, ayrıştığınız maçlarda kim haklı çıktı, en çok hangi takımların maçlarında ayrıştınız.","Canlı: en üstte \"gece şu an bitse\" kutusu; gecedeki sıran, puanın, lidere farkın ve sezon sırana etkisi.","Bu gece: kilitlenen maçların satırında ligin dağılımı (kaç kişi hangi takımı seçti).","Maç önü penceresi: iki takımın sezon istatistikleri lig sıralarıyla yan yana ve iki takımın son maçlarının formu.","Profil: sezon boyu gece puanı çizgisi ve aynı gecelerin lig ortalaması. En iyi bildiği takımlar için en az 5 maç şartı; yanında en çok yanıldığı takım.","Oyuncu kartı: sezonluk verim (gerçek isabet, etkili isabet, serbest atış oranı).","Duyurular artık süreli; süresi dolan duyuru kendiliğinden kalkar."]},
+  {v:"1.51.0", d:"12 Kasım 2026", items:["Sıralama: sezon tablosunda her oyuncunun yanında son geceye göre sıra değişimi (▲ / ▼). Bir oyuncuya dokununca yeni \"Kafa kafaya\" düğmesi: kaç gece kim önde bitirdi, ayrıştığınız maçlarda kim haklı çıktı, en çok hangi takımların maçlarında ayrıştınız.","Canlı: en üstte \"gece şu an bitse\" kutusu; gecedeki sıran, puanın, lidere farkın ve sezon sırana etkisi.","Bu gece: kilitlenen maçların satırında ligin dağılımı (kaç kişi hangi takımı seçti).","Maç önü penceresi: iki takımın sezon istatistikleri lig sıralarıyla yan yana ve iki takımın son maçlarının formu.","Profil: sezon boyu gece puanı çizgisi ve aynı gecelerin lig ortalaması. En iyi bildiği takımlar için en az 5 maç şartı; yanında en çok yanıldığı takım.","Oyuncu kartı: sezonluk verim (gerçek isabet, etkili isabet, serbest atış oranı).","Duyurular artık süreli (varsayılan 2 gün); süresi dolan duyuru kendiliğinden kalkar."]},
   {v:"1.50.0", d:"12 Kasım 2026", items:["Maç penceresi ve Canlı › Özet: kazanma ihtimali grafiği (ESPN, her oyunda) ve maçı en çok çeviren sayılar, kimin attığı ve ihtimali yüzde kaçtan kaça taşıdığıyla.","İstatistik sekmesi: Dört faktör (etkili isabet, top kaybı oranı, hücum ribaundu oranı, serbest atış oranı), 100 hücumda sayı ve maçın temposu.","Maçın en verimli üç oyuncusu: Game Score ve gerçek isabet (TS) ile. Oyuncuya dokununca kartı açılıyor.","Maç bilgisi: salon, seyirci sayısı ve hakemler."]},
   {v:"1.49.0", d:"12 Kasım 2026", items:["Takım sayfası: Form (son 15 maçın skor farkı) ve Sezon istatistikleri (sayı, isabet, üçlük, ribaund, asist, top çalma, blok, top kaybı…) ligdeki sırasıyla; ilk 8 yeşil, son 8 kırmızı.","Oyuncu kartı: Ayrımlar tablosu (iç saha / deplasman, galibiyet / mağlubiyet, aylara göre) ve en çok / en az sayı attığı rakip.","Maç penceresi ve Canlı › İstatistik: oyuncu tablosu sütuna dokununca sıralanıyor; yeni ORT± sütunu oyuncunun bu maçta sezon ortalamasının ne kadar üstünde ya da altında attığını gösteriyor. Şut haritası oyuncuya göre de süzülebiliyor."]},
   {v:"1.48.3", d:"12 Kasım 2026", items:["Haftalık ilk 3'te sıra artık atlanmıyor: bütün eşitlik bozucular da eşitse iki kişi birinciyse ikisi de +5 alır, sonraki kişi ikinci olur ve +3 alır."]},
@@ -3306,8 +3306,8 @@ function renderBanners(){
     if(tr){ const left=Math.max(0, Math.round((parseYmd(shiftDay(tr.end,1))-parseYmd(espnToday()))/864e5));
       strip.innerHTML=`<span class="ts-tag">🧪 DENEME HAFTASI</span><span class="ts-t">${dayNice(baseStart(),{day:"numeric",month:"long"})}–${dayNice(tr.end,{day:"numeric",month:"long"})} · puanlar ${dayNice(shiftDay(tr.end,1),{day:"numeric",month:"long"})} pazartesi sıfırlanacak${left?` · asıl lige ${left} gün`:""}</span><span class="ts-s">Puanlar ${dayNice(shiftDay(tr.end,1),{day:"numeric",month:"long"})} pazartesi sıfırlanır</span>`; } }
   const n=S.notice;
-  // 1.51.0: duyurular süreli. Süresi yazılmamış eski duyurular 3 gün sonra kendiliğinden kalkar.
-  if(n?.text && lsGet("noticeSeen")!==String(n.at) && Date.now()<(n.until || (n.at||0)+3*864e5)) html += `<div class="banner notice"><span class="bn-i">${ICON.megaphone}</span><span class="bn-t">${esc(n.text)}</span><button class="bn-x" data-bn="notice" aria-label="Kapat">✕</button></div>`;
+  // 1.51.0: duyurular süreli. Süresi yazılmamış eski duyurular 2 gün sonra kendiliğinden kalkar.
+  if(n?.text && lsGet("noticeSeen")!==String(n.at) && Date.now()<(n.until || (n.at||0)+2*864e5)) html += `<div class="banner notice"><span class="bn-i">${ICON.megaphone}</span><span class="bn-t">${esc(n.text)}</span><button class="bn-x" data-bn="notice" aria-label="Kapat">✕</button></div>`;
   const later=+(lsGet("mailNudge")||0);
   if(S.contactLoaded && !S.contact?.verified && Date.now()>later) html += `<div class="banner nudge"><span class="bn-i">${ICON.mail}</span><span class="bn-t"><b>${S.contact?.email?"Mail onay kodunu gir":"Mail adresini ekle"}</b> ${S.contact?.email?"Adresin kayıtlı ama onaylanmadı. Kodu girmezsen hiçbir mail gelmez; şifreni unutursan mail ile sıfırlayamazsın.":"Onaylı adres olmadan hatırlatma maili gelmez ve şifreni unutursan kodla sıfırlayamazsın."}</span>
     <span class="bn-acts"><button class="btn sm" data-bn="mail">${S.contact?.email?"Onayla":"Ekle"}</button><button class="linkish" data-bn="later">Sonra</button></span></div>`;
@@ -3323,7 +3323,7 @@ $("#banners").addEventListener("click", e=>{
   const b=e.target.closest("[data-bn]"); if(!b) return;
   if(b.dataset.bn==="notice"){ lsSet("noticeSeen", String(S.notice?.at)); }
   if(b.dataset.bn==="later"){ lsSet("mailNudge", String(Date.now()+6*36e5)); }
-  if(b.dataset.bn==="plater"){ lsSet("profileNudge", String(Date.now()+3*864e5)); }
+  if(b.dataset.bn==="plater"){ lsSet("profileNudge", String(Date.now()+2*864e5)); }
   if(b.dataset.bn==="profile"){ openProfile("ayar"); setTimeout(()=>{ $(".pf-avtab")?.closest(".pf-sec")?.scrollIntoView({block:"start"}); }, 300); }
   if(b.dataset.bn==="mail"){ allPlayers().catch(()=>{}).finally(()=>openOnboard(5)); }
   renderBanners();
@@ -5610,8 +5610,8 @@ async function openAdmin(){
     <div class="pf-sec"><h4>Uzun vade</h4><button class="btn" id="admLT" type="button">${ICON.medal}Sonuçları gir</button></div>
     <div class="pf-sec"><h4>Duyuru</h4><small class="muted" style="margin:0 0 8px">Sitenin üstünde herkese görünür. Kapatan bir daha görmez; yeni duyuru yine çıkar.</small>
       <textarea id="admNotice" class="adm-in" rows="2" maxlength="200" placeholder="Ör. Yeni oyuncu: Zeki 👋">${esc(S.notice?.text||"")}</textarea>
-      <label class="adm-row" style="margin-top:8px;gap:8px;align-items:center"><small class="muted">Görünme süresi</small><select id="admNoticeDays" class="adm-in" style="width:auto">${[[1,"1 gün"],[3,"3 gün"],[7,"1 hafta"],[30,"1 ay"]].map(([v,l])=>`<option value="${v}" ${v===3?"selected":""}>${l}</option>`).join("")}</select></label>
-      ${S.notice?.text?`<small class="muted">${Date.now()<(S.notice.until||(S.notice.at||0)+3*864e5)?"Şu an yayında, "+dayNice(ymd(new Date(S.notice.until||(S.notice.at||0)+3*864e5)),{day:"numeric",month:"long"})+" tarihine kadar görünür.":"Süresi doldu, kimseye görünmüyor."}</small>`:""}
+      <label class="adm-row" style="margin-top:8px;gap:8px;align-items:center"><small class="muted">Görünme süresi</small><select id="admNoticeDays" class="adm-in" style="width:auto">${[[1,"1 gün"],[2,"2 gün"],[3,"3 gün"],[7,"1 hafta"],[30,"1 ay"]].map(([v,l])=>`<option value="${v}" ${v===2?"selected":""}>${l}</option>`).join("")}</select></label>
+      ${S.notice?.text?`<small class="muted">${Date.now()<(S.notice.until||(S.notice.at||0)+2*864e5)?"Şu an yayında, "+dayNice(ymd(new Date(S.notice.until||(S.notice.at||0)+2*864e5)),{day:"numeric",month:"long"})+" tarihine kadar görünür.":"Süresi doldu, kimseye görünmüyor."}</small>`:""}
       <div class="adm-row" style="margin-top:8px"><button class="btn" id="admNoticeSave" type="button">Yayınla</button>${S.notice?.text?'<button class="btn danger" id="admNoticeDel" type="button">Kaldır</button>':""}</div>
       <small class="muted" id="admNoticeMsg"></small></div>`;
   $("#admLT")?.addEventListener("click", ()=>allPlayers().catch(()=>{}).then(openLTAdmin));
@@ -5663,7 +5663,7 @@ async function openAdmin(){
     try{ await navigator.clipboard.writeText(url); $("#admInvMsg").textContent="Link kopyalandı: "+url; }catch(e){ $("#admInvMsg").textContent=url; }
   };
   $("#admNoticeSave").onclick=async()=>{ const text=$("#admNotice").value.trim(); if(!text) return;
-    const n={text, at:Date.now(), until:Date.now()+(+$("#admNoticeDays").value||3)*864e5};
+    const n={text, at:Date.now(), until:Date.now()+(+$("#admNoticeDays").value||2)*864e5};
     try{ await setDoc(doc(S.db,"league","notice"), n); S.notice=n; renderBanners(); $("#admNoticeMsg").textContent="Duyuru yayınlandı."; }catch(e){ $("#admNoticeMsg").textContent="Yayınlanamadı."; } };
   $("#admNoticeDel")?.addEventListener("click", async()=>{ try{ await deleteDoc(doc(S.db,"league","notice")); S.notice=null; renderBanners(); openAdmin(); }catch(e){ $("#admNoticeMsg").textContent="Kaldırılamadı."; } });
   $("#admInvSave").onclick=async()=>{ const v=$("#admInv").value.trim(); if(!v) return;
