@@ -2424,3 +2424,8 @@ body.beta .new-ui-btn{display:none!important}
 .fx-r[data-fxg]{cursor:pointer;transition:background .15s}.fx-r[data-fxg]:hover{background:color-mix(in srgb,var(--ink) 6%,transparent)}
 .fx-r.busy{opacity:.55}
 .fx-back{display:inline-block;margin:0 0 10px;font-weight:700;font-size:14px}
+/* 1.54.0: dokununca maç / oyuncu açan satırlar */
+[data-og]{cursor:pointer}
+.l5r[data-og]:hover,.ss-row[data-og]:hover,.agl-r[data-og]:hover,.hs[data-og]:hover,.injr[data-ath]:hover{background:color-mix(in srgb,var(--ink) 6%,transparent);border-radius:8px}
+.tf-bars>span[data-og]:hover i{filter:brightness(1.25)}
+.injr[data-ath]{cursor:pointer}
