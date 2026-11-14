@@ -47,12 +47,13 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.52.1";
+const VERSION = "1.53.0";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
 // Her yeni paket CHANGELOG'un başına eklenir; oyunculara bir kez "Yenilikler" penceresi olarak gösterilir.
 const CHANGELOG = [
+  {v:"1.53.0", d:"15 Kasım 2026", items:["Takım sayfası › Fikstür: bir maça dokununca oynanmışsa box score ve istatistikleri, oynanmamışsa maç önü penceresi açılıyor. Takım sayfası bir pencerede açıksa en üstte \"takım sayfasına dön\" düğmesi var."]},
   {v:"1.52.0", d:"12 Kasım 2026", items:["Tahminler: gecenin ilk kilidinden sonra en üstte Günün oyuncusu ve Gecenin sorusu kartı. Doğrusu, kaç kişinin neyi seçtiği ve kimin puan aldığı tek bakışta; isimler satıra dokununca açılır. Gece sürerken şu an önde olan skorer görünür. Oyuncu filtresiyle birlikte çalışır.","Duyurular varsayılan olarak 2 gün görünür."]},
   {v:"1.51.0", d:"12 Kasım 2026", items:["Sıralama: sezon tablosunda her oyuncunun yanında son geceye göre sıra değişimi (▲ / ▼). Bir oyuncuya dokununca yeni \"Kafa kafaya\" düğmesi: kaç gece kim önde bitirdi, ayrıştığınız maçlarda kim haklı çıktı, en çok hangi takımların maçlarında ayrıştınız.","Canlı: en üstte \"gece şu an bitse\" kutusu; gecedeki sıran, puanın, lidere farkın ve sezon sırana etkisi.","Bu gece: kilitlenen maçların satırında ligin dağılımı (kaç kişi hangi takımı seçti).","Maç önü penceresi: iki takımın sezon istatistikleri lig sıralarıyla yan yana ve iki takımın son maçlarının formu.","Profil: sezon boyu gece puanı çizgisi ve aynı gecelerin lig ortalaması. En iyi bildiği takımlar için en az 5 maç şartı; yanında en çok yanıldığı takım.","Oyuncu kartı: sezonluk verim (gerçek isabet, etkili isabet, serbest atış oranı).","Duyurular artık süreli (varsayılan 2 gün); süresi dolan duyuru kendiliğinden kalkar."]},
   {v:"1.50.0", d:"12 Kasım 2026", items:["Maç penceresi ve Canlı › Özet: kazanma ihtimali grafiği (ESPN, her oyunda) ve maçı en çok çeviren sayılar, kimin attığı ve ihtimali yüzde kaçtan kaça taşıdığıyla.","İstatistik sekmesi: Dört faktör (etkili isabet, top kaybı oranı, hücum ribaundu oranı, serbest atış oranı), 100 hücumda sayı ve maçın temposu.","Maçın en verimli üç oyuncusu: Game Score ve gerçek isabet (TS) ile. Oyuncuya dokununca kartı açılıyor.","Maç bilgisi: salon, seyirci sayısı ve hakemler."]},
@@ -1938,13 +1939,21 @@ function fixtureHTML(evs, abbr){
   if(!evs.length) return emptyBox("ball","Takvime şu an ulaşılamıyor.");
   const rows=evs.map(e=>{ const c=e.competitions[0], me=c.competitors.find(x=>x.team?.abbreviation===abbr), op=c.competitors.find(x=>x!==me), done=c.status?.type?.completed;
     const sv=v=>v?.displayValue ?? v ?? ""; const d=new Date(e.date), oa=op?.team?.abbreviation||"";
-    return {done, k:usDay(e.date), m:ymd(new Date(d.getTime()+3*36e5)).slice(0,6), html:`<div class="fx-r ${done?(me?.winner?"W":"L"):"up"}" data-k="${usDay(e.date)}"><span class="fx-d">${d.toLocaleDateString(LOC,{day:"numeric",month:"short",timeZone:TZ})}<small>${d.toLocaleDateString(LOC,{weekday:"short",timeZone:TZ})}</small></span><span class="fx-o"><em>${me?.homeAway==="home"?"vs":"@"}</em><img src="${LOGO_SMALL(oa)}" alt="" loading="lazy"><b>${esc(op?.team?.shortDisplayName||oa)}</b></span>${done?`<span class="fx-s"><i>${me?.winner?"G":"M"}</i>${sv(me?.score)}–${sv(op?.score)}</span>`:`<span class="fx-s up">${d.toLocaleTimeString(LOC,{hour:"2-digit",minute:"2-digit",timeZone:TZ})}</span>`}</div>`}; });
+    return {done, k:usDay(e.date), m:ymd(new Date(d.getTime()+3*36e5)).slice(0,6), html:`<div class="fx-r ${done?(me?.winner?"W":"L"):"up"}" data-k="${usDay(e.date)}" data-fxg="${escA(e.id)}" role="button" tabindex="0" title="${done?"Maçın istatistikleri":"Maç önü"}"><span class="fx-d">${d.toLocaleDateString(LOC,{day:"numeric",month:"short",timeZone:TZ})}<small>${d.toLocaleDateString(LOC,{weekday:"short",timeZone:TZ})}</small></span><span class="fx-o"><em>${me?.homeAway==="home"?"vs":"@"}</em><img src="${LOGO_SMALL(oa)}" alt="" loading="lazy"><b>${esc(op?.team?.shortDisplayName||oa)}</b></span>${done?`<span class="fx-s"><i>${me?.winner?"G":"M"}</i>${sv(me?.score)}–${sv(op?.score)}</span>`:`<span class="fx-s up">${d.toLocaleTimeString(LOC,{hour:"2-digit",minute:"2-digit",timeZone:TZ})}</span>`}</div>`}; });
   const nd=rows.filter(r=>r.done), w=nd.filter(r=>/fx-r W/.test(r.html)).length;
   let h="", lastM=""; for(const r of rows){ if(r.m!==lastM){ lastM=r.m; h+=`<div class="fx-m">${MONTHS_TR[+r.m.slice(4)-1]} ${r.m.slice(0,4)}</div>`; } h+=r.html; }
   return `<div class="fx-head"><div class="seg2 fx-f"><button data-fx="all" aria-pressed="true">Tümü (${rows.length})</button><button data-fx="done" aria-pressed="false">Oynanan (${nd.length})</button><button data-fx="up" aria-pressed="false">Kalan (${rows.length-nd.length})</button></div><small class="muted">${w}-${nd.length-w} · saatler TR</small></div><div class="fx-list">${h}</div>`;
 }
-function bindFixture(root){
+function bindFixture(root, abbr){
   const list=root.querySelector(".fx-list"); if(!list) return;
+  // 1.53.0: fikstürde bir maça dokununca: oynanmışsa box score ve istatistikler, oynanmamışsa maç önü. Sayfa bir pencerenin içindeyse geri dönüş düğmesi eklenir.
+  const go=async r=>{ const k=r.dataset.k, id=r.dataset.fxg; if(!k||!id) return; r.classList.add("busy");
+    try{ await loadDay(k); }catch(e){} r.classList.remove("busy");
+    const g=S.days[k]?.games.find(x=>String(x.id)===String(id)); if(!g) return toast("Bu maça şu an ulaşılamıyor.");
+    S.fxBack = root.closest("#sheet") && abbr ? {abbr, gid:String(g.id)} : null;
+    return g.state==="pre" ? openInfo(g) : openBox(g); };
+  list.addEventListener("click", e=>{ const r=e.target.closest(".fx-r[data-fxg]"); if(r){ e.stopPropagation(); go(r); } });
+  list.addEventListener("keydown", e=>{ if(e.key!=="Enter") return; const r=e.target.closest(".fx-r[data-fxg]"); if(r) go(r); });
   const first=list.querySelector(".fx-r.up"); if(first){ first.classList.add("next"); setTimeout(()=>{ list.scrollTop=Math.max(0, first.offsetTop-list.offsetTop-90); }, 30); }
   root.querySelectorAll("[data-fx]").forEach(b=>b.onclick=e=>{ e.stopPropagation(); const v=b.dataset.fx; root.querySelectorAll("[data-fx]").forEach(x=>x.setAttribute("aria-pressed", x===b));
     list.querySelectorAll(".fx-r").forEach(r=>r.classList.toggle("hide", v==="done"?r.classList.contains("up"):v==="up"?!r.classList.contains("up"):false));
@@ -2024,12 +2033,13 @@ async function openInfo(g){
       <div><small>Bu sezon</small><b>${ssDone.length?esc(sumTR||`${ssDone.length} maç`):"0 maç"}</b><i>${ss?`${ss.totalCompetitions||"?"} maçın ${ssDone.length}'i oynandı`:"–"}</i></div>
       <div class="${tr>1?"warn":""}"><small>Sürpriz</small><b>${dog?`${escA(dog.abbr)} +${tr}`:"–"}</b><i>${dog?`kazanırsa · %${dogP.toFixed(0)}`:"şans yok"}</i></div></div>`;
     const pc = await preCmpHTML(g).catch(()=>"");
-    $("#shBody").innerHTML = `<h3 id="shTitle">${esc(g.away.name)} @ ${esc(g.home.name)}</h3><p class="muted" style="margin-top:-6px">Maç önü · ${dayNice(S.day,{day:"numeric",month:"long"})} · ${timeTR(g.start)}${g.cup?" · NBA Kupası (2× puan)":""}</p>
+    $("#shBody").innerHTML = `<h3 id="shTitle">${esc(g.away.name)} @ ${esc(g.home.name)}</h3><p class="muted" style="margin-top:-6px">Maç önü · ${dayNice(usDay(g.start),{day:"numeric",month:"long"})} · ${timeTR(g.start)}${g.cup?" · NBA Kupası (2× puan)":""}</p>
       <div class="bi">${hero}${bx}${series?`<div class="b-lb"><span>ARALARINDAKİ MAÇLAR</span><span></span></div>${series}`:""}${pc}${comp?`<div class="b-lb"><span>TAKIMLAR YAN YANA</span><span>maç başına · küçük sayı lig sırası</span></div>${comp}`:""}
       <div class="b-lb"><span>TAKIMLAR</span><span>form, oyuncular, sakatlar</span></div>${teamSec("away")}${teamSec("home")}</div>`;
+    fxBackBtn(g);
     return;
   }
-  $("#shBody").innerHTML = `<h3 id="shTitle">${esc(g.away.name)} @ ${esc(g.home.name)}</h3><p class="muted" style="margin-top:-6px">${dayNice(S.day,{day:"numeric",month:"long"})} · ${timeTR(g.start)}${g.cup?" · NBA Kupası (2× puan)":""}</p>${pred}${series}${comp}${teamSec("away")}${teamSec("home")}`;
+  $("#shBody").innerHTML = `<h3 id="shTitle">${esc(g.away.name)} @ ${esc(g.home.name)}</h3><p class="muted" style="margin-top:-6px">${dayNice(usDay(g.start),{day:"numeric",month:"long"})} · ${timeTR(g.start)}${g.cup?" · NBA Kupası (2× puan)":""}</p>${pred}${series}${comp}${teamSec("away")}${teamSec("home")}`;
 }
 // 1.51.0: maç önü › iki takımın sezon istatistikleri lig sıralarıyla yan yana + iki takımın formu
 async function preCmpHTML(g){
@@ -2068,7 +2078,10 @@ async function openBox(g){
 function openSheet(html){ S.sheetCount=(S.sheetCount||0)+1; if($("#sheet").classList.contains("hide")){ try{ history.pushState({sheet:1}, ""); }catch(e){} }
   S.sheetLocked=false; $("#shClose").classList.remove("hide");
   $("#shBody").innerHTML=html; $("#sheet").classList.remove("hide"); $$("#sheet, #sheet *").forEach(el=>{ if(el.scrollTop) el.scrollTop=0; }); document.body.style.overflow="hidden"; $("#shClose").focus(); }
-function closeSheet(fromPop){ if(S.sheetLocked){ if(fromPop) try{ history.pushState({sheet:1}, ""); }catch(e){} return; }
+// fikstürden açılan maç penceresinin başına "takıma dön" düğmesi
+function fxBackBtn(g){ const b=S.fxBack; if(!b || b.gid!==String(g?.id) || $("#fxBack")) return;
+  const t=ALLP?.teams?.find(x=>x.a===b.abbr); $("#shBody")?.insertAdjacentHTML("afterbegin", `<button type="button" id="fxBack" class="linkish fx-back" data-tp="${escA(b.abbr)}">‹ ${esc(t?.n||b.abbr)} sayfasına dön</button>`); }
+function closeSheet(fromPop){ S.fxBack=null; if(S.sheetLocked){ if(fromPop) try{ history.pushState({sheet:1}, ""); }catch(e){} return; }
   if($("#sheet").classList.contains("hide")) return;
   $("#sheet").classList.add("hide"); document.body.style.overflow="";
   if(!fromPop && history.state?.sheet){ S.popSkip=true; history.back(); }
@@ -3633,7 +3646,7 @@ async function teamPage(abbr, root, opts={}){
     <div class="sec-title"><h2 style="font-size:20px">Senin karnen</h2></div>
     ${my.length?`<div class="box"><b style="font-size:20px">%${Math.round(ok/my.length*100)}</b> <span class="muted">bu takımın ${my.length} maçında kazananı bildin</span>
       <div class="pk" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px">${my.slice(-6).reverse().map(x=>`<span class="rc ${x.r.w>0?"ok":"no"}"><i>${x.r.w>0?"✓":"✗"}</i>${escA(x.away.abbr)}–${escA(x.home.abbr)}</span>`).join("")}</div></div>`:emptyBox("cards", "Bu takımın maçlarına tahmin yaptıkça karnen burada oluşacak.")}`;
-  bindFixture(root.querySelector(".fx-wrap"));
+  bindFixture(root.querySelector(".fx-wrap"), abbr);
   teamSeasonHTML(abbr).then(h=>{ const el=root.querySelector(".tmSeas"); if(el) el.innerHTML=h||`<p class="cl-none">Sezon istatistiklerine şu an ulaşılamıyor.</p>`; }).catch(()=>{});
   // kadro: seçilen istatistiğe göre (sayı, ribaund, asist, top çalma, blok, saha içi %, üçlük %, maç)
   if(roster.length){
@@ -6740,6 +6753,7 @@ function betaBoxPaint(){
   $("#shBody").innerHTML = `<div class="bb" style="--ca:${tcol(g.away.abbr)};--ch:${tcol(g.home.abbr)}">${head}
     <div class="cl-tabs bb-tabs" role="tablist" aria-label="Maç ayrıntısı">${tabs.map(([k,l])=>`<button type="button" role="tab" aria-selected="${tab===k}" data-bxt="${k}">${l}</button>`).join("")}</div>
     <div class="cl-body">${body}</div></div>`;
+  fxBackBtn(g);
 }
 document.addEventListener("click", e=>{
   if(!BETA.on || !BETA.box) return;

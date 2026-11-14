@@ -2420,3 +2420,7 @@ body:has(#auth:not(.hide)) .topbar{display:none}
 /* 1.48.2: eski görünümde yeni görünüme dönüş */
 .new-ui-btn{border:0;border-radius:999px;background:var(--amber);color:#10161e;font:inherit;font-weight:800;font-size:13px;padding:7px 12px;cursor:pointer;white-space:nowrap}
 body.beta .new-ui-btn{display:none!important}
+/* 1.53.0: fikstür satırları maçı açar */
+.fx-r[data-fxg]{cursor:pointer;transition:background .15s}.fx-r[data-fxg]:hover{background:color-mix(in srgb,var(--ink) 6%,transparent)}
+.fx-r.busy{opacity:.55}
+.fx-back{display:inline-block;margin:0 0 10px;font-weight:700;font-size:14px}
