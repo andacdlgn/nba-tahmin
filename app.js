@@ -47,7 +47,7 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.54.3";
+const VERSION = "1.54.4";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
@@ -657,8 +657,11 @@ function elToggle(force){
 }
 function elEnsure(){ if($("#view-el-tur")) return;
   $("#view-bugece").insertAdjacentHTML("afterend", EL_TABS.map(k=>`<section id="view-${k}" data-view class="hide"><div id="${k}" class="b-page"></div></section>`).join("")); }
-async function elRounds(){ const r=await cached("el_rounds", `${ELAPI}/v2/competitions/E/seasons/${elSeason()}/rounds`, 6*36e5); return (r?.data||r||[]).filter(x=>x.phaseTypeCode==="RS").sort((a,b)=>a.round-b.round); }
-function elCurRound(R){ const t=ymd(new Date()); const cur=R.find(x=>String(x.maxGameStartDate).slice(0,10).replace(/-/g,"")>=t); return cur?cur.round:(R[R.length-1]?.round||1); }
+// Tur listesini veren servis tarayıcıya kapalı; turları bir takımın (favori takım) sezon programından çıkarıyoruz: her turda bir maçı var
+async function elRounds(){ const team=S.elMe?.favTeam||"IST";
+  const r=await cached("el_sched_"+team, `${ELAPI}/v2/competitions/E/seasons/${elSeason()}/games?teamCode=${team}`, 3*36e5);
+  return (r?.data||[]).filter(g=>g.phaseType?.code==="RS" || !g.phaseType).map(g=>({round:typeof g.round==="object"?g.round.round:g.round, utc:g.utcDate, played:!!g.played})).sort((a,b)=>a.round-b.round); }
+function elCurRound(R){ const cur=R.find(x=>!x.played); return cur?cur.round:(R[R.length-1]?.round||1); }
 async function elGames(n){ const key="el_g_"+n, c=S.nbaC[key]; const live=c?.data?.some?.(g=>elState(g)==="in");
   const r=await cached(key, `${ELAPI}/v2/competitions/E/seasons/${elSeason()}/games?roundNumber=${n}`, live?45e3:10*60e3); return (r?.data||[]).sort((a,b)=>a.utcDate.localeCompare(b.utcDate)); }
 // maç durumu: post (bitti), in (oynanıyor: başlama saati geçti, sonuç yok), pre
@@ -680,9 +683,10 @@ async function elRender(){
   try{
     if(k==="el-tur" || k==="el-fik"){
       const R=await elRounds(), cur=elCurRound(R); if(k==="el-tur") BETA.elRound=null;
-      const n=k==="el-tur" ? cur : (BETA.elRound||cur), G=await elGames(n), ri=R.find(x=>x.round===n);
+      const n=k==="el-tur" ? cur : (BETA.elRound||cur), G=await elGames(n);
       const live=G.filter(g=>elState(g)==="in").length, done=G.filter(g=>g.played).length, next=G.find(g=>elState(g)==="pre");
-      const span = ri ? `${dayNice(String(ri.minGameStartDate).slice(0,10).replace(/-/g,""),{day:"numeric",month:"long"})} – ${dayNice(String(ri.maxGameStartDate).slice(0,10).replace(/-/g,""),{day:"numeric",month:"long"})}` : "";
+      const dk=g=>ymd(new Date(Date.parse(g.utcDate)+3*36e5)), d1=G.length?dk(G[0]):"", d2=G.length?dk(G[G.length-1]):"";
+      const span = d1 ? (d1===d2 ? dayNice(d1,{day:"numeric",month:"long"}) : `${dayNice(d1,{day:"numeric",month:"long"})} – ${dayNice(d2,{day:"numeric",month:"long"})}`) : "";
       if(k==="el-tur"){ BETA.elSub = `${n}. tur · ${span}`;
         const me=S.elMe, c=(await elClubs().catch(()=>[])).find(x=>x.code===me.favTeam);
         el.innerHTML = `<div class="b-gr el-hero"><div class="el-hr"><small>${live?`<span class="badge-live">Canlı</span> ${live} maç oynanıyor`:next?`Sıradaki maç ${dayNice(ymd(new Date(Date.parse(next.utcDate)+3*36e5)),{weekday:"long"})} ${timeTR(new Date(next.utcDate))}`:"Tur tamamlandı"}</small><b>${n}. Tur</b><span>${span} · ${G.length} maç · ${done} bitti</span></div>
