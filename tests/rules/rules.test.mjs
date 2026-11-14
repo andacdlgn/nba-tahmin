@@ -47,7 +47,7 @@ t("chat bad rp id", ()=>assertFails(setDoc(doc(A,"chat/AbCdEfGhIjKlMnOpQrSv"),{u
 t("dm msg ok", async()=>{ const b=writeBatch(A); b.set(doc(A,"dm/alice_bob"),{u:["alice","bob"],at:serverTimestamp(),last:{uid:"alice",t:"hey"},rd:{alice:serverTimestamp()},bl:{}}); b.set(doc(A,"dm/alice_bob/m/AbCdEfGhIjKlMnOpQrSt"),{uid:"alice",t:"hey",at:serverTimestamp()}); return assertSucceeds(b.commit()); });
 t("dm msg bad id", async()=>{ const b=writeBatch(A); b.update(doc(A,"dm/alice_bob"),{at:serverTimestamp(),last:{uid:"alice",t:"x"},rd:{alice:serverTimestamp()}}); b.set(doc(A,'dm/alice_bob/m/"><img src=x>'),{uid:"alice",t:"x",at:serverTimestamp()}); return assertFails(b.commit()); });
 // 1.55.0: EuroLeague profili
-const EL={favTeam:"IST", av:"e:1dU3kpCqReRp93/1BSdBWIjHGF4xs/33183699-533f-4f6b-a10f-beec6af2277e.png", color:"p3", club:"Efes Sevenler"};
+const EL={favTeam:"IST", av:"e:c/1dU3kpCqReRp93/1BSdBWIjHGF4xs/33183699-533f-4f6b-a10f-beec6af2277e.png", color:"p3", club:"Efes Sevenler"};
 t("el create ok", ()=>assertSucceeds(setDoc(doc(A,"elPlayers/alice"),{...EL, joined:serverTimestamp()})));
 t("el update ok", ()=>assertSucceeds(updateDoc(doc(A,"elPlayers/alice"),{favTeam:"ULK", color:"p7", club:"Fener Ordusu", av:""})));
 t("el update joined no", ()=>assertFails(updateDoc(doc(A,"elPlayers/alice"),{joined:serverTimestamp()})));

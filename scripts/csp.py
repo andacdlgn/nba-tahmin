@@ -9,7 +9,7 @@ CSP = {
     "script-src": ["'self'", "https://www.gstatic.com/firebasejs/", "https://www.google.com/recaptcha/", "https://www.gstatic.com/recaptcha/"],
     "style-src": ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
     "font-src": ["'self'", "data:", "https://fonts.gstatic.com"],
-    "img-src": ["'self'", "data:", "blob:", "https://a.espncdn.com", "https://media-cdn.cortextech.io"],
+    "img-src": ["'self'", "data:", "blob:", "https://a.espncdn.com", "https://media-cdn.cortextech.io", "https://media-cdn.incrowdsports.com"],
     "connect-src": ["'self'", "https://firestore.googleapis.com", "https://identitytoolkit.googleapis.com", "https://securetoken.googleapis.com",
                     "https://content-firebaseappcheck.googleapis.com", "https://www.google.com", "https://site.web.api.espn.com", "https://site.api.espn.com",
                     "https://a.espncdn.com", "https://raw.githubusercontent.com", "https://www.gstatic.com", "https://api-live.euroleague.net", "https://live.euroleague.net", "http://127.0.0.1:9099", "http://127.0.0.1:8085"],

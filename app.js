@@ -47,7 +47,7 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.54.1";
+const VERSION = "1.54.2";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
@@ -637,8 +637,10 @@ async function elRoster(code){ const r=await cached("el_r_"+code, `${ELAPI}/v2/c
   return (r?.data||r||[]).filter(x=>x.type==="J" && x.active!==false && x.images?.headshot).map(x=>({code:x.person?.code, n:x.person?.name||"", img:x.images.headshot, no:x.dorsal||""})); }
 // EuroLeague adları "SOYAD, AD" biçiminde gelir
 const elName = n => { const [s,f]=String(n||"").split(",").map(x=>x.trim()); const cap=x=>x.toLocaleLowerCase("tr").replace(/(^|[\s'-])(\p{L})/gu,(m,a,b)=>a+b.toLocaleUpperCase("tr")); return f ? cap(f)+" "+cap(s) : cap(s||""); };
-const EL_IMG = "https://media-cdn.cortextech.io/";
-const elAvUrl = av => /^e:/.test(av||"") ? EL_IMG + av.slice(2) : "";
+// avatar kaydı: "e:c/<yol>" (media-cdn.cortextech.io) ya da "e:i/<yol>" (media-cdn.incrowdsports.com)
+const EL_HOSTS = {c:"https://media-cdn.cortextech.io/", i:"https://media-cdn.incrowdsports.com/"};
+const elAvUrl = av => { const m=/^e:([ci])\/(.+)$/.exec(av||""); return m ? EL_HOSTS[m[1]]+m[2] : ""; };
+const elAvKey = url => { for(const [k,h] of Object.entries(EL_HOSTS)) if(url.startsWith(h)) return "e:"+k+"/"+url.slice(h.length); return ""; };
 const elCol = u => { const c=(u===S.uid?S.elMe:S.elp?.[u])?.color; return PKEYS.includes(c) ? `var(--${c})` : col(u); };
 function elAvatar(u, cls=""){ const p=(u===S.uid?S.elMe:S.elp?.[u])||{}, img=elAvUrl(p.av);
   return `<span class="av ${cls} ${img?"has-img":""}" style="--pc:${elCol(u)}">${img?`<span class="av-ini">${esc(initials(pname(u)))}</span><img class="av-img" src="${escA(img)}" alt="" loading="lazy">`:esc(initials(pname(u)))}</span>`; }
@@ -656,7 +658,7 @@ async function openEL(){
     <ul class="el-ul"><li>Kendi tahminleri, kendi puan durumu ve ödülleri olur; NBA puanların etkilenmez.</li>
       <li>Bu lig için ayrı bir profil kurarsın: favori takım, avatar, renk ve takım adı.</li>
       <li>Maçlar Türkiye saatiyle çoğunlukla akşam 20:00–22:30 arası.</li></ul>
-    <div class="b-two"><button class="btn" type="button" data-elno>Şimdi değil</button><button class="btn primary" type="button" data-eljoin>Katıl ›</button></div>
+    <div class="b-two"><button class="btn" type="button" data-elno>Şimdi değil</button><button class="btn primary-ish" type="button" data-eljoin>Katıl ›</button></div>
     ${EL_OPEN?"":`<p class="muted" style="font-size:12px;margin-top:10px">Kapalı beta: bu düğmeyi şimdilik yalnızca sen görüyorsun.</p>`}</div>`;
   $("[data-elno]").onclick=()=>closeSheet();
   $("[data-eljoin]").onclick=()=>elSetup();
@@ -681,7 +683,7 @@ async function elSetup(start=0){
       const team=st.avTeam||st.fav||clubs[0].code; let ros=[]; try{ ros=await elRoster(team); }catch(e){}
       body=`<p class="muted">Avatarın bir EuroLeague oyuncusunun fotoğrafı olur. Takım seçip oyuncuya dokun.</p>
         <div class="chips el-tch">${clubs.map(x=>`<button class="chip" type="button" data-elavt="${escA(x.code)}" aria-pressed="${team===x.code}"><img src="${escA(crest(x))}" alt="" width="16" height="16">${esc(x.editorialName||x.code)}</button>`).join("")}</div>
-        <div class="pf-avs el-avs">${ros.length?ros.map(r=>{ const v="e:"+r.img.replace(EL_IMG,""); return `<button class="pf-av" type="button" data-elav="${escA(v)}" aria-pressed="${st.av===v}"><img src="${escA(r.img)}" alt="" loading="lazy"><small>${esc(elName(r.n).split(" ").slice(-1)[0])}</small></button>`; }).join(""):`<p class="muted">Bu takımın fotoğrafları şu an gelmedi.</p>`}</div>`; }
+        <div class="pf-avs el-avs">${ros.length?ros.map(r=>{ const v=elAvKey(r.img); if(!v) return ""; return `<button class="pf-av" type="button" data-elav="${escA(v)}" aria-pressed="${st.av===v}"><img src="${escA(r.img)}" alt="" loading="lazy"><small>${esc(elName(r.n).split(" ").slice(-1)[0])}</small></button>`; }).join(""):`<p class="muted">Bu takımın fotoğrafları şu an gelmedi.</p>`}</div>`; }
     if(st.step===2){ const usedBy=c2=>Object.entries(S.elp||{}).filter(([u,p])=>u!==S.uid && p.color===c2).map(([u])=>pname(u));
       body=`<p class="muted">Bu ligdeki sıralamalarda adın bu renkle görünür.</p><div class="pf-colors">${PKEYS.map(c2=>{ const u=usedBy(c2); return `<button class="pf-col" type="button" data-elcol="${c2}" style="--c:var(--${c2})" aria-pressed="${st.color===c2}" title="${u.length?esc(u.join(", "))+" de kullanıyor":""}">${u.length?"<i></i>":""}</button>`; }).join("")}</div><small class="muted">Noktalı renkleri bu ligde başka oyuncular kullanıyor.</small>`; }
     if(st.step===3) body=`<p class="muted">Bu ligdeki takımının adı. Puan durumunda adının yerine bu görünür.</p>
@@ -691,7 +693,7 @@ async function elSetup(start=0){
       <div class="el-steps">${STEPS.map((t,i)=>`<button type="button" data-elstep="${i}" class="${i===st.step?"on":i<st.step?"done":""}"><i>${i+1}</i><span>${t}</span></button>`).join("")}</div>
       ${prev}<div class="el-body">${body}</div>
       <div class="b-two el-nav">${st.step?`<button class="btn" type="button" data-elback>‹ Geri</button>`:`<button class="btn" type="button" data-elno>Vazgeç</button>`}
-        ${st.step<3?`<button class="btn primary" type="button" data-elnext ${st.step===0&&!st.fav?"disabled":""}>İleri ›</button>`:`<button class="btn primary" type="button" data-elsave>${st.edit?"Kaydet":"Kaydet ve katıl"}</button>`}</div>
+        ${st.step<3?`<button class="btn primary-ish" type="button" data-elnext ${st.step===0&&!st.fav?"disabled":""}>İleri ›</button>`:`<button class="btn primary-ish" type="button" data-elsave>${st.edit?"Kaydet":"Kaydet ve katıl"}</button>`}</div>
       <small class="err" id="elErr"></small>`;
   };
   $("#shBody").onclick=async e=>{
