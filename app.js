@@ -47,7 +47,7 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.54.2";
+const VERSION = "1.54.3";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
@@ -647,6 +647,73 @@ function elAvatar(u, cls=""){ const p=(u===S.uid?S.elMe:S.elp?.[u])||{}, img=elA
 async function loadElMe(){ if(!S.uid) return null; try{ const d=await getDoc(doc(S.db,"elPlayers",S.uid)); S.elMe=d.exists()?d.data():null; }catch(e){ S.elMe=null; } return S.elMe; }
 async function loadElPlayers(){ try{ const q=await getDocs(collection(S.db,"elPlayers")); S.elp=Object.fromEntries(q.docs.map(d=>[d.id,d.data()])); }catch(e){ S.elp={}; } return S.elp; }
 
+
+// ---- EuroLeague modu (1.55.0): EL düğmesi bütün siteyi EuroLeague'e çevirir; NBA'ye geri döner
+const EL_TABS=["el-tur","el-fik","el-sira","el-puan"];
+function elToggle(force){
+  if(!S.elMe && !force) return openEL();
+  if(EL_TABS.includes(S.tab)){ document.body.classList.remove("el-mode"); location.hash="#"+(BETA.nbaTab||"bugece"); toast("NBA'ye döndün."); return; }
+  BETA.nbaTab=S.tab; location.hash="#"+(BETA.elTab||"el-tur"); if(!force) toast("EuroLeague moduna geçtin.");
+}
+function elEnsure(){ if($("#view-el-tur")) return;
+  $("#view-bugece").insertAdjacentHTML("afterend", EL_TABS.map(k=>`<section id="view-${k}" data-view class="hide"><div id="${k}" class="b-page"></div></section>`).join("")); }
+async function elRounds(){ const r=await cached("el_rounds", `${ELAPI}/v2/competitions/E/seasons/${elSeason()}/rounds`, 6*36e5); return (r?.data||r||[]).filter(x=>x.phaseTypeCode==="RS").sort((a,b)=>a.round-b.round); }
+function elCurRound(R){ const t=ymd(new Date()); const cur=R.find(x=>String(x.maxGameStartDate).slice(0,10).replace(/-/g,"")>=t); return cur?cur.round:(R[R.length-1]?.round||1); }
+async function elGames(n){ const key="el_g_"+n, c=S.nbaC[key]; const live=c?.data?.some?.(g=>elState(g)==="in");
+  const r=await cached(key, `${ELAPI}/v2/competitions/E/seasons/${elSeason()}/games?roundNumber=${n}`, live?45e3:10*60e3); return (r?.data||[]).sort((a,b)=>a.utcDate.localeCompare(b.utcDate)); }
+// maç durumu: post (bitti), in (oynanıyor: başlama saati geçti, sonuç yok), pre
+function elState(g){ if(g.played) return "post"; const t=Date.parse(g.utcDate); return Date.now()>=t && Date.now()<t+3*36e5 ? "in" : "pre"; }
+const elCrest = c => c?.images?.crest || "";
+const elTeamName = c => c?.editorialName || c?.abbreviatedName || c?.name || "";
+function elGameRow(g){
+  const st=elState(g), d=new Date(g.utcDate), L=g.local, R=g.road, fav=S.elMe?.favTeam;
+  const sc=(t,o)=>st==="pre"?"":`<b class="sc tnum ${st==="post" && (t.score??0)<(o.score??0)?"lose":""}">${t.score??""}</b>`;
+  const team=(t,o)=>`<span class="t ${t.club?.code===fav?"fav":""}"><img class="b-logo" src="${escA(elCrest(t.club))}" alt="" width="24" height="24" loading="lazy"><b>${esc(elTeamName(t.club))}</b>${sc(t,o)}</span>`;
+  const mid = st==="post" ? `<small class="muted">Bitti</small>` : st==="in" ? `<span class="badge-live">Canlı</span>` : `<b class="cond tm">${timeTR(d)}</b>`;
+  return `<div class="b-row el-row ${st}"><span class="teams">${team(L,R)}${team(R,L)}</span><span class="mid">${mid}</span></div>`;
+}
+function elDayGroups(G){ const by={}; for(const g of G){ const k=ymd(new Date(Date.parse(g.utcDate)+3*36e5)); (by[k] ||= []).push(g); }
+  return Object.entries(by).map(([k,list])=>`<div class="b-lb"><span>${dayNice(k,{weekday:"long",day:"numeric",month:"long"}).toLocaleUpperCase("tr")}</span><span>${list.length} maç</span></div><div class="b-gr">${list.map(elGameRow).join("")}</div>`).join(""); }
+async function elRender(){
+  const k=S.tab, el=$("#"+k); if(!el) return; BETA.elTab=k;
+  if(!el.innerHTML) el.innerHTML=skeletonCards(2);
+  try{
+    if(k==="el-tur" || k==="el-fik"){
+      const R=await elRounds(), cur=elCurRound(R); if(k==="el-tur") BETA.elRound=null;
+      const n=k==="el-tur" ? cur : (BETA.elRound||cur), G=await elGames(n), ri=R.find(x=>x.round===n);
+      const live=G.filter(g=>elState(g)==="in").length, done=G.filter(g=>g.played).length, next=G.find(g=>elState(g)==="pre");
+      const span = ri ? `${dayNice(String(ri.minGameStartDate).slice(0,10).replace(/-/g,""),{day:"numeric",month:"long"})} – ${dayNice(String(ri.maxGameStartDate).slice(0,10).replace(/-/g,""),{day:"numeric",month:"long"})}` : "";
+      if(k==="el-tur"){ BETA.elSub = `${n}. tur · ${span}`;
+        const me=S.elMe, c=(await elClubs().catch(()=>[])).find(x=>x.code===me.favTeam);
+        el.innerHTML = `<div class="b-gr el-hero"><div class="el-hr"><small>${live?`<span class="badge-live">Canlı</span> ${live} maç oynanıyor`:next?`Sıradaki maç ${dayNice(ymd(new Date(Date.parse(next.utcDate)+3*36e5)),{weekday:"long"})} ${timeTR(new Date(next.utcDate))}`:"Tur tamamlandı"}</small><b>${n}. Tur</b><span>${span} · ${G.length} maç · ${done} bitti</span></div>
+            <button type="button" class="el-me" data-b="elme">${elAvatar(S.uid,"sm")}<span><b style="color:${elCol(S.uid)}">${esc(me.club||pname(S.uid))}</b><small>${c?`<img src="${escA(elCrest(c))}" alt="" width="14" height="14"> ${esc(elTeamName(c))}`:""}</small></span></button></div>
+          <div class="el-note">Tur tahminleri bir sonraki adımda burada açılacak: her maç için kazanan, fark ve skorer.</div>${elDayGroups(G)}`;
+      } else {
+        el.innerHTML = `<div class="el-rnav"><button class="b-ib" type="button" data-elr="${n-1}" ${n<=1?"disabled":""} aria-label="Önceki tur">‹</button><span><b>${n}. Tur</b><small>${span}</small></span><button class="b-ib" type="button" data-elr="${n+1}" ${n>=R.length?"disabled":""} aria-label="Sonraki tur">›</button></div>
+          ${n!==cur?`<button type="button" class="linkish el-cur" data-elr="${cur}">Bu tura dön (${cur}. tur)</button>`:""}${elDayGroups(G)}`;
+        el.querySelectorAll("[data-elr]").forEach(b=>b.onclick=()=>{ BETA.elRound=+b.dataset.elr; elRender(); scrollTo({top:0}); });
+      }
+    }
+    if(k==="el-puan"){
+      const R=await elRounds(), cur=elCurRound(R); let n=cur, data=null;
+      for(; n>=1 && !data; n--){ const r=await cached("el_st_"+n, `${ELAPI}/v2/competitions/E/seasons/${elSeason()}/rounds/${n}/standings`, 30*60e3).catch(()=>null); const st=r?.[0]?.standings; if(st?.length && st.some(x=>x.data?.gamesPlayed)) data=st; }
+      const fav=S.elMe?.favTeam;
+      el.innerHTML = data ? `<div class="st-tbl el-st"><div class="st-h"><span>#</span><span></span><span>Takım</span><span>G-M</span><span>%</span><span>Fark</span></div>
+        ${data.map(x=>{ const d=x.data, p=d.position, df=d.pointsFavour-d.pointsAgainst;
+          return `<div class="st-r ${p<=6?"po":p<=10?"pi":""} ${x.club.code===fav?"me":""}"><span class="st-n">${p}</span><img src="${escA(elCrest(x.club))}" alt="" loading="lazy"><span class="st-t">${esc(elTeamName(x.club))}</span><span class="tnum">${d.gamesWon}-${d.gamesLost}</span><span class="tnum">${d.gamesPlayed?Math.round(d.gamesWon/d.gamesPlayed*1000)/10:0}</span><span class="tnum ${df>0?"up":df<0?"dn":""}">${df>0?"+":""}${df}</span></div>`; }).join("")}</div>
+        <p class="b-note" style="text-align:left">İlk 6 doğrudan playoff, 7–10 play-in. Senin takımın vurgulu.</p>` : `<div class="note">Puan durumuna şu an ulaşılamıyor.</div>`;
+    }
+    if(k==="el-sira"){
+      await loadElPlayers(); const clubs=await elClubs().catch(()=>[]);
+      const us=Object.entries(S.elp||{}).sort((a,b)=>(a[1].joined?.seconds||0)-(b[1].joined?.seconds||0));
+      el.innerHTML = `<div class="el-note">Puanlar tur tahminleri başlayınca işlemeye başlar. Şimdilik ligin kadrosu:</div>
+        <div class="b-gr b-rank">${us.map(([u,p],i)=>{ const c=clubs.find(x=>x.code===p.favTeam);
+          return `<div class="b-rk ${u===S.uid?"me":""}"><span class="pl">–</span>${elAvatar(u,"sm")}<span class="nm"><b style="color:${elCol(u)}">${esc(p.club||pname(u))}</b><small>${esc(pname(u))}${c?` · ${esc(elTeamName(c))}`:""}</small></span><span class="pt"><b class="tnum">0</b></span></div>`; }).join("")}</div>
+        <p class="b-note">${us.length} kişi bu ligde.</p>`;
+    }
+  }catch(e){ console.error(e); el.innerHTML=`<div class="note">EuroLeague verisine şu an ulaşılamıyor. Biraz sonra tekrar dene.</div>`; }
+  betaHead();
+}
 async function openEL(){
   openSheet(`<h3 id="shTitle">EuroLeague ligi</h3><p class="muted">Yükleniyor…</p>`);
   await loadElMe();
@@ -715,7 +782,8 @@ async function elSetup(start=0){
       try{
         if(S.elMe) await updateDoc(doc(S.db,"elPlayers",S.uid), data);
         else await setDoc(doc(S.db,"elPlayers",S.uid), {...data, joined:serverTimestamp()});
-        await loadElMe(); if(BETA.on) betaRender(); toast(st.edit?"EuroLeague profilin kaydedildi.":"EuroLeague ligine katıldın!"); elHome();
+        await loadElMe(); S.elp=null; toast(st.edit?"EuroLeague profilin kaydedildi.":"EuroLeague ligine katıldın! EuroLeague moduna geçtin.");
+        closeSheet(); if(EL_TABS.includes(S.tab)) betaRender(); else elToggle(true);
       }catch(err){ t.disabled=false; $("#elErr").textContent="Kaydedilemedi. "+(String(err?.code||"").includes("permission")?"Sunucu bu ligi henüz kabul etmiyor (kurallar yayınlanmadı).":"Tekrar dene."); }
     }
   };
@@ -730,11 +798,11 @@ async function elHome(){
   await loadElPlayers(); const n=Object.keys(S.elp||{}).length;
   $("#shBody").innerHTML=`<h3 id="shTitle">EuroLeague ligi</h3>
     <div class="el-card" style="--pc:${elCol(S.uid)}">${elAvatar(S.uid,"lg")}<span><b style="color:${elCol(S.uid)}">${esc(me.club||pname(S.uid))}</b><small>${esc(pname(S.uid))}${c?` · <img src="${escA(c.images?.crest||"")}" alt="" width="14" height="14"> ${esc(c.editorialName||c.name)}`:""}</small></span></div>
-    <div class="b-gr el-soon"><b>Ligde ${n} kişi var.</b><span>Tur tahminleri, skorlar ve ayrı puan durumu sıradaki adımda burada açılacak.</span></div>
+    <div class="b-gr el-soon"><b>Ligde ${n} kişi var.</b><span>Tur tahminleri ve ligin puan tablosu sıradaki adımda açılacak.</span></div>
     <div class="b-two"><button class="btn" type="button" data-eledit>Profili düzenle</button><button class="btn" type="button" data-elleave>Ligden ayrıl</button></div>`;
   $("[data-eledit]").onclick=()=>elSetup(0);
   $("[data-elleave]").onclick=async e=>{ const b=e.currentTarget; if(b.dataset.sure!=="1"){ b.dataset.sure="1"; b.textContent="Emin misin? Tekrar dokun"; return; }
-    try{ await deleteDoc(doc(S.db,"elPlayers",S.uid)); S.elMe=null; if(BETA.on) betaRender(); toast("EuroLeague liginden ayrıldın."); closeSheet(); }catch(err){ toast("Yapılamadı, tekrar dene."); } };
+    try{ await deleteDoc(doc(S.db,"elPlayers",S.uid)); S.elMe=null; S.elp=null; toast("EuroLeague liginden ayrıldın."); closeSheet(); if(EL_TABS.includes(S.tab)) location.hash="#"+(BETA.nbaTab||"bugece"); else if(BETA.on) betaRender(); }catch(err){ toast("Yapılamadı, tekrar dene."); } };
 }
 /* ====================================================== Firebase */
 async function initFirebase(){
@@ -4515,7 +4583,7 @@ function render(){
 function route(){
   const t=(location.hash||"#tahmin").slice(1);
   if(t==="istatistik"){ history.replaceState(null,"","#tahmin"); setTimeout(()=>S.uid && openProf(S.statFor||S.uid,"ist"),50); }
-  S.tab=[...(BETA.on?["bugece","profil","rozetler","ayarlar","gece","maclar","lb","takas","canli"]:[]),"tahmin","sonuclar","ayrisma","puan","uzun","takim","nba"].includes(t)?t:(BETA.on?"bugece":"tahmin");
+  S.tab=[...(BETA.on?["bugece","profil","rozetler","ayarlar","gece","maclar","lb","takas","canli",...EL_TABS]:[]),"tahmin","sonuclar","ayrisma","puan","uzun","takim","nba"].includes(t)?t:(BETA.on?"bugece":"tahmin");
   if(S.tab!==t && t && !location.hash.startsWith("#tahmin")) try{ history.replaceState(history.state, "", location.pathname+location.search+"#"+S.tab); }catch(e){}
   render.nbaAt=0; render.tkAt=0; S.boardOpen=null;
   $$("[data-view]").forEach(v=>v.classList.toggle("hide", v.id!=="view-"+S.tab));
@@ -6020,6 +6088,10 @@ function betaBoot(){
 function betaRevoke(){ if(BETA.on) switchUI(false); else betaSet(false); }
 function betaRender(){
   if(!BETA.on || !S.uid) return;
+  const isEL=EL_TABS.includes(S.tab); document.body.classList.toggle("el-mode", isEL);
+  if(isEL){ elEnsure(); $("#view-"+S.tab)?.classList.remove("hide");
+    if(!S.elMe){ loadElMe().then(m=>{ if(m) betaRender(); else { location.hash="#bugece"; openEL(); } }); return; }
+    elRender(); betaHead(); betaNav(S.tab); return; }
   const tab=BTABS[S.tab] ?? "";
   if(S.tab==="bugece") betaTonight();
   if(["profil","rozetler","ayarlar"].includes(S.tab)) betaPage();
@@ -6034,7 +6106,8 @@ function betaRender(){
   betaHead(); betaNav(tab); betaStrip(); betaLtStrip(); setTimeout(betaIntro, 0);
 }
 function betaHead(){
-  const T={takas:["Takas","Takas makinesi · 2026-27 maaş kontrolü"], lb:["LetterBasket","Ligin maç günlüğü"], maclar:["Maçlar",""], gece:["Gece özeti",""], profil:["Profil",""], rozetler:["Rozetler",""], ayarlar:["Ayarlar","Profil bilgilerin Profil › Düzenle’de"], bugece:["Bu gece",""], tahmin:["Bu gece","Klasik maç kartları"], sonuclar:["Maçlar","Skorlar, box score ve öne çıkanlar"], ayrisma:["Tahminler","Kim ne tahmin etti"], canli:["Canlı",""], puan:["Sıralama",""], nba:["NBA",""], takim:["NBA","Takımım"], uzun:["Uzun vade",""]}[S.tab]||["NBA Tahmin",""];
+  const isEL=EL_TABS.includes(S.tab);
+  const T={"el-tur":["Bu tur",BETA.elSub||""], "el-fik":["Fikstür","EuroLeague 2026-27 normal sezon"], "el-sira":["Lig","EuroLeague tahmin ligi"], "el-puan":["Puan durumu","EuroLeague 2026-27"], takas:["Takas","Takas makinesi · 2026-27 maaş kontrolü"], lb:["LetterBasket","Ligin maç günlüğü"], maclar:["Maçlar",""], gece:["Gece özeti",""], profil:["Profil",""], rozetler:["Rozetler",""], ayarlar:["Ayarlar","Profil bilgilerin Profil › Düzenle’de"], bugece:["Bu gece",""], tahmin:["Bu gece","Klasik maç kartları"], sonuclar:["Maçlar","Skorlar, box score ve öne çıkanlar"], ayrisma:["Tahminler","Kim ne tahmin etti"], canli:["Canlı",""], puan:["Sıralama",""], nba:["NBA",""], takim:["NBA","Takımım"], uzun:["Uzun vade",""]}[S.tab]||["NBA Tahmin",""];
   const seg = (opts) => `<div class="b-seg" style="grid-template-columns:repeat(${opts.length},1fr)">${opts.map(([h,l])=>`<a href="#${h}" aria-pressed="${S.tab===h}">${l}</a>`).join("")}</div>`;
   let sub=T[1], extra="";
   if(S.tab==="bugece") sub=BETA.sub||"";
@@ -6045,14 +6118,17 @@ function betaHead(){
   if(S.tab==="profil"){ const u=betaProfU(); sub = u===S.uid ? "Senin profilin" : esc(pname(u)); }
   if(S.tab==="rozetler"){ const u=betaProfU(); sub = u===S.uid ? "Senin rozetlerin" : esc(pname(u))+" · rozetler"; }
   const sub2 = ["profil","rozetler","ayarlar","gece","lb","takas"].includes(S.tab);
-  $("#bHead").innerHTML = `<div class="b-h1">${sub2?`<button class="b-ib" data-b="back" type="button" aria-label="Geri">${bic("back",20,2.4)}</button>`:""}<span class="t"><b>${T[0]} <span class="b-beta">BETA</span></b>${sub?`<small>${sub}</small>`:""}</span>
-    ${elVisible()?`<button class="b-ib b-el ${S.elMe?"on":""}" data-b="el" type="button" aria-label="EuroLeague ligi" title="EuroLeague ligi">EL</button>`:""}
-    <button class="b-ib" data-b="search" type="button" aria-label="Ara">${bic("srch",19)}</button>
-    <button class="b-ib b-me" data-b="me" type="button" aria-label="Profilim">${avatar(S.uid,"")}</button></div>${extra}`;
+  $("#bHead").innerHTML = `<div class="b-h1">${sub2?`<button class="b-ib" data-b="back" type="button" aria-label="Geri">${bic("back",20,2.4)}</button>`:""}<span class="t"><b>${T[0]} ${isEL?'<span class="b-beta b-elb">EUROLEAGUE</span>':'<span class="b-beta">BETA</span>'}</b>${sub?`<small>${sub}</small>`:""}</span>
+    ${elVisible()?(isEL?`<button class="b-ib b-el b-tonba" data-b="el" type="button" aria-label="NBA'ye dön" title="NBA'ye dön">NBA</button>`:`<button class="b-ib b-el ${S.elMe?"on":""}" data-b="el" type="button" aria-label="EuroLeague moduna geç" title="EuroLeague moduna geç">EL</button>`):""}
+    ${isEL?"":`<button class="b-ib" data-b="search" type="button" aria-label="Ara">${bic("srch",19)}</button>`}
+    ${isEL?`<button class="b-ib b-me" data-b="elme" type="button" aria-label="EuroLeague profilim">${elAvatar(S.uid,"")}</button>`:`<button class="b-ib b-me" data-b="me" type="button" aria-label="Profilim">${avatar(S.uid,"")}</button>`}</div>${extra}`;
 }
 function betaNav(cur){
   const n=$("#chatN"), chatN = n && !n.classList.contains("hide") ? n.textContent : "";
   const it=(k,h,t,icn)=>`<a href="#${h}" ${cur===k?'aria-current="page"':""}>${bic(icn)}<span>${t}</span></a>`;
+  if(EL_TABS.includes(S.tab)){ $("#bNav").innerHTML = `<div class="in">${it("el-tur","el-tur","Bu tur","gece")}${it("el-fik","el-fik","Fikstür","mac")}
+    <button type="button" data-b="plus" aria-label="Daha fazla" aria-expanded="${!!BETA.plus}"><span class="pl">${bic("plus",24,2.6)}</span>${chatN?'<i class="b-dot"></i>':""}<span>Daha fazla</span></button>
+    ${it("el-sira","el-sira","Lig","sira")}${it("el-puan","el-puan","Puan durumu","nba")}</div>`; return; }
   const nLive=[S.today, shiftDay(S.today,-1)].reduce((x,d)=>x+(S.days[d]?.games.filter(g=>g.state==="in").length||0),0);
   // 1.44.0: 6 sekme + ortada artı. Canlı maç sayısı Canlı sekmesinde görünür
   $("#bNav").innerHTML = `<div class="in in7">${it("bugece","bugece","Bu gece","gece")}${it("canli","canli","Canlı","live").replace("</a>", nLive?`<i class="b-live">${nLive}</i></a>`:"</a>")}${it("maclar","sonuclar","Maçlar","mac")}
@@ -6260,7 +6336,8 @@ function betaClick(e){
   if(d.b==="me") return betaOpenProf(S.uid,"ozet");
   if(d.b==="back"){ if(BETA.navDepth>0){ BETA.navDepth--; history.back(); } else location.hash="#bugece"; return; }
   if(d.b==="search") return openSearch();
-  if(d.b==="el") return openEL();
+  if(d.b==="el") return elToggle();
+  if(d.b==="elme") return openEL();
   if(d.p) return betaPlusGo(d.p);
   if(d.bx) return betaExtra(d.bx);
   if(d.ft){ return d.ft==="start" ? ftStart() : ftShoot(); }

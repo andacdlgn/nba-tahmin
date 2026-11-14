@@ -1141,3 +1141,24 @@ body.beta tr[data-ath],tr[data-ath]{cursor:pointer}
 .el-body{min-height:120px}
 .el-nav{margin-top:14px}
 .el-soon{padding:12px 14px;display:flex;flex-direction:column;gap:4px;margin-bottom:12px}.el-soon span{color:var(--muted);font-size:13px}
+.el-body .adm-in{width:100%;margin-top:6px}
+/* 1.55.0: EuroLeague modu — turuncu tema, kendi sayfaları */
+body.el-mode{--amber:#ff7a1a}
+body.el-mode .b-head,body.el-mode #bHead{box-shadow:inset 0 3px 0 #ff7a1a}
+.b-beta.b-elb{background:color-mix(in srgb,#ff7a1a 22%,transparent);color:#ff9a4d;letter-spacing:.06em}
+.b-ib.b-el.b-tonba{color:#6aa8ff;border-color:color-mix(in srgb,#6aa8ff 45%,var(--line));font-size:13px}
+.el-hero{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px;margin-bottom:10px;background:linear-gradient(135deg,color-mix(in srgb,#ff7a1a 22%,var(--panel)),var(--panel))}
+.el-hr{display:flex;flex-direction:column;gap:2px;min-width:0}.el-hr small{color:var(--muted);font-size:12px;display:flex;align-items:center;gap:6px}
+.el-hr b{font-family:"Barlow Condensed";font-weight:800;font-size:30px;line-height:1}.el-hr span{color:var(--muted);font-size:13px}
+.el-me{display:flex;align-items:center;gap:8px;background:var(--panel-2);border:1px solid var(--line);border-radius:12px;padding:6px 10px;color:var(--ink);font:inherit;cursor:pointer;max-width:55%}
+.el-me span{display:flex;flex-direction:column;min-width:0;text-align:left}.el-me b{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.el-me small{color:var(--muted);font-size:11px;display:flex;align-items:center;gap:4px}
+.el-note{font-size:13px;color:var(--muted);padding:10px 12px;border:1px dashed color-mix(in srgb,#ff7a1a 45%,var(--line));border-radius:12px;margin:0 0 12px}
+.el-row{cursor:default}.el-row .t.fav b{color:#ff9a4d}.el-row .sc.lose{opacity:.55}.el-row.post .mid small{font-size:12px}
+.el-rnav{display:grid;grid-template-columns:44px 1fr 44px;align-items:center;gap:8px;margin-bottom:6px;text-align:center}
+.el-rnav span{display:flex;flex-direction:column}.el-rnav b{font-family:"Barlow Condensed";font-size:24px}.el-rnav small{color:var(--muted);font-size:12px}
+.el-cur{display:block;margin:0 auto 8px;font-size:13px}
+.el-st .st-h,.el-st .st-r{grid-template-columns:24px 26px 1fr 50px 44px 48px;cursor:default}
+.el-st .st-r img{width:22px;height:22px;object-fit:contain}
+.el-st .st-r.me{background:color-mix(in srgb,#ff7a1a 14%,transparent)}
+.el-st .up{color:var(--win)}.el-st .dn{color:var(--lose)}
+@media (max-width:420px){ .el-st .st-h span:nth-child(6){display:inline} .el-st .st-h,.el-st .st-r{grid-template-columns:20px 22px 1fr 44px 40px 44px} }
