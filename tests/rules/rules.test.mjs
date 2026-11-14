@@ -1,5 +1,5 @@
 import { initializeTestEnvironment, assertSucceeds, assertFails } from "@firebase/rules-unit-testing";
-import { doc, setDoc, getDoc, updateDoc, writeBatch, serverTimestamp, Timestamp, arrayUnion, increment } from "firebase/firestore";
+import { doc, setDoc, getDoc, updateDoc, deleteDoc, writeBatch, serverTimestamp, Timestamp, arrayUnion, increment } from "firebase/firestore";
 import fs from "fs";
 const env = await initializeTestEnvironment({ projectId:"demo-tahmin", firestore:{ rules: fs.readFileSync(new URL("../../firestore.rules", import.meta.url),"utf8"), host:"127.0.0.1", port:8085 } });
 await env.withSecurityRulesDisabled(async c=>{ const db=c.firestore();
@@ -46,5 +46,20 @@ t("chat bad id", ()=>assertFails(setDoc(doc(A,'chat/"><img src=x onerror=1>'),{u
 t("chat bad rp id", ()=>assertFails(setDoc(doc(A,"chat/AbCdEfGhIjKlMnOpQrSv"),{uid:"alice",t:"x",at:serverTimestamp(),re:{},rp:{id:'"><b>',uid:"alice",t:"selam"}})));
 t("dm msg ok", async()=>{ const b=writeBatch(A); b.set(doc(A,"dm/alice_bob"),{u:["alice","bob"],at:serverTimestamp(),last:{uid:"alice",t:"hey"},rd:{alice:serverTimestamp()},bl:{}}); b.set(doc(A,"dm/alice_bob/m/AbCdEfGhIjKlMnOpQrSt"),{uid:"alice",t:"hey",at:serverTimestamp()}); return assertSucceeds(b.commit()); });
 t("dm msg bad id", async()=>{ const b=writeBatch(A); b.update(doc(A,"dm/alice_bob"),{at:serverTimestamp(),last:{uid:"alice",t:"x"},rd:{alice:serverTimestamp()}}); b.set(doc(A,'dm/alice_bob/m/"><img src=x>'),{uid:"alice",t:"x",at:serverTimestamp()}); return assertFails(b.commit()); });
+// 1.55.0: EuroLeague profili
+const EL={favTeam:"IST", av:"e:1dU3kpCqReRp93/1BSdBWIjHGF4xs/33183699-533f-4f6b-a10f-beec6af2277e.png", color:"p3", club:"Efes Sevenler"};
+t("el create ok", ()=>assertSucceeds(setDoc(doc(A,"elPlayers/alice"),{...EL, joined:serverTimestamp()})));
+t("el update ok", ()=>assertSucceeds(updateDoc(doc(A,"elPlayers/alice"),{favTeam:"ULK", color:"p7", club:"Fener Ordusu", av:""})));
+t("el update joined no", ()=>assertFails(updateDoc(doc(A,"elPlayers/alice"),{joined:serverTimestamp()})));
+t("el other user no", ()=>assertFails(setDoc(doc(A,"elPlayers/bob"),{...EL, joined:serverTimestamp()})));
+t("el stranger no", ()=>assertFails(setDoc(doc(X,"elPlayers/stranger"),{...EL, joined:serverTimestamp()})));
+t("el bad team", ()=>assertFails(updateDoc(doc(A,"elPlayers/alice"),{favTeam:'"><x'})));
+t("el bad av url", ()=>assertFails(updateDoc(doc(A,"elPlayers/alice"),{av:"e:../../evil.svg"})));
+t("el bad color", ()=>assertFails(updateDoc(doc(A,"elPlayers/alice"),{color:"red"})));
+t("el bad club", ()=>assertFails(updateDoc(doc(A,"elPlayers/alice"),{club:"siktir"})));
+t("el short club", ()=>assertFails(updateDoc(doc(A,"elPlayers/alice"),{club:"ab"})));
+t("el extra key", ()=>assertFails(updateDoc(doc(A,"elPlayers/alice"),{pts:999})));
+t("el read public", ()=>assertSucceeds(getDoc(doc(U,"elPlayers/alice"))));
+t("el leave ok", ()=>assertSucceeds(deleteDoc(doc(A,"elPlayers/alice"))));
 let fail=0; for(const [n,p] of T){ try{ await p(); console.log("OK  ",n); }catch(e){ fail++; console.log("FAIL",n, String(e.message||e).slice(0,160)); } }
 await env.cleanup(); console.log(fail?fail+" failed":"all passed"); process.exit(fail?1:0);

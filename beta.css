@@ -1118,3 +1118,26 @@ body.beta tr[data-ath],tr[data-ath]{cursor:pointer}
 .nx-st{text-align:right;font-size:13px}.nx-st.ok{color:var(--win)}.nx-st.no{color:var(--muted)}.nx-st.now{color:var(--amber);font-size:11px}
 .nx-nm{display:flex;flex-wrap:wrap;gap:4px 12px;padding:4px 8px 8px 40px;font-size:13px}.nx-nm .linkish{font-weight:700}
 .nx-none{display:block;margin-top:8px;font-size:12px;color:var(--muted)}
+/* 1.55.0: EuroLeague ligi — düğme, katılma, ikinci profil */
+.b-ib.b-el{font-family:"Barlow Condensed";font-weight:800;font-size:15px;letter-spacing:.02em;color:#ff7a1a;border:1px solid color-mix(in srgb,#ff7a1a 45%,var(--line))}
+.b-ib.b-el.on{background:color-mix(in srgb,#ff7a1a 18%,transparent)}
+.el-join{text-align:center;padding:6px 4px}
+.el-badge{width:64px;height:64px;margin:4px auto 10px;border-radius:18px;display:grid;place-items:center;font-family:"Barlow Condensed";font-weight:800;font-size:30px;color:#fff;background:linear-gradient(135deg,#ff7a1a,#c2410c)}
+.el-join p{color:var(--muted);font-size:14px;line-height:1.45}
+.el-ul{text-align:left;margin:12px 0 16px;padding-left:18px;font-size:14px;line-height:1.5;display:flex;flex-direction:column;gap:6px}
+.el-steps{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:4px 0 12px}
+.el-steps button{display:flex;flex-direction:column;align-items:center;gap:4px;background:none;border:0;color:var(--muted);font:inherit;font-size:11px;cursor:pointer}
+.el-steps i{font-style:normal;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;border:1px solid var(--line);font-weight:700;font-size:13px}
+.el-steps .on{color:var(--ink)}.el-steps .on i{background:#ff7a1a;border-color:#ff7a1a;color:#fff}.el-steps .done i{border-color:var(--win);color:var(--win)}
+.el-prev,.el-card{display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--line);border-radius:14px;background:var(--panel-2);margin-bottom:12px}
+.el-prev span,.el-card span{display:flex;flex-direction:column;gap:2px;min-width:0}.el-prev small,.el-card small{color:var(--muted);font-size:12px;display:flex;align-items:center;gap:4px}
+.el-card b{font-size:17px}
+.el-clubs{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px}
+.el-club{display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 4px;border-radius:12px;border:1px solid var(--line);background:var(--panel-2);color:var(--ink);font:inherit;cursor:pointer}
+.el-club img{width:40px;height:40px;object-fit:contain}.el-club small{font-size:11px;text-align:center;line-height:1.2}
+.el-club[aria-pressed="true"]{border-color:#ff7a1a;box-shadow:0 0 0 2px color-mix(in srgb,#ff7a1a 40%,transparent)}
+.el-tch{flex-wrap:nowrap;overflow-x:auto;margin:8px 0;padding-bottom:4px}.el-tch .chip{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.el-avs{margin-top:6px}
+.el-body{min-height:120px}
+.el-nav{margin-top:14px}
+.el-soon{padding:12px 14px;display:flex;flex-direction:column;gap:4px;margin-bottom:12px}.el-soon span{color:var(--muted);font-size:13px}

@@ -143,6 +143,26 @@ service cloud.firestore {
         && request.resource.data.invite == get(/databases/$(database)/documents/config/secret).data.invite;
     }
 
+    // 1.55.0: EuroLeague ligi profili (NBA profilinden ayrı). Yalnızca NBA ligindeki oyuncular katılabilir.
+    function elOk(d) {
+      return d.keys().hasOnly(['favTeam', 'av', 'color', 'club', 'joined'])
+        && d.favTeam is string && d.favTeam.matches('^[A-Z]{3}$')
+        && d.av is string && d.av.size() <= 200 && d.av.matches('^(e:[A-Za-z0-9/_.-]+[.](png|jpg|jpeg|webp))?$')
+        && d.color is string && (d.color == '' || d.color in ['p0', 'p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8', 'p9', 'p10', 'p11', 'p12', 'p13', 'p14', 'p15', 'p16', 'p17', 'p18', 'p19'])
+        && d.club is string && d.club.size() >= 3 && d.club.size() <= 40
+        && !d.club.lower().matches('.*(orospu|siktir|sikerim|sikeyim|sikik|yarrak|yarak|am[iı]nak|amc[iı]k|ibne|pezevenk|kahpe|kaltak|yav[sş]ak|[sş]erefsiz|gerizekal|dalyarak|ta[sş]ak|fuck|shit|bitch|cunt|nigg|faggot|whore|asshole).*');
+    }
+    match /elPlayers/{uid} {
+      allow read: if true;
+      allow create: if signedIn() && request.auth.uid == uid
+        && exists(/databases/$(database)/documents/players/$(uid))
+        && !exists(/databases/$(database)/documents/banned/$(uid))
+        && elOk(request.resource.data) && request.resource.data.joined == request.time;
+      allow update: if signedIn() && request.auth.uid == uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['favTeam', 'av', 'color', 'club'])
+        && elOk(request.resource.data);
+      allow delete: if isAdmin() || (signedIn() && request.auth.uid == uid);
+    }
     match /players/{uid} {
       allow read: if true;
       allow create: if signedIn() && request.auth.uid == uid
