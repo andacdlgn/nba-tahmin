@@ -47,7 +47,7 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.54.4";
+const VERSION = "1.54.5";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
@@ -630,7 +630,8 @@ function dayPlayerResult(day, uid){
 const EL_OPEN = false;                       // false iken düğmeyi yalnızca yönetici görür (kapalı beta)
 const ELAPI = "https://api-live.euroleague.net";
 const elSeason = () => { const d=new Date(); return "E"+(d.getMonth()>=7 ? d.getFullYear() : d.getFullYear()-1); };
-const elVisible = () => !!S.uid && (EL_OPEN || S.isAdmin || !!S.elMe);
+// kapalı beta: EL_OPEN false iken yalnızca yönetici görür (adres elle yazılsa da açılmaz)
+const elVisible = () => !!S.uid && (EL_OPEN || !!S.isAdmin);
 S.elMe = null; S.elp = null;
 async function elClubs(){ const r=await cached("el_clubs", `${ELAPI}/v2/competitions/E/seasons/${elSeason()}/clubs`, 12*36e5); return (r?.data||r||[]).filter(c=>c && !c.isVirtual); }
 async function elRoster(code){ const r=await cached("el_r_"+code, `${ELAPI}/v2/competitions/E/seasons/${elSeason()}/clubs/${code}/people`, 6*36e5);
@@ -719,6 +720,7 @@ async function elRender(){
   betaHead();
 }
 async function openEL(){
+  if(!elVisible()) return;
   openSheet(`<h3 id="shTitle">EuroLeague ligi</h3><p class="muted">Yükleniyor…</p>`);
   await loadElMe();
   if(S.elMe) return elHome();
@@ -6018,7 +6020,7 @@ if("serviceWorker" in navigator){ navigator.serviceWorker.getRegistrations?.().t
     loadLT(); setTimeout(installBanner, 6000); later(markSeen, 3000);
     // bilgilendirme pencereleri sıraya girer; açılıştan ~3 sn sonra en önemlisi (varsa) bir tane açılır
     setTimeout(()=>{ maybeNews(); maybeCeremony(); markVisit(); maybePoll(); maybeLeaguePop(); maybeWeekPop(); maybeSelfPlay(); maybeScoringGuide(); maybeInvitePop(); maybeInstallPop(); maybeAskAuto(); maybeRealName(); }, 600);
-    later(()=>{ getDoc(doc(S.db,"config","admin")).then(()=>{ S.isAdmin=true; maybeArchiveTrial(); if(BETA.on) betaRender(); }).catch(e=>{ S.isAdmin=false; });
+    later(()=>{ getDoc(doc(S.db,"config","admin")).then(()=>{ S.isAdmin=true; maybeArchiveTrial(); if(BETA.on) betaRender(); }).catch(e=>{ S.isAdmin=false; if(BETA.on && EL_TABS.includes(S.tab)) betaRender(); });
       loadElMe().then(m=>{ if(m && BETA.on) betaRender(); });
       getDoc(doc(S.db,"config","secret")).then(r=>{ S.invite=r.data()?.invite||""; }).catch(()=>{});
       allPlayers().catch(()=>{}); }, 2000);
@@ -6094,6 +6096,8 @@ function betaRender(){
   if(!BETA.on || !S.uid) return;
   const isEL=EL_TABS.includes(S.tab); document.body.classList.toggle("el-mode", isEL);
   if(isEL){ elEnsure(); $("#view-"+S.tab)?.classList.remove("hide");
+    if(!EL_OPEN && S.isAdmin===undefined){ const el=$("#"+S.tab); if(el && !el.innerHTML) el.innerHTML=skeletonCards(2); return; }   // yönetici kontrolü henüz bitmedi; bitince yeniden çizilir
+    if(!elVisible()){ document.body.classList.remove("el-mode"); location.hash="#bugece"; return; }
     if(!S.elMe){ loadElMe().then(m=>{ if(m) betaRender(); else { location.hash="#bugece"; openEL(); } }); return; }
     elRender(); betaHead(); betaNav(S.tab); return; }
   const tab=BTABS[S.tab] ?? "";
