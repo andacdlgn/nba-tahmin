@@ -76,7 +76,7 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.55.3";
+const VERSION = "1.55.4";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
@@ -789,8 +789,10 @@ function elLivePatch(g, bx){
   if(bx.Live===false && (tot[0]||0)+(tot[1]||0)>0 && q.length) g._ended=true;
 }
 async function elLiveDay(G){ await Promise.all(G.filter(g=>elState(g)==="in").map(async g=>{
-  const bx=await elFetch(`https://live.euroleague.net/api/Boxscore?gamecode=${g.gameCode}&seasoncode=${elSeason()}&_=${Math.floor(Date.now()/15e3)}`).catch(()=>null);
-  if(bx) elLivePatch(g, bx); })); return G; }
+  const [bx, pl]=await Promise.all([elFetch(`https://live.euroleague.net/api/Boxscore?gamecode=${g.gameCode}&seasoncode=${elSeason()}&_=${Math.floor(Date.now()/15e3)}`).catch(()=>null),
+    elPlays(g.gameCode, true).catch(()=>[])]);
+  if(bx) elLivePatch(g, bx);
+  const last=pl.filter(p=>p.period?.number).at(-1); if(last){ g._per=last.period.number; g._clk=last.clock?.displayValue||""; } })); return G; }
 function elState(g){ if(g.played || g._ended) return "post"; const t=Date.parse(g.utcDate); return Date.now()>=t && Date.now()<t+3*36e5 ? "in" : "pre"; }
 const elCrest = c => c?.images?.crest || "";
 const elTeamName = c => EL_NICK[c?.code] || c?.editorialName || c?.abbreviatedName || c?.name || "";
@@ -890,8 +892,8 @@ function elEvent(g){
     score: st==="pre" ? "" : String(t.score??0), records:[{summary:""}],
     linescores: Object.entries(t.partials||{}).filter(([k,v])=>/^partials\d$/.test(k) && v!=null).map(([,v])=>({value:v, displayValue:String(v)})) });
   return { id:elGid(g), date:g.utcDate, season:{type:2, year:elYear()+1}, el:g,
-    status:{ period: st==="post"?4:per, displayClock:"", type:{ state:st, completed:st==="post", name: st==="post"?"STATUS_FINAL":st==="in"?"STATUS_IN_PROGRESS":"STATUS_SCHEDULED",
-      shortDetail: st==="post"?"Bitti":st==="in"?"Canlı":timeTR(new Date(g.utcDate)) } },
+    status:{ period: st==="post"?4:(g._per||per), displayClock:st==="in"?(g._clk||""):"", type:{ state:st, completed:st==="post", name: st==="post"?"STATUS_FINAL":st==="in"?"STATUS_IN_PROGRESS":"STATUS_SCHEDULED",
+      shortDetail: st==="post"?"Bitti":st==="in"?(g._per?`${g._per<=4?g._per+". Ç":"UZ"} ${g._clk||""}`.trim():"Canlı"):timeTR(new Date(g.utcDate)) } },
     competitions:[{ competitors:[side(L,R,"home"), side(R,L,"away")], notes:[], venue:{fullName:g.venue?.name||""}, date:g.utcDate,
       status:{ period: st==="post"?4:per, type:{ state:st, completed:st==="post", shortDetail: st==="post"?"Bitti":"" } } }] };
 }
@@ -917,11 +919,21 @@ function elBoxStats(p){ const fgm=(p.FieldGoalsMade2||0)+(p.FieldGoalsMade3||0),
 async function elStandAt(n){ if(n<1) return null;
   const r=await cached("el_st_"+n, `${ELAPI}/v2/competitions/E/seasons/${elSeason()}/rounds/${n}/standings`, 30*60e3).catch(()=>null);
   const m={}; for(const x of r?.[0]?.standings||[]){ const d=x.data||{}; m[x.club?.code]=d; } return Object.keys(m).length?m:null; }
-async function elHomeProb(g){
+async function elHomeMg(g){
   const st=await elStandAt((g.round||1)-1); if(!st) return null;
   const net=c=>{ const d=st[c]; if(!d?.gamesPlayed) return 0; return (d.pointsFavour-d.pointsAgainst)/d.gamesPlayed * d.gamesPlayed/(d.gamesPlayed+4); };
-  const mg=net(g.local.club.code)-net(g.road.club.code)+3;
-  return 1/(1+Math.exp(-mg/7));
+  return net(g.local.club.code)-net(g.road.club.code)+3;   // ev sahibinin beklenen farkı
+}
+async function elHomeProb(g){ const mg=await elHomeMg(g); return mg==null ? null : 1/(1+Math.exp(-mg/7)); }
+// Maç içi kazanma ihtimali (kendi modelimiz): kalan süreye göre beklenen fark = şimdiki fark + maç önü beklentinin kalan kısmı,
+// belirsizlik kalan sürenin kareköküyle küçülür (EuroLeague'de bir maçın farkı ortalama ±11 sayı oynar)
+const elNormCdf = z => { const t=1/(1+0.2316419*Math.abs(z)), d=0.3989423*Math.exp(-z*z/2), p=d*t*(0.3193815+t*(-0.3565638+t*(1.781478+t*(-1.821256+t*1.330274)))); return z>0?1-p:p; };
+function elWinProb(plays, mg){
+  return plays.filter(p=>p.period?.number).map(p=>{ const per=p.period.number, [m,sec]=String(p.clock?.displayValue||"0:00").split(":").map(Number);
+    const left = per<=4 ? (4-per)*QLEN + (m||0) + (sec||0)/60 : (m||0) + (sec||0)/60, frac=Math.max(0, left/GMIN);
+    const d=(p.homeScore||0)-(p.awayScore||0), mu=d+(mg||0)*frac, sd=11*Math.sqrt(frac);
+    const hw = sd<0.3 ? (d>0?1:d<0?0:0.5) : elNormCdf(mu/sd);
+    return { playId:p.id, homeWinPercentage: Math.min(0.999, Math.max(0.001, hw)) }; });
 }
 async function elLastFive(code, before){
   const r=await cached("el_sched_"+code, `${ELAPI}/v2/competitions/E/seasons/${elSeason()}/games?teamCode=${code}`, 3*36e5).catch(()=>null);
@@ -956,7 +968,8 @@ async function elSummary(id){
   if(bx && st==="in") elLivePatch(g, bx);
   const ev=elEvent(g);
   const plays = st!=="pre" ? await elPlays(code, st==="in").catch(()=>[]) : [];
-  const [hp, ...l5] = await Promise.all([elHomeProb(g).catch(()=>null), ...[g.local.club.code, g.road.club.code].map(c=>elLastFive(c, g.utcDate).catch(()=>({team:{abbreviation:c},events:[]})))]);
+  const [mg, ...l5] = await Promise.all([elHomeMg(g).catch(()=>null), ...[g.local.club.code, g.road.club.code].map(c=>elLastFive(c, g.utcDate).catch(()=>({team:{abbreviation:c},events:[]})))]);
+  const hp = mg==null ? null : 1/(1+Math.exp(-mg/7));
   const roster={};   // kadrolardan fotoğraf
   const teams=[g.local.club, g.road.club];
   await Promise.all(teams.map(async c=>{ try{ for(const r of await elRoster(c.code)) roster[elPid(r.code)]=r; }catch(e){} }));
@@ -978,7 +991,7 @@ async function elSummary(id){
     gameInfo:{ venue:{fullName:g.venue?.name||"", address:{city:""}}, attendance: bx?.Attendance ? +bx.Attendance : (g.audience||0),
       officials:String(bx?.Referees||"").split(/,\s*/).reduce((a,x,i,arr)=>{ if(i%2===0 && arr[i+1]) a.push({displayName:elName(arr[i]+", "+arr[i+1])}); return a; },[]) },
     predictor: hp!=null ? { homeTeam:{gameProjection:(hp*100).toFixed(1)}, awayTeam:{gameProjection:((1-hp)*100).toFixed(1)} } : undefined,
-    plays, winprobability:[], lastFiveGames:l5, seasonseries:[], injuries:[], leaders:[] };
+    plays, winprobability: plays.length>20 ? elWinProb(plays, mg) : [], lastFiveGames:l5, seasonseries:[], injuries:[], leaders:[] };
 }
 async function elEspn(path){
   let m;
@@ -2290,7 +2303,7 @@ function paintQuick(){
       ${d.winner?(isRules2(g) ? marginCtl(g,d,"qk") : `<div class="qk-m">${marginsFor(g).map(m=>`<button data-qm="${m}" data-g="${g.id}" aria-pressed="${d.margin===m}">${m}</button>`).join("")}</div>`):""}${sel}</div>`;
   }).join("");
   const ready=games.filter(g=>{ const d=draftFor(g), sv=D.picks[g.id]?.[S.uid]; return d.winner&&d.margin&&d.scorerId && !(sv && sv.winner===d.winner && sv.margin===d.margin && sv.scorerId===d.scorerId); }).length;
-  box.innerHTML=`<h3 id="shTitle">Hızlı tahmin</h3><p class="muted">Kazananı seç; fark ESPN olasılığına göre, skorer takımın sayı liderine göre önerilir. İstersen değiştir, sonra hepsini birden kaydet.</p>
+  box.innerHTML=`<h3 id="shTitle">Hızlı tahmin</h3><p class="muted">Kazananı seç; fark ${IS_EL?"kazanma şansına":"ESPN olasılığına"} göre, skorer takımın sayı liderine göre önerilir. İstersen değiştir, sonra hepsini birden kaydet.</p>
     <div class="qk-list">${rows}</div>
     <div class="qk-bar"><button class="btn-primary" id="qkSave" ${ready?"":"disabled"}>${ready?`${ready} tahmini kaydet`:"Kaydedilecek değişiklik yok"}</button></div>`;
   box.onclick=e=>{
@@ -8237,7 +8250,7 @@ function clWP(g, s, n=3){
   const top=sw.sort((a,b)=>Math.abs(b.d)-Math.abs(a.d)).slice(0,n).filter(m=>Math.abs(m.d)>=4).sort((a,b)=>a.t-b.t);
   const lw=Math.round(last.w), lead=lw>=50?g.home:g.away, lp=lw>=50?lw:100-lw;
   const head=g.state==="post"?`<small>Maç sonu</small>`:`<small>Şu an: ${esc(lead.name)} %${lp}</small>`;
-  return `<div class="cl-sec">KAZANMA İHTİMALİ <small>ESPN, her oyunda</small></div><figure class="cl-flow cl-wpc" role="img" aria-label="Kazanma ihtimali grafiği">
+  return `<div class="cl-sec">KAZANMA İHTİMALİ <small>${IS_EL?"skor, kalan süre ve maç önü güce göre":"ESPN, her oyunda"}</small></div><figure class="cl-flow cl-wpc" role="img" aria-label="Kazanma ihtimali grafiği">
     <div class="cl-chl"><span>${bLogo(g.home,16)} ${escA(g.home.abbr)} %100</span>${head}</div>
     <svg viewBox="0 0 ${X} ${Y}" preserveAspectRatio="none" aria-hidden="true"><defs><clipPath id="${id}t"><rect x="0" y="0" width="${X}" height="${Y/2}"/></clipPath><clipPath id="${id}b"><rect x="0" y="${Y/2}" width="${X}" height="${Y/2}"/></clipPath></defs>
       ${bounds.map(t=>`<line x1="${x(t)}" x2="${x(t)}" y1="0" y2="${Y}" class="q"/>`).join("")}<line x1="0" x2="${X}" y1="${Y/2}" y2="${Y/2}" class="z"/>
