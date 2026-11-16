@@ -23,26 +23,33 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@v4
         with:
           ref: main
 
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
       - name: Sonuçları ve puanları hesapla
         run: python scripts/sync.py ${{ inputs.full && '--full' || '' }}
 
+      # EuroLeague ligi (?lg=el): aynı betik, data/el/ klasörüne yazar. Hata verirse NBA sonuçları yine kaydedilir.
+      - name: EuroLeague sonuçları ve puanları
+        continue-on-error: true
+        env:
+          LEAGUE: el
+        run: python scripts/sync.py ${{ inputs.full && '--full' || '' }}
+
       - name: Değiştiyse kaydet
         run: |
-          if git diff --quiet -- data/; then
+          git add data/
+          if git diff --cached --quiet; then
             echo "Değişiklik yok."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/
           git commit -m "Sonuçlar ve puanlar güncellendi"
           git pull --rebase -X theirs origin main
           git push

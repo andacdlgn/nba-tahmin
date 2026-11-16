@@ -26,7 +26,14 @@ from zoneinfo import ZoneInfo
 TR_TZ = ZoneInfo("Europe/Istanbul")
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DATA = os.path.join(ROOT, "data")
+# 1.55.0: aynı betik EuroLeague ligi için de çalışır (LEAGUE=el): maçlar EuroLeague'in resmî servisinden, tahminler
+# "el_" önekli koleksiyonlardan okunur, sonuçlar data/el/ klasörüne yazılır (app.js ?lg=el ile aynı düzen).
+IS_EL = os.environ.get("LEAGUE", "nba") == "el"
+DATA = os.path.join(ROOT, "data", "el") if IS_EL else os.path.join(ROOT, "data")
+EL_NS = {"picks", "daily", "progress", "league", "talk", "series", "chat", "chatpin", "chatlim", "typing", "dm",
+         "polls", "lt", "ltResults", "ft", "reports"}   # app.js EL_NS ile aynı
+EL_START = "20261117"   # EuroLeague tahmin liginin ilk gecesi (app.js EL_START)
+EL_SEASON_FIRST = "20260924"   # EuroLeague normal sezonunun ilk günü (istatistikler buradan)
 CONFIG = json.load(open(os.path.join(ROOT, "config.json"), encoding="utf-8"))
 ESPN = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba"
 FS_BASE = "https://firestore.googleapis.com/v1/projects/{p}/databases/(default)/documents"
@@ -79,7 +86,7 @@ def espn_today() -> date:
 RULES2_FROM = "20261104"   # 5 barem, günün oyuncusu +3, yanan banko katlanmaz, yeni soru havuzu
 MARGINS2 = [(1, 3, "1-3"), (4, 7, "4-7"), (8, 12, "8-12"), (13, 19, "13-19"), (20, 999, "20+")]
 MARGINS2_LABELS = {x[2] for x in MARGINS2}
-MARGIN_TOL, MARGIN_MAX = 3, 40
+MARGIN_TOL, MARGIN_MAX = 3, (30 if IS_EL else 40)   # app.js MARGIN_MAX ile aynı (EuroLeague 30+)
 AUTO_FROM = "20261104"    # yedek tahmin: hiç tahmin yapmayan ve tercihi açık olana ESPN favorileri; her 2 doğru kazanan 1 puan
 STREAK_NIGHTS, STREAK_BONUS = 4, 2   # devamlılık: haftada en az 4 gece kendi tahmini olana +2
 
@@ -106,6 +113,8 @@ def week_key(day: str) -> str:
 
 # ---------------------------------------------------------------- ESPN
 def scoreboard(day: str):
+    if IS_EL:
+        return el_scoreboard(day)
     return get(f"{ESPN}/scoreboard?dates={day}&limit=50").get("events", [])
 
 
@@ -177,6 +186,10 @@ def espn_fav(s):
 
 
 def box(event_id: str):
+    if IS_EL:
+        r = el_box(event_id)
+        box.last = el_box.last
+        return r
     s = get(f"{ESPN}/summary?event={event_id}")
     box.last = s
     players = []
@@ -250,6 +263,130 @@ def series_info(ev):
             "done": bool(s.get("completed")), "need": (int(s.get("totalCompetitions") or 7) // 2) + 1}
 
 
+# ---------------------------------------------------------------- EuroLeague (LEAGUE=el)
+ELAPI = "https://api-live.euroleague.net/v2/competitions/E/seasons"
+
+
+def el_season():
+    d = datetime.now(timezone.utc)
+    return f"E{d.year if d.month >= 8 else d.year - 1}"
+
+
+def el_gid(g):
+    return f"{el_season()[1:]}{int(g['gameCode']):03d}"
+
+
+def el_pid(v):
+    return re.sub(r"\D", "", str(v or "")).lstrip("0") or "0"
+
+
+def el_name(n):
+    """'SARIC, DARIO' -> 'Dario Saric' (app.js elName ile aynı)."""
+    def cap(x):
+        x = x.replace("İ", "i").lower()
+        return re.sub(r"(^|[\s'.-])(\w)", lambda m: m.group(1) + m.group(2).upper(), x)
+    parts = [x.strip() for x in str(n or "").split(",")]
+    return f"{cap(parts[1])} {cap(parts[0])}" if len(parts) > 1 and parts[1] else cap(parts[0])
+
+
+def el_et_day(utc):
+    return (datetime.fromisoformat(utc.replace("Z", "+00:00")) - timedelta(hours=5)).strftime("%Y%m%d")
+
+
+def el_all_games():
+    if not hasattr(el_all_games, "c"):
+        el_all_games.c = get(f"{ELAPI}/{el_season()}/games").get("data", [])
+    return el_all_games.c
+
+
+def el_standings(n):
+    """Turun sonundaki puan durumu {kulüp: veri} (app.js elStandAt)."""
+    if n < 1:
+        return None
+    el_standings.c = getattr(el_standings, "c", {})
+    if n not in el_standings.c:
+        try:
+            r = get(f"{ELAPI}/{el_season()}/rounds/{n}/standings")
+            el_standings.c[n] = {x["club"]["code"]: x.get("data") or {} for x in (r[0].get("standings") or [])} if r else {}
+        except Exception as e:   # noqa: BLE001
+            print("Puan durumu alınamadı", n, e, file=sys.stderr)
+            el_standings.c[n] = {}
+    return el_standings.c[n] or None
+
+
+def el_home_prob(g):
+    """app.js elHomeProb ile aynı model: maç başına sayı farkı (az maçta sıfıra çekilir) + 3 sayı saha avantajı, lojistik."""
+    import math
+    st = el_standings((g.get("round") or 1) - 1)
+    if not st:
+        return None
+    def net(c):
+        d = st.get(c) or {}
+        gp = d.get("gamesPlayed") or 0
+        return 0 if not gp else (d["pointsFavour"] - d["pointsAgainst"]) / gp * gp / (gp + 4)
+    mg = net(g["local"]["club"]["code"]) - net(g["road"]["club"]["code"]) + 3
+    return 1 / (1 + math.exp(-mg / 7))
+
+
+def el_event(g):
+    st = "post" if g.get("played") else "pre"
+    def side(t, o, h):
+        return {"homeAway": h, "team": {"abbreviation": t["club"]["code"], "id": t["club"]["code"]},
+                "score": t.get("score") or 0, "winner": st == "post" and (t.get("score") or 0) > (o.get("score") or 0)}
+    ot = bool((g["local"].get("partials") or {}).get("extraPeriods"))
+    return {"id": el_gid(g), "date": g["utcDate"], "season": {"type": 2}, "el": g,
+            "competitions": [{"status": {"period": 5 if ot else 4, "type": {"state": st}}, "notes": [],
+                              "competitors": [side(g["local"], g["road"], "home"), side(g["road"], g["local"], "away")]}]}
+
+
+def el_save_all_players():
+    """EuroLeague kulüpleri ve oyuncuları -> data/el/allplayers.json (NBA'deki allplayers.json ile aynı biçim)."""
+    clubs = [c for c in get(f"{ELAPI}/{el_season()}/clubs").get("data", []) if not c.get("isVirtual")]
+    out, tl = [], []
+    for c in clubs:
+        tl.append({"a": c["code"], "n": c.get("editorialName") or c.get("name", ""), "id": c["code"]})
+        r = get(f"{ELAPI}/{el_season()}/clubs/{c['code']}/people")
+        for x in (r.get("data", r) if isinstance(r, dict) else r) or []:
+            if x.get("type") == "J" and x.get("active") is not False and (x.get("person") or {}).get("code"):
+                out.append({"id": el_pid(x["person"]["code"]), "n": el_name(x["person"].get("name")), "t": c["code"]})
+    if len(out) < 150:
+        raise RuntimeError(f"yalnızca {len(out)} oyuncu geldi")
+    seen = {x["id"] for x in out}
+    out += [x for x in load("allplayers.json", {}).get("players", []) if x["id"] not in seen]
+    out.sort(key=lambda x: (x["n"], x["id"]))
+    tl.sort(key=lambda x: x["n"])
+    return save("allplayers.json", {"teams": tl, "players": out})
+
+
+def el_scoreboard(day):
+    return [el_event(g) for g in el_all_games() if el_et_day(g["utcDate"]) == day]
+
+
+def el_box(event_id):
+    code = int(str(event_id)[4:])
+    g = next(x for x in el_all_games() if int(x["gameCode"]) == code)
+    bx = get(f"https://live.euroleague.net/api/Boxscore?gamecode={code}&seasoncode={el_season()}")
+    hp = el_home_prob(g)
+    comp = el_event(g)["competitions"][0]
+    el_box.last = {"header": {"competitions": [{"status": {"type": {"completed": bool(g.get("played")) and bx.get("Live") is False}},
+                                                "competitors": comp["competitors"]}]},
+                   **({"predictor": {"homeTeam": {"gameProjection": round(hp * 100, 1)}}} if hp is not None else {})}
+    clubs = [g["local"]["club"]["code"], g["road"]["club"]["code"]]
+    players = []
+    for i, T in enumerate(bx.get("Stats") or []):
+        for p in T.get("PlayersStats") or []:
+            if not p.get("Minutes") and not p.get("Points"):
+                continue
+            fgm = (p.get("FieldGoalsMade2") or 0) + (p.get("FieldGoalsMade3") or 0)
+            fga = (p.get("FieldGoalsAttempted2") or 0) + (p.get("FieldGoalsAttempted3") or 0)
+            players.append({"id": el_pid(p.get("Player_ID")), "name": el_name(p.get("Player")), "team": clubs[i] if i < 2 else "",
+                            "pts": p.get("Points") or 0, "reb": p.get("TotalRebounds") or 0, "ast": p.get("Assistances") or 0,
+                            "stl": p.get("Steals") or 0, "blk": p.get("BlocksFavour") or 0,
+                            "fg": (fgm, fga), "tp": (p.get("FieldGoalsMade3") or 0, p.get("FieldGoalsAttempted3") or 0),
+                            "min": str(p.get("Minutes") or "0").split(":")[0]})
+    return players
+
+
 # ---------------------------------------------------------------- Firestore
 def fs_value(v):
     if "stringValue" in v: return v["stringValue"]
@@ -267,6 +404,11 @@ EMU = os.environ.get("FIRESTORE_EMULATOR_HOST")  # test için
 
 
 def fs_url(path):
+    if IS_EL:
+        head, _, rest = path.partition("/")
+        name, q, qs = head.partition("?")
+        if name in EL_NS:
+            path = "el_" + name + q + qs + ("/" + rest if rest else "")
     fb = CONFIG["firebase"]
     if EMU:
         return f"http://{EMU}/v1/projects/demo-tahmin/databases/(default)/documents/{path}"
@@ -520,6 +662,9 @@ def fs_players():
         uid = doc["name"].rsplit("/", 1)[1]
         f = {k: fs_value(v) for k, v in doc.get("fields", {}).items()}
         out[uid] = {"name": f.get("name", "?"), "joined": f.get("joined"), "autoPick": bool(f.get("autoPick"))}
+    if IS_EL:
+        elp = fs_list("elPlayers")
+        out = {u: {**v, "joined": elp[u].get("joined") or v["joined"]} for u, v in out.items() if u in elp}
     return out
 
 
@@ -671,6 +816,33 @@ QUESTIONS3 = [
     ("k", .262, lambda g: _tot(g) >= 240),
     ("k", .318, lambda g: _tot(g) <= 215),
 ]
+
+# EuroLeague (1.55.0): aynı 21 soru, eşikler ve oranlar EuroLeague 2026-27'nin ilk 110 maçından (app.js QUESTIONS3_EL ile aynı)
+QUESTIONS3_EL = [
+    ("x", [(20, .636), (22, .427), (24, .30), (26, .182), (28, .082), (30, .064), (32, .036), (35, .009)], lambda g, x: _gtop(g) >= x),
+    ("k", .536, lambda g: g["winner"] == g["home"]["abbr"]),
+    ("x", [(10, .473), (15, .309), (20, .109), (25, .027), (30, .018)], lambda g, x: g["margin"] >= x),
+    ("k", .473, lambda g: _tot(g) >= 175),
+    ("x", [(10, .591), (8, .482), (7, .418), (6, .355), (5, .318), (4, .255), (3, .191), (2, .127), (1, .018)], lambda g, x: g["margin"] <= x),
+    ("k", .427, lambda g: _gtop(g) >= 22),
+    ("x", [(90, .6), (95, .409), (100, .255), (105, .118), (110, .055), (115, .018)], lambda g, x: _hi(g) >= x),
+    ("k", .473, lambda g: g["margin"] >= 10),
+    ("x", [(85, .655), (80, .464), (75, .264), (70, .136), (65, .055)], lambda g, x: _lo(g) <= x),
+    ("k", .409, lambda g: _hi(g) >= 95),
+    ("x", [(165, .691), (170, .6), (175, .473), (180, .373), (185, .30), (190, .255), (200, .082)], lambda g, x: _tot(g) >= x),
+    ("k", .418, lambda g: g["margin"] <= 7),
+    ("k", .464, lambda g: g["winner"] == g["away"]["abbr"]),
+    ("x", [(180, .636), (175, .536), (170, .427), (165, .318), (160, .236), (155, .182), (150, .109), (145, .055)], lambda g, x: _tot(g) <= x),
+    ("k", .264, lambda g: _lo(g) <= 75),
+    ("k", .30, lambda g: _gtop(g) >= 24),
+    ("k", .309, lambda g: g["margin"] >= 15),
+    ("k", .255, lambda g: _hi(g) >= 100),
+    ("k", .364, lambda g: _lo(g) >= 85),
+    ("k", .30, lambda g: _tot(g) >= 185),
+    ("k", .236, lambda g: _tot(g) <= 160),
+]
+if IS_EL:
+    QUESTIONS3 = QUESTIONS3_EL
 
 
 def q3_param(qd, n):
@@ -895,7 +1067,7 @@ def main(full=False):
         full = True
     counted = set(pstats["counted"])
 
-    start = datetime.strptime(CONFIG["seasonStart"], "%Y%m%d").date()
+    start = datetime.strptime(EL_SEASON_FIRST if IS_EL else CONFIG["seasonStart"], "%Y%m%d").date()
     today = espn_today()
     if any("cup" not in x or "fav" not in x for x in games.values()):   # kupa ve ESPN favorisi bilgisi eski kayıtlara bir kere eklenir
         full = True
@@ -965,7 +1137,7 @@ def main(full=False):
 
     # 2) puanlar — yalnızca ligin başladığı geceden itibaren (yönetim panelinden sıfırlanabilir)
     league = fs_doc("league/settings") or {}
-    league_start = max(CONFIG["seasonStart"], str(league.get("start") or ""))
+    league_start = max(EL_START if IS_EL else CONFIG["seasonStart"], str(league.get("start") or ""))
     # deneme haftası: bitiş gecesinden sonraki gün (TR 08.00) lig kendiliğinden sıfırlanır (app.js leagueStart ile aynı an)
     trial = league.get("trial") or {}
     if isinstance(trial, dict) and trial.get("end") and not trial.get("done") and str(trial["end"]) >= league_start:
@@ -982,7 +1154,7 @@ def main(full=False):
     new_done = {gid for gid, g in games.items() if g.get("top")} - done_before
     if not (full or new_done or daily_due or old.get("leagueStart") != league_start or not old.get("days")):
         changed = [save("games.json", games), save("players.json", pstats), save("nights.json", nights)]
-        for fn in (save_injuries, save_all_players):
+        for fn in ((el_save_all_players,) if IS_EL else (save_injuries, save_all_players)):
             try:
                 changed.append(fn())
             except Exception as e:
@@ -1133,7 +1305,8 @@ def main(full=False):
                     tot[uid]["aw"] = tot[uid].get("aw", 0) + x["pts"]
     # uzun vade puanları: toplama ve sonucun açıklandığı haftaya eklenir
     try:
-        lt, lt_days = lt_scores(players, league_start)
+        # EuroLeague uzun vadesi (haftanın MVP'si) sonraki aşamada
+        lt, lt_days = ({}, {}) if IS_EL else lt_scores(players, league_start)
     except Exception as e:   # alınamazsa önceki sonuçlar korunur
         print("Uzun vade puanları alınamadı, önceki değerler kullanılıyor:", e)
         lt = {u: v.get("rounds", {}) for u, v in (old.get("lt") or {}).items() if u in players}
@@ -1171,6 +1344,13 @@ def main(full=False):
     changed = [save("games.json", games), save("players.json", pstats), save("scores.json", sc), save("nights.json", nights)]
     if daily_due:
         changed.append(save("syncstate.json", {"full": tr_now.strftime("%Y%m%d")}))
+    if IS_EL:   # yedek, sakatlık, maaş ve takım istatistikleri NBA'ye özgü
+        try:
+            changed.append(el_save_all_players())
+        except Exception as e:   # noqa: BLE001
+            print("EuroLeague kadro listesi alınamadı:", e)
+        print(f"EuroLeague: {len(games)} maç, {len(players)} oyuncu. Değişen dosya: {sum(changed)}")
+        return 0
     try:
         changed.append(backup(players, today))
     except Exception as e:
