@@ -77,5 +77,13 @@ t("el chat nba-only no", ()=>assertFails(setDoc(doc(B,"el_chat/AbCdEfGhIjKlMnOpQ
 t("el dm needs both el", async()=>{ const b=writeBatch(A); b.set(doc(A,"el_dm/alice_bob"),{u:["alice","bob"],at:serverTimestamp(),last:{uid:"alice",t:"hey"},rd:{alice:serverTimestamp()},bl:{}}); b.set(doc(A,"el_dm/alice_bob/m/AbCdEfGhIjKlMnOpQrSt"),{uid:"alice",t:"hey",at:serverTimestamp()}); return assertFails(b.commit()); });
 t("nba pick still separate", ()=>assertSucceeds(getDoc(doc(A,"picks/401909940_alice"))));
 t("el league write no", ()=>assertFails(setDoc(doc(A,"el_league/x"),{a:1})));
+// 1.55.2: EuroLeague haftanın MVP'si (el_lt, yalnızca w_<pazartesi>, salı 15.00 UTC kilit)
+const nextMon=(()=>{ const d=new Date(); d.setUTCDate(d.getUTCDate()+((8-d.getUTCDay())%7||7)); return d.toISOString().slice(0,10).replaceAll("-",""); })();
+const elmv=(k,o={})=>({uid:"alice",key:k,picks:{mvp:"9754"},names:{mvp:"Shane Larkin"},updatedAt:serverTimestamp(),...o});
+t("el mvp future week ok", ()=>assertSucceeds(setDoc(doc(A,`el_lt/w_${nextMon}_alice`),elmv("w_"+nextMon))));
+t("el mvp past week no", ()=>assertFails(setDoc(doc(A,"el_lt/w_20261109_alice"),elmv("w_20261109"))));
+t("el mvp month key no", ()=>assertFails(setDoc(doc(A,"el_lt/m_202612_alice"),elmv("m_202612"))));
+t("el mvp nba-only no", ()=>assertFails(setDoc(doc(B,`el_lt/w_${nextMon}_bob`),elmv("w_"+nextMon,{uid:"bob"}))));
+t("el mvp hidden before lock", ()=>assertFails(getDoc(doc(B,`el_lt/w_${nextMon}_alice`))));
 let fail=0; for(const [n,p] of T){ try{ await p(); console.log("OK  ",n); }catch(e){ fail++; console.log("FAIL",n, String(e.message||e).slice(0,160)); } }
 await env.cleanup(); console.log(fail?fail+" failed":"all passed"); process.exit(fail?1:0);

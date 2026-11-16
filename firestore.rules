@@ -613,6 +613,7 @@ service cloud.firestore {
     function isElPlayer() { return signedIn() && exists(/databases/$(database)/documents/elPlayers/$(request.auth.uid)); }
     function elDmPath(pid) { return /databases/$(database)/documents/el_dm/$(pid); }
     function elPollPath(pid) { return /databases/$(database)/documents/el_polls/$(pid); }
+    function elLtLock(k) { return timestamp.date(int(k[2:6]), int(k[6:8]), int(k[8:10])) + duration.value(39, 'h'); }
     match /el_picks/{pid} {
       // Olmayan belgeyi okumak serbest (bilgi sızdırmaz); var olan belge sahibine
       // ya da kilitlendikten sonra (gecenin ilk maçı başlayınca) herkese açık.
@@ -845,15 +846,15 @@ service cloud.firestore {
     match /el_lt/{id} {
       allow read: if resource == null
         || (signedIn() && resource.data.uid == request.auth.uid)
-        || request.time >= ltLock(resource.data.key);
+        || request.time >= elLtLock(resource.data.key);
       allow create, update: if isElPlayer()
         && id == request.resource.data.key + '_' + request.auth.uid
         && request.resource.data.uid == request.auth.uid
-        && request.resource.data.key.matches('^(w_[0-9]{8}|m_[0-9]{6}|c_2026|k_2027|s_2027)$')
+        && request.resource.data.key.matches('^w_[0-9]{8}$')
         && request.resource.data.keys().hasOnly(['uid', 'key', 'picks', 'names', 'swaps', 'updatedAt'])
         && request.resource.data.picks is map && request.resource.data.picks.size() <= 12
         && request.resource.data.updatedAt == request.time
-        && (request.time < ltLock(request.resource.data.key)
+        && (request.time < elLtLock(request.resource.data.key)
           || (resource != null && request.resource.data.key == 's_2027'
               && request.time < timestamp.date(2027, 3, 1)
               && request.resource.data.picks == resource.data.picks

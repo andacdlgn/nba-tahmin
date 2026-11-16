@@ -88,7 +88,7 @@ MARGINS2 = [(1, 3, "1-3"), (4, 7, "4-7"), (8, 12, "8-12"), (13, 19, "13-19"), (2
 MARGINS2_LABELS = {x[2] for x in MARGINS2}
 MARGIN_TOL, MARGIN_MAX = 3, (30 if IS_EL else 40)   # app.js MARGIN_MAX ile aynı (EuroLeague 30+)
 AUTO_FROM = "20261104"    # yedek tahmin: hiç tahmin yapmayan ve tercihi açık olana ESPN favorileri; her 2 doğru kazanan 1 puan
-STREAK_NIGHTS, STREAK_BONUS = 4, 2   # devamlılık: haftada en az 4 gece kendi tahmini olana +2
+STREAK_NIGHTS, STREAK_BONUS = (2 if IS_EL else 4), 2   # EuroLeague haftada 2-4 gece (app.js STREAK_N)   # devamlılık: haftada en az 4 gece kendi tahmini olana +2
 
 
 def margin_bucket2(m):
@@ -348,7 +348,13 @@ def el_save_all_players():
         r = get(f"{ELAPI}/{el_season()}/clubs/{c['code']}/people")
         for x in (r.get("data", r) if isinstance(r, dict) else r) or []:
             if x.get("type") == "J" and x.get("active") is not False and (x.get("person") or {}).get("code"):
-                out.append({"id": el_pid(x["person"]["code"]), "n": el_name(x["person"].get("name")), "t": c["code"]})
+                y = {"id": el_pid(x["person"]["code"]), "n": el_name(x["person"].get("name")), "t": c["code"]}
+                img = (x.get("images") or {}).get("headshot") or (x.get("person", {}).get("images") or {}).get("headshot")
+                if img:
+                    y["img"] = img
+                if x.get("positionName"):
+                    y["pos"] = x["positionName"]
+                out.append(y)
     if len(out) < 150:
         raise RuntimeError(f"yalnızca {len(out)} oyuncu geldi")
     seen = {x["id"] for x in out}
@@ -383,7 +389,7 @@ def el_box(event_id):
                             "pts": p.get("Points") or 0, "reb": p.get("TotalRebounds") or 0, "ast": p.get("Assistances") or 0,
                             "stl": p.get("Steals") or 0, "blk": p.get("BlocksFavour") or 0,
                             "fg": (fgm, fga), "tp": (p.get("FieldGoalsMade3") or 0, p.get("FieldGoalsAttempted3") or 0),
-                            "min": str(p.get("Minutes") or "0").split(":")[0]})
+                            "min": str(p.get("Minutes") or "0").split(":")[0], "val": p.get("Valuation") or 0})
     return players
 
 
@@ -463,6 +469,45 @@ def lt_lock(k):
     if k[0] == "k":
         return datetime(2026, 12, 1, 17, tzinfo=timezone.utc)
     return datetime(2027, 1, 15, 17, tzinfo=timezone.utc)
+
+
+EL_MVP_PTS = 3   # EuroLeague haftanın MVP'si: haftanın maçlarında en çok PIR toplayanı bilene (app.js EL_MVP_PTS)
+
+
+def el_mvp_week(games, wk):
+    """Haftanın (pazartesi wk) maçlarındaki PIR toplamları {oyuncu: toplam}; haftanın bütün maçları bitmediyse None."""
+    mon = datetime.strptime(wk, "%Y%m%d").date()
+    days = {(mon + timedelta(days=i)).strftime("%Y%m%d") for i in range(7)}
+    sched = [g for g in el_all_games() if el_et_day(g["utcDate"]) in days]
+    if not sched or not all(g.get("played") for g in sched):
+        return None
+    tot = {}
+    for g in games.values():
+        if g.get("day") in days and g.get("pir"):
+            for pid, v in g["pir"].items():
+                tot[pid] = tot.get(pid, 0) + v
+    return tot
+
+
+def el_lt_scores(players, games, league_start):
+    """EuroLeague uzun vadesi: her hafta (w_<pazartesi>) haftanın MVP'si. Kazanan(lar) = en çok PIR toplayan(lar)."""
+    out, days, res = {}, {}, {}
+    weeks = sorted({week_key(g["day"]) for g in games.values() if g.get("day", "") >= league_start})
+    for wk in weeks:
+        tot = el_mvp_week(games, wk)
+        if not tot:
+            continue
+        best = max(tot.values())
+        win = sorted(p for p, v in tot.items() if v == best)
+        k = "w_" + wk
+        days[k] = max(g["day"] for g in games.values() if week_key(g["day"]) == wk)
+        res[k] = {"mvp": win, "pir": best}
+        for uid in players:
+            d = fs_doc(f"lt/{k}_{uid}") or {}
+            pick = (d.get("picks") or {}).get("mvp")
+            if pick:
+                out.setdefault(uid, {})[k] = EL_MVP_PTS if pick in win else 0
+    return out, days, res
 
 
 def lt_scores(players, league_start="00000000"):
@@ -1062,8 +1107,9 @@ def save_teamstats(force=False):
 def main(full=False):
     games = load("games.json", {})
     pstats = load("players.json", {"counted": [], "p": {}})
-    if pstats.get("v") != 3:   # v3: maç maç kayıt + isabet yüzdeleri (uzun vade istatistikleri için); bir kere baştan kurulur
-        pstats = {"v": 3, "counted": [], "p": {}}
+    PV = 4 if IS_EL else 3   # EuroLeague v4: maç kaydına maç kimliği, rakip, skor ve dakika da eklenir (oyuncu kartı için)
+    if pstats.get("v") != PV:   # v3: maç maç kayıt + isabet yüzdeleri (uzun vade istatistikleri için); bir kere baştan kurulur
+        pstats = {"v": PV, "counted": [], "p": {}}
         full = True
     counted = set(pstats["counted"])
 
@@ -1118,6 +1164,8 @@ def main(full=False):
             winner = g.get("winner")
             g["day"] = day
             g["top"] = [{"id": p["id"], "name": p["name"], "team": p["team"], "pts": p["pts"]} for p in bx if p["pts"] == top]
+            if IS_EL:   # haftanın MVP'si için oyuncuların verimlilik puanı (PIR)
+                g["pir"] = {p["id"]: p.get("val", 0) for p in bx}
             games[g["id"]] = g
             if g["id"] not in counted:
                 for p in bx:
@@ -1129,8 +1177,15 @@ def main(full=False):
                         s[k + "m"] = s.get(k + "m", 0) + m; s[k + "a"] = s.get(k + "a", 0) + a
                     s["l5"] = (s.get("l5", []) + [p["pts"]])[-5:]   # son 5 maçın sayıları (formda olanlar listesi için)
                     # son 16 maç: [gün, sayı, ribaund, asist, top çalma, blok, galibiyet, isabet, deneme, üçlük isabet, üçlük deneme]
-                    s["lg"] = (s.get("lg", []) + [[day, p["pts"], p["reb"], p["ast"], p["stl"], p["blk"], 1 if p["team"] == winner else 0,
-                                                   p["fg"][0], p["fg"][1], p["tp"][0], p["tp"][1]]])[-16:]
+                    row = [day, p["pts"], p["reb"], p["ast"], p["stl"], p["blk"], 1 if p["team"] == winner else 0,
+                           p["fg"][0], p["fg"][1], p["tp"][0], p["tp"][1]]
+                    if IS_EL:   # + maç kimliği, rakip, vs/@, skor (kendi-rakip), dakika
+                        home = g["home"]["abbr"] == p["team"]
+                        me, op = (g["home"], g["away"]) if home else (g["away"], g["home"])
+                        mins = int(p["min"]) if str(p["min"]).isdigit() else 0
+                        row += [g["id"], op["abbr"], "vs" if home else "@", f"{me['score']}-{op['score']}", mins]
+                        s["min"] = s.get("min", 0) + mins
+                    s["lg"] = (s.get("lg", []) + [row])[-16:]
                 counted.add(g["id"])
         d += timedelta(days=1)
     pstats["counted"] = sorted(counted)
@@ -1305,8 +1360,10 @@ def main(full=False):
                     tot[uid]["aw"] = tot[uid].get("aw", 0) + x["pts"]
     # uzun vade puanları: toplama ve sonucun açıklandığı haftaya eklenir
     try:
-        # EuroLeague uzun vadesi (haftanın MVP'si) sonraki aşamada
-        lt, lt_days = ({}, {}) if IS_EL else lt_scores(players, league_start)
+        if IS_EL:
+            lt, lt_days, sc["mvp"] = el_lt_scores(players, games, league_start)
+        else:
+            lt, lt_days = lt_scores(players, league_start)
     except Exception as e:   # alınamazsa önceki sonuçlar korunur
         print("Uzun vade puanları alınamadı, önceki değerler kullanılıyor:", e)
         lt = {u: v.get("rounds", {}) for u, v in (old.get("lt") or {}).items() if u in players}

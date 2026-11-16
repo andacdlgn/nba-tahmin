@@ -1162,3 +1162,40 @@ body.el-mode .b-head,body.el-mode #bHead{box-shadow:inset 0 3px 0 #ff7a1a}
 .el-st .st-r.me{background:color-mix(in srgb,#ff7a1a 14%,transparent)}
 .el-st .up{color:var(--win)}.el-st .dn{color:var(--lose)}
 @media (max-width:420px){ .el-st .st-h span:nth-child(6){display:inline} .el-st .st-h,.el-st .st-r{grid-template-columns:20px 22px 1fr 44px 40px 44px} }
+/* 1.55.2: EuroLeague sekmesi · liderler, takımlar, oyuncular */
+.el-st .st-r[data-tp]{cursor:pointer}
+.el-cats{flex-wrap:wrap;margin:0 0 10px}
+.el-ld .b-row{display:grid;align-items:center;gap:10px;text-align:left}
+.el-ldr{grid-template-columns:22px 36px 1fr auto}
+.el-ln{font-weight:700;color:var(--muted);text-align:center}
+.el-lp{width:36px;height:36px;border-radius:50%;object-fit:cover;object-position:top;background:var(--line);display:block}
+.el-lt{display:flex;flex-direction:column;min-width:0}
+.el-lt b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.el-lt small{color:var(--muted);display:flex;align-items:center;gap:4px}
+.el-lv{font-size:18px;font-variant-numeric:tabular-nums}
+.el-oyf{display:flex;gap:8px;margin:0 0 10px}
+.el-oyf input{flex:1;min-width:0}.el-oyf select{width:auto;max-width:44%}
+.el-oyh,.el-oyr{grid-template-columns:36px 1fr 28px 40px 36px 36px}
+.el-oyh{display:grid;gap:10px;padding:8px 12px;font-size:12px;color:var(--muted);font-weight:700}
+.el-oyh span:nth-child(n+3),.el-oyr>span:nth-child(n+3),.el-oyr>b{text-align:right;font-variant-numeric:tabular-nums}
+.el-tg{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
+.el-tgi{display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px 10px;border-radius:16px;background:var(--panel);border:1px solid var(--line);cursor:pointer;color:inherit;font:inherit}
+.el-tgi img{width:48px;height:48px;object-fit:contain}
+.el-tgi b{font-size:14px;text-align:center}
+.el-tgi small{color:var(--amber);font-weight:700;font-size:12px}
+.el-tgi.me{border-color:var(--amber)}
+/* EuroLeague haftanın MVP'si */
+.el-mvi{padding:14px 16px;display:flex;flex-direction:column;gap:6px}
+.el-mvi span{color:var(--muted);font-size:14px;line-height:1.45}
+.el-mv{margin-top:12px;padding:12px 14px}
+.el-mvh{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:10px}
+.el-mvh small{color:var(--muted)}
+.el-mvp{display:flex;align-items:center;gap:10px}
+.el-mvp .el-lt{flex:1}
+.el-mvl{margin-top:12px;display:flex;flex-direction:column;gap:2px}
+.el-mvl>small{margin-bottom:4px;font-weight:700}
+.el-mvr{display:grid;grid-template-columns:auto 1fr auto auto;align-items:center;gap:8px;padding:7px 2px;border-top:1px solid var(--line);font-size:14px}
+.b-gr>.el-mvr{padding:10px 14px}
+.el-mvr small{color:var(--muted)}
+.el-mvr[data-ath]{cursor:pointer}
+.el-ldr.on{background:color-mix(in srgb,var(--amber) 12%,transparent)}
