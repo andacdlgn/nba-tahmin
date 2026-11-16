@@ -61,5 +61,21 @@ t("el short club", ()=>assertFails(updateDoc(doc(A,"elPlayers/alice"),{club:"ab"
 t("el extra key", ()=>assertFails(updateDoc(doc(A,"elPlayers/alice"),{pts:999})));
 t("el read public", ()=>assertSucceeds(getDoc(doc(U,"elPlayers/alice"))));
 t("el leave ok", ()=>assertSucceeds(deleteDoc(doc(A,"elPlayers/alice"))));
+// 1.55.0: EuroLeague modu ayrı koleksiyonlar (el_*); yazmak için EuroLeague profili gerekir
+const B=env.authenticatedContext("bob").firestore();
+const elp=(o={})=>pick({gameId:"2026095",winner:"IST",margin:"30",scorerId:"9754",scorerName:"Shane Larkin",...o});
+t("el pick without el profile no", ()=>assertFails(setDoc(doc(B,"el_picks/2026095_bob"),elp({uid:"bob"}))));
+t("el profile back", ()=>assertSucceeds(setDoc(doc(A,"elPlayers/alice"),{...EL, joined:serverTimestamp()})));
+t("el pick ok", ()=>assertSucceeds(setDoc(doc(A,"el_picks/2026095_alice"),elp())));
+t("el pick bad winner", ()=>assertFails(setDoc(doc(A,"el_picks/2026096_alice"),elp({gameId:"2026096",winner:'"x'}))));
+t("el pick read own", ()=>assertSucceeds(getDoc(doc(A,"el_picks/2026095_alice"))));
+t("el pick hidden from others", ()=>assertFails(getDoc(doc(B,"el_picks/2026095_alice"))));
+t("el progress ok", ()=>assertSucceeds(setDoc(doc(A,"el_progress/20261117_alice"),{uid:"alice",day:"20261117",gids:["2026095"],updatedAt:serverTimestamp()})));
+t("el progress nba-only no", ()=>assertFails(setDoc(doc(B,"el_progress/20261117_bob"),{uid:"bob",day:"20261117",gids:["2026095"],updatedAt:serverTimestamp()})));
+t("el chat ok", ()=>assertSucceeds(setDoc(doc(A,"el_chat/AbCdEfGhIjKlMnOpQrSt"),{uid:"alice",t:"selam",at:serverTimestamp(),re:{}})));
+t("el chat nba-only no", ()=>assertFails(setDoc(doc(B,"el_chat/AbCdEfGhIjKlMnOpQrSx"),{uid:"bob",t:"selam",at:serverTimestamp(),re:{}})));
+t("el dm needs both el", async()=>{ const b=writeBatch(A); b.set(doc(A,"el_dm/alice_bob"),{u:["alice","bob"],at:serverTimestamp(),last:{uid:"alice",t:"hey"},rd:{alice:serverTimestamp()},bl:{}}); b.set(doc(A,"el_dm/alice_bob/m/AbCdEfGhIjKlMnOpQrSt"),{uid:"alice",t:"hey",at:serverTimestamp()}); return assertFails(b.commit()); });
+t("nba pick still separate", ()=>assertSucceeds(getDoc(doc(A,"picks/401909940_alice"))));
+t("el league write no", ()=>assertFails(setDoc(doc(A,"el_league/x"),{a:1})));
 let fail=0; for(const [n,p] of T){ try{ await p(); console.log("OK  ",n); }catch(e){ fail++; console.log("FAIL",n, String(e.message||e).slice(0,160)); } }
 await env.cleanup(); console.log(fail?fail+" failed":"all passed"); process.exit(fail?1:0);

@@ -4,7 +4,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, connectAuthEmulator }
   from "https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, collection, query, where, writeBatch, serverTimestamp, increment, Timestamp, arrayUnion, connectFirestoreEmulator, onSnapshot, orderBy, limit, startAfter, deleteField }
+import { getFirestore, doc as fsDoc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, collection as fsColl, query, where, writeBatch, serverTimestamp, increment, Timestamp, arrayUnion, connectFirestoreEmulator, onSnapshot, orderBy, limit, startAfter, deleteField }
   from "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js";
 
 const $ = s => document.querySelector(s);
@@ -14,6 +14,25 @@ const TZ = "Europe/Istanbul";
 const UI_EN = (()=>{ try{ if(localStorage.getItem("lang")==="en") localStorage.setItem("lang","tr"); }catch(e){} return false; })();
 const LOC = UI_EN ? "en-US" : "tr-TR";
 const Q = new URLSearchParams(location.search);
+/* ====================================================== Lig katmanı (1.55.0)
+   Aynı uygulama iki lig için çalışır: NBA (varsayılan) ve EuroLeague (?lg=el). EuroLeague modunda
+   - maç verisi EuroLeague'in servislerinden gelir ve ESPN biçimine çevrilir (elEspn), böylece bütün ekranlar aynı kalır;
+   - ligle ilgili Firestore koleksiyonları "el_" önekiyle ayrı tutulur (tahminler, günlük seçimler, sohbet, lig ayarları…);
+     hesap, profil ve LetterBasket ortaktır;
+   - tarayıcıda saklanan ayarlar "el:" önekiyle ayrılır. */
+const IS_EL = Q.get("lg")==="el";
+const LG = IS_EL ? "el" : "nba";
+const EL_NS = new Set(["picks","daily","progress","league","talk","series","chat","chatpin","chatlim","typing","dm","polls","lt","ltResults","ft","reports"]);
+const nsName = n => IS_EL && EL_NS.has(n) ? "el_"+n : n;
+const nsPath = p => { const [h,...t]=String(p).split("/"); return [nsName(h),...t].join("/"); };
+// Firestore yollarını lige göre çevir: doc(db,"picks",id) EuroLeague'de el_picks/id olur. İlk argüman bir koleksiyon/
+// belge referansıysa (alt koleksiyon, doc(collRef,id)) dokunulmaz.
+function doc(a, ...r){ if(a?.type==="firestore" && typeof r[0]==="string") r[0]=nsPath(r[0]); return fsDoc(a, ...r); }
+function collection(a, ...r){ if(a?.type==="firestore" && typeof r[0]==="string") r[0]=nsPath(r[0]); return fsColl(a, ...r); }
+// tarayıcıda iki ligin ortak kullandığı ayarlar; geri kalan her şey EuroLeague'de "el:" önekiyle ayrı tutulur
+const LS_SHARED = new Set(["newsSeen","newsPopAt","installDone","installAsk","installPopN","installPopAt","lastUser","beta","betaOff","betaInvLater","realName","mailAsk","mailNudge","resetReq","theme","lang","guideDone","bIntroSeen","bIntro","lg"]);
+const lsKey = k => IS_EL && !LS_SHARED.has(String(k).split(/[_:]/)[0]) ? "el:"+k : k;
+const DATA = IS_EL ? "data/el/" : "data/";
 // 1.30.1 güvenlik: veri kaynağı adresten (?espn=) değiştirilemez; yalnızca ESPN'in iki sunucusu
 const ESPN_BASES = ["https://site.web.api.espn.com/apis/site/v2/sports/basketball/nba", "https://site.api.espn.com/apis/site/v2/sports/basketball/nba"];
 // Fark baremleri: MARGINS 3 Kasım 2026'ya kadar, MARGINS2 4 Kasım'dan itibaren.
@@ -32,7 +51,7 @@ const S = {
   pstats:{}, arch:{games:{}, scores:{days:{}, games:{}, totals:{}, weeks:{}}},
   draft:{}, statFor:null, timer:null, seen:new Set(), sub:"maclar", viewFor:null
 };
-try{ S.seen = new Set(JSON.parse(localStorage.getItem("seenReveal")||"[]")); }catch(e){}
+try{ S.seen = new Set(JSON.parse(localStorage.getItem(lsKey("seenReveal"))||"[]")); }catch(e){}
 const BETA = {on:false};   // yeni görünüm (kapalı beta), aşağıda "YENİ GÖRÜNÜM" bölümü
 
 /* ====================================================== yardımcılar */
@@ -47,7 +66,7 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.54.5";
+const VERSION = "1.55.0";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
@@ -254,7 +273,7 @@ function maybeNews(){
 const verNum = v => String(v||"0").split(".").reduce((t,x)=>t*1000+(+x||0),0);
 // 1.30.1 güvenlik: kullanıcıdan gelen takım kısaltması / oyuncu numarası adrese girmeden temizlenir
 const safeId = v => String(v??"").replace(/[^0-9A-Za-z_-]/g,"");
-const LOGO_SMALL = a => `logos/${safeId(a).toLowerCase()}.png`;
+const LOGO_SMALL = a => IS_EL ? (EL_CREST[a]||"") : `logos/${safeId(a).toLowerCase()}.png`;
 const LOGO_FULL  = a => `https://a.espncdn.com/i/teamlogos/nba/500/${safeId(a).toLowerCase()}.png`;
 document.addEventListener("error", e => {
   const img = e.target;
@@ -283,7 +302,7 @@ const isRules2 = g => g.day ? g.day>=RULES2_FROM : g.start>=PERGAME_FROM;
 const marginsFor = g => isRules2(g) ? MARGINS2 : MARGINS;
 const bucketOf = (g, m) => isRules2(g) ? bucket2(m) : bucket(m);
 // tahmindeki barem hangi düzendeyse onunla karşılaştır (yeni kurala geçişte eski seçimler bozulmasın)
-const MARGIN_TOL = 3, MARGIN_MAX = 40;
+const MARGIN_TOL = 3, MARGIN_MAX = IS_EL ? 30 : 40;   // EuroLeague maçları daha az sayılı; kaydırıcı 30+ ile biter
 // 1.23.0: asıl ligden (9 Kasım 2026) itibaren farkı tam bilen +1 ek puan alır (fark puanı 2). "40+" tam sayılmaz.
 const EXACT_FROM = "20261109";
 const marginExact = (label, m, day) => (day||"") >= EXACT_FROM && /^\d+$/.test(String(label)) && +label < MARGIN_MAX && +label === m;
@@ -336,8 +355,13 @@ async function getJSON(url, ms=10000){
   try{ const r = await fetch(url, {cache:"no-store", ...(ac?{signal:ac.signal}:{})}); if(!r.ok) throw new Error(r.status); return await r.json(); }
   finally{ clearTimeout(t); }
 }
+// EuroLeague'in önbelleği (Cloudflare) bazen tarayıcı izni (CORS) başlığı olmayan bir kopyayı saklıyor; o zaman
+// adres 10 dakikalık bir ekle değiştirilip yeniden denenir (ek, önbellekte yeni bir kopya açar)
+const elFetch = url => getJSON(url).catch(e => /euroleague\.net/.test(url) && e?.name!=="AbortError"
+  ? getJSON(url + (url.includes("?")?"&":"?") + "_=" + Math.floor(Date.now()/6e5)) : Promise.reject(e));
 const withTimeout = (p, ms) => Promise.race([p, new Promise(r=>setTimeout(()=>r("timeout"), ms))]);
 async function espn(path){
+  if(IS_EL) return elEspn(path);
   let err;
   for(const b of ESPN_BASES){ try{ return await getJSON(b+path); }catch(e){ err=e; } }
   throw err;
@@ -635,9 +659,10 @@ const elVisible = () => !!S.uid && (EL_OPEN || !!S.isAdmin);
 S.elMe = null; S.elp = null;
 async function elClubs(){ const r=await cached("el_clubs", `${ELAPI}/v2/competitions/E/seasons/${elSeason()}/clubs`, 12*36e5); return (r?.data||r||[]).filter(c=>c && !c.isVirtual); }
 async function elRoster(code){ const r=await cached("el_r_"+code, `${ELAPI}/v2/competitions/E/seasons/${elSeason()}/clubs/${code}/people`, 6*36e5);
-  return (r?.data||r||[]).filter(x=>x.type==="J" && x.active!==false && x.images?.headshot).map(x=>({code:x.person?.code, n:x.person?.name||"", img:x.images.headshot, no:x.dorsal||""})); }
+  return (r?.data||r||[]).filter(x=>x.type==="J" && x.active!==false).map(x=>({code:x.person?.code, n:x.person?.name||"", img:x.images?.headshot||"", no:x.dorsal||"", pos:x.positionName||""})); }
 // EuroLeague adları "SOYAD, AD" biçiminde gelir
-const elName = n => { const [s,f]=String(n||"").split(",").map(x=>x.trim()); const cap=x=>x.toLocaleLowerCase("tr").replace(/(^|[\s'-])(\p{L})/gu,(m,a,b)=>a+b.toLocaleUpperCase("tr")); return f ? cap(f)+" "+cap(s) : cap(s||""); };
+// "SARIC, DARIO" → "Dario Saric" (Türkçe küçültme "Darıo" yapardı)
+const elName = n => { const [s,f]=String(n||"").split(",").map(x=>x.trim()); const cap=x=>x.replace(/İ/g,"i").toLocaleLowerCase("en").replace(/(^|[\s'-])(\p{L})/gu,(m,a,b)=>a+b.toLocaleUpperCase("en")); return f ? cap(f)+" "+cap(s) : cap(s||""); };
 // avatar kaydı: "e:c/<yol>" (media-cdn.cortextech.io) ya da "e:i/<yol>" (media-cdn.incrowdsports.com)
 const EL_HOSTS = {c:"https://media-cdn.cortextech.io/", i:"https://media-cdn.incrowdsports.com/"};
 const elAvUrl = av => { const m=/^e:([ci])\/(.+)$/.exec(av||""); return m ? EL_HOSTS[m[1]]+m[2] : ""; };
@@ -651,10 +676,11 @@ async function loadElPlayers(){ try{ const q=await getDocs(collection(S.db,"elPl
 
 // ---- EuroLeague modu (1.55.0): EL düğmesi bütün siteyi EuroLeague'e çevirir; NBA'ye geri döner
 const EL_TABS=["el-tur","el-fik","el-sira","el-puan"];
+// 1.55.0: EuroLeague ayrı bir mod: aynı uygulama ?lg=el ile EuroLeague verisi ve EuroLeague kayıtlarıyla açılır
 function elToggle(force){
+  if(IS_EL){ location.href = location.pathname + "#" + (EL_TABS.includes(S.tab)?"bugece":S.tab); return; }
   if(!S.elMe && !force) return openEL();
-  if(EL_TABS.includes(S.tab)){ document.body.classList.remove("el-mode"); location.hash="#"+(BETA.nbaTab||"bugece"); toast("NBA'ye döndün."); return; }
-  BETA.nbaTab=S.tab; location.hash="#"+(BETA.elTab||"el-tur"); if(!force) toast("EuroLeague moduna geçtin.");
+  location.href = location.pathname + "?lg=el#" + (["bugece","canli","sonuclar","ayrisma","puan","gece"].includes(S.tab)?S.tab:"bugece");
 }
 function elEnsure(){ if($("#view-el-tur")) return;
   $("#view-bugece").insertAdjacentHTML("afterend", EL_TABS.map(k=>`<section id="view-${k}" data-view class="hide"><div id="${k}" class="b-page"></div></section>`).join("")); }
@@ -718,6 +744,84 @@ async function elRender(){
     }
   }catch(e){ console.error(e); el.innerHTML=`<div class="note">EuroLeague verisine şu an ulaşılamıyor. Biraz sonra tekrar dene.</div>`; }
   betaHead();
+}
+
+/* ---- EuroLeague → ESPN biçimi çevirmeni (1.55.0). Uygulama ESPN'in döndürdüğü yapıyı bekler; EuroLeague modunda espn()
+   buraya gelir ve aynı yapıyı EuroLeague verisinden kurar. Böylece tahmin destesi, box score, listeler değişmeden çalışır. */
+const elYear = () => +elSeason().slice(1);
+const elGid = g => `${elYear()}${String(g.gameCode).padStart(3,"0")}`;            // ör. 2026095 (sezon + maç kodu)
+const elCodeOf = id => +String(id).slice(4);
+const elPid = v => String(v||"").replace(/\D/g,"").replace(/^0+/,"") || "0";       // "P009754" / "009754" → "9754"
+const EL_CREST = {}, EL_NAME = {};
+async function elBoot(){ try{ for(const c of await elClubs()){ EL_CREST[c.code]=c.images?.crest||""; EL_NAME[c.code]=elTeamName(c); } }catch(e){} }
+const elEtDay = utc => ymd(new Date(Date.parse(utc) - 5*36e5));                    // ESPN'in "gün"ü gibi: ABD doğu saati
+function elEvent(g){
+  const st=elState(g), L=g.local, R=g.road;
+  const per = Object.values(L.partials||{}).filter(v=>typeof v==="number").length;
+  const side = (t,o,h) => ({ homeAway:h, winner: st==="post" && (t.score??0)>(o.score??0),
+    team:{ abbreviation:t.club.code, id:t.club.code, shortDisplayName:elTeamName(t.club), displayName:t.club.name, logo:t.club.images?.crest||"" },
+    score: st==="pre" ? "" : String(t.score??0), records:[{summary:""}],
+    linescores: Object.entries(t.partials||{}).filter(([k,v])=>/^partials\d$/.test(k) && v!=null).map(([,v])=>({value:v, displayValue:String(v)})) });
+  return { id:elGid(g), date:g.utcDate, season:{type:2, year:elYear()+1}, el:g,
+    status:{ period: st==="post"?4:per, displayClock:"", type:{ state:st, completed:st==="post", name: st==="post"?"STATUS_FINAL":st==="in"?"STATUS_IN_PROGRESS":"STATUS_SCHEDULED",
+      shortDetail: st==="post"?"Bitti":st==="in"?"Canlı":timeTR(new Date(g.utcDate)) } },
+    competitions:[{ competitors:[side(L,R,"home"), side(R,L,"away")], notes:[], venue:{fullName:g.venue?.name||""} }] };
+}
+async function elDayGames(day){
+  const R = await elRounds(), t = parseYmd(day).getTime();
+  const cand = R.filter(r=>Math.abs(Date.parse(r.utc)-t) < 5*864e5).map(r=>r.round);
+  const lists = await Promise.all(cand.map(n=>elGames(n).catch(()=>[])));
+  const seen=new Set(); return lists.flat().filter(g=>{ if(seen.has(g.gameCode)) return false; seen.add(g.gameCode); return elEtDay(g.utcDate)===day; });
+}
+async function elGameByCode(code){
+  for(const n of Object.keys(S.nbaC).filter(k=>k.startsWith("el_g_"))){ const g=S.nbaC[n].data?.find?.(x=>x.gameCode===code); if(g) return g; }
+  const R=await elRounds(); for(const r of R){ const g=(await elGames(r.round).catch(()=>[])).find(x=>x.gameCode===code); if(g) return g; }
+  return null;
+}
+const EL_BOX_KEYS=["minutes","points","fieldGoalsMade-fieldGoalsAttempted","threePointFieldGoalsMade-threePointFieldGoalsAttempted","freeThrowsMade-freeThrowsAttempted","offensiveRebounds","defensiveRebounds","rebounds","assists","steals","blocks","turnovers","fouls","plusMinus","valuation"];
+const EL_BOX_NAMES=["MIN","PTS","FG","3PT","FT","OREB","DREB","REB","AST","STL","BLK","TO","PF","+/-","PIR"];
+function elBoxStats(p){ const fgm=(p.FieldGoalsMade2||0)+(p.FieldGoalsMade3||0), fga=(p.FieldGoalsAttempted2||0)+(p.FieldGoalsAttempted3||0);
+  return [String(parseInt(String(p.Minutes||"0").split(":")[0],10)||0), String(p.Points||0), `${fgm}-${fga}`, `${p.FieldGoalsMade3||0}-${p.FieldGoalsAttempted3||0}`, `${p.FreeThrowsMade||0}-${p.FreeThrowsAttempted||0}`,
+    String(p.OffensiveRebounds||0), String(p.DefensiveRebounds||0), String(p.TotalRebounds||0), String(p.Assistances||0), String(p.Steals||0), String(p.BlocksFavour||0),
+    String(p.Turnovers||0), String(p.FoulsCommited||0), (p.Plusminus>0?"+":"")+String(p.Plusminus??0), String(p.Valuation??0)]; }
+async function elSummary(id){
+  const code=elCodeOf(id), g=await elGameByCode(code); if(!g) throw new Error("EuroLeague maçı bulunamadı");
+  const ev=elEvent(g), st=elState(g);
+  let bx=null; if(st!=="pre") bx=await elFetch(`https://live.euroleague.net/api/Boxscore?gamecode=${code}&seasoncode=${elSeason()}`).catch(()=>null);
+  const roster={};   // kadrolardan fotoğraf
+  const teams=[g.local.club, g.road.club];
+  await Promise.all(teams.map(async c=>{ try{ for(const r of await elRoster(c.code)) roster[elPid(r.code)]=r; }catch(e){} }));
+  const players = bx ? (bx.Stats||[]).map((T,i)=>{ const club=teams[i]||{}; return { team:{abbreviation:club.code, id:club.code, displayName:club.name, logo:club.images?.crest||""},
+    statistics:[{ names:EL_BOX_NAMES, keys:EL_BOX_KEYS, labels:EL_BOX_NAMES,
+      athletes:(T.PlayersStats||[]).map(p=>{ const pid=elPid(p.Player_ID), r=roster[pid];
+        return { athlete:{ id:pid, displayName:elName(p.Player), shortName:elName(p.Player), jersey:p.Dorsal||"", headshot:{href:r?.img||""} },
+          starter:!!p.IsStarter, didNotPlay: !p.IsPlaying && !p.Minutes, stats: p.IsPlaying||p.Minutes ? elBoxStats(p) : [] }; }) }] }; }) : [];
+  const tstat = (T,club) => { const x=T?.totr||{}, fgm=(x.FieldGoalsMade2||0)+(x.FieldGoalsMade3||0), fga=(x.FieldGoalsAttempted2||0)+(x.FieldGoalsAttempted3||0);
+    const S2=(name,label,v)=>({name,label,displayValue:String(v)});
+    return { team:{abbreviation:club.code, displayName:club.name}, statistics:[S2("fieldGoalsMade-fieldGoalsAttempted","FG",`${fgm}-${fga}`), S2("fieldGoalPct","FG%",fga?(fgm/fga*100).toFixed(1):"0"),
+      S2("threePointFieldGoalsMade-threePointFieldGoalsAttempted","3PT",`${x.FieldGoalsMade3||0}-${x.FieldGoalsAttempted3||0}`), S2("threePointFieldGoalPct","3P%",x.FieldGoalsAttempted3?((x.FieldGoalsMade3||0)/x.FieldGoalsAttempted3*100).toFixed(1):"0"),
+      S2("freeThrowsMade-freeThrowsAttempted","FT",`${x.FreeThrowsMade||0}-${x.FreeThrowsAttempted||0}`), S2("freeThrowPct","FT%",x.FreeThrowsAttempted?((x.FreeThrowsMade||0)/x.FreeThrowsAttempted*100).toFixed(1):"0"),
+      S2("totalRebounds","REB",x.TotalRebounds||0), S2("offensiveRebounds","OR",x.OffensiveRebounds||0), S2("defensiveRebounds","DR",x.DefensiveRebounds||0), S2("assists","AST",x.Assistances||0),
+      S2("steals","STL",x.Steals||0), S2("blocks","BLK",x.BlocksFavour||0), S2("totalTurnovers","TO",x.Turnovers||0), S2("fouls","PF",x.FoulsCommited||0)] }; };
+  const done = st==="post" && bx && bx.Live===false;
+  return { header:{ id, competitions:[{ ...ev.competitions[0], status:{...ev.status, type:{...ev.status.type, completed:done}}, date:ev.date }] },
+    boxscore:{ players, teams: bx ? (bx.Stats||[]).map((T,i)=>tstat(T,teams[i]||{})) : [] },
+    gameInfo:{ venue:{fullName:g.venue?.name||"", address:{city:""}}, attendance: bx?.Attendance ? +bx.Attendance : (g.audience||0),
+      officials:String(bx?.Referees||"").split(/,\s*/).reduce((a,x,i,arr)=>{ if(i%2===0 && arr[i+1]) a.push({displayName:elName(arr[i]+", "+arr[i+1])}); return a; },[]) },
+    plays:[], winprobability:[], lastFiveGames:[], seasonseries:[], injuries:[], leaders:[] };
+}
+async function elEspn(path){
+  let m;
+  if((m=/^\/scoreboard\?dates=(\d{8})/.exec(path))) return { events:(await elDayGames(m[1])).map(elEvent) };
+  if((m=/^\/summary\?event=(\d+)/.exec(path))) return elSummary(m[1]);
+  if((m=/^\/teams\/([A-Z]{3})\/roster/.exec(path))) return { athletes:(await elRoster(m[1])).map(r=>({ id:elPid(r.code), displayName:elName(r.n), position:{abbreviation:r.pos||""}, jersey:r.no, headshot:{href:r.img}, injuries:[] })) };
+  if((m=/^\/teams\/([A-Z]{3})\/schedule/.exec(path))){ const r=await cached("el_sched_"+m[1], `${ELAPI}/v2/competitions/E/seasons/${elSeason()}/games?teamCode=${m[1]}`, 3*36e5); return { events:(r?.data||[]).map(elEvent) }; }
+  throw new Error("EuroLeague verisinde karşılığı yok: "+path);
+}
+// ESPN'in "web" uçları (oyuncu kartı, liderler, sakatlar, puan durumu): EuroLeague karşılıkları sonraki aşamalarda; şimdilik boş döner
+async function elWeb(url){
+  if(/injuries/.test(url)) return { injuries:[] };
+  return {};
 }
 async function openEL(){
   if(!elVisible()) return;
@@ -825,7 +929,14 @@ async function loadPlayers(){
   // katılma saati henüz sunucudan gelmediyse "en yeni" say (renk sırası kaymasın)
   snap.forEach(d => { const x=d.data({serverTimestamps:"estimate"});
     S.players[d.id] = {name:x.name, joined:x.joined?.toMillis?.()||Date.now(), color:x.color||"", emoji:x.emoji||"", favTeam:x.favTeam||"", theme:x.theme||"default", av:x.av||"", bio:x.bio||"", ref:x.ref||"", club:x.club?x.club[0].toLocaleUpperCase("tr")+x.club.slice(1):"", rival:x.rival||"", ...("autoPick" in x ? {autoPick:!!x.autoPick} : {}), seen:x.seen?.toMillis?.()||0, vd:Array.isArray(x.vd)?x.vd:[]}; });
-  S.order = Object.keys(S.players).sort((a,b) => (S.players[a].joined-S.players[b].joined) || pname(a).localeCompare(pname(b),"tr"));
+  // EuroLeague modu: lig kadrosu elPlayers'tan; takım adı, renk, avatar ve favori takım EuroLeague profilinden gelir.
+  // Diğer oyuncuların adları yine görünsün diye S.players hepsini tutar, S.order yalnızca EuroLeague ligindekileri.
+  let members = Object.keys(S.players);
+  if(IS_EL){ const es=await getDocs(collection(S.db,"elPlayers")).catch(()=>null); S.elp={};
+    es?.forEach(d=>{ const x=d.data({serverTimestamps:"estimate"}); S.elp[d.id]=x; const p=S.players[d.id]; if(!p) return;
+      Object.assign(p, {club:x.club?x.club[0].toLocaleUpperCase("tr")+x.club.slice(1):"", color:x.color||"", av:x.av||"", favTeam:x.favTeam||"", joined:x.joined?.toMillis?.()||p.joined}); });
+    members = members.filter(u=>S.elp[u]); if(S.uid) S.elMe = S.elp[S.uid]||null; }
+  S.order = members.sort((a,b) => (S.players[a].joined-S.players[b].joined) || pname(a).localeCompare(pname(b),"tr"));
   S.colorOrder = [...S.order];
   // giriş yapan oyuncu her zaman ilk sırada (iki kişide solda)
   if(S.uid && S.order.includes(S.uid)) S.order = [S.uid, ...S.order.filter(u=>u!==S.uid)];
@@ -988,15 +1099,18 @@ function readableOn(hex, bgs, min=4.5){
   return "#"+c;
 }
 const lum = h => { const n=parseInt(h,16), c=[n>>16&255,n>>8&255,n&255].map(v=>{v/=255; return v<=.03928?v/12.92:((v+.055)/1.055)**2.4;}); return .2126*c[0]+.7152*c[1]+.0722*c[2]; };
+// EuroLeague kulüp renkleri (birincil, ikincil)
+const EL_TCOL = {IST:["1B3D8F","D7262D"],MIL:["D0102A","FFFFFF"],BES:["111111","FFFFFF"],RED:["D3202E","FFFFFF"],DUB:["0F1E3C","C8A24A"],BAR:["004D98","A50044"],MUN:["DC052D","0066B2"],ULK:["1C2B57","FFED00"],HTA:["D71920","FFFFFF"],BAS:["9E1B32","1F2A44"],ASV:["00843D","FFFFFF"],TEL:["FFD200","003DA5"],OLY:["D7141A","FFFFFF"],PAN:["007A33","FFFFFF"],PRS:["111111","E40046"],PAR:["111111","FFFFFF"],MAD:["3E2A7E","FEBE10"],PAM:["F47920","111111"],VIR:["111111","FFFFFF"],ZAL:["006A44","FFFFFF"]};
+const TCOL = () => IS_EL ? EL_TCOL : TEAM_COL;
 function tcol(abbr){
-  const c = TEAM_COL[abbr]; if(!c) return "var(--line)";
+  const c = TCOL()[abbr]; if(!c) return "var(--line)";
   return "#" + (isDark() && lum(c[0]) < .03 ? c[1] : c[0]);
 }
 // İki takımın rengi birbirine çok yakınsa ev sahibi ikinci rengini kullanır (ör. Lakers–Jazz)
 function pairCols(a, h){
   const ca=tcol(a), ch=tcol(h), hx=c=>c.startsWith("#")?[1,3,5].map(i=>parseInt(c.slice(i,i+2),16)):null;
   const A=hx(ca), H=hx(ch);
-  if(A && H && Math.hypot(A[0]-H[0],A[1]-H[1],A[2]-H[2]) < 90){ const alt=TEAM_COL[h]?.[1]; if(alt && lum(alt)>.03 && lum(alt)<.9) return [ca,"#"+alt]; }
+  if(A && H && Math.hypot(A[0]-H[0],A[1]-H[1],A[2]-H[2]) < 90){ const alt=TCOL()[h]?.[1]; if(alt && lum(alt)>.03 && lum(alt)<.9) return [ca,"#"+alt]; }
   return [ca,ch];
 }
 const initials = n => String(n||"?").trim().split(/\s+/).slice(0,2).map(w=>w[0]).join("").toLocaleUpperCase("tr");
@@ -1014,7 +1128,7 @@ const WHEADSHOT = id => `https://a.espncdn.com/combiner/i?img=/i/headshots/wnba/
 // 1.42.6: ESPN dışı özel avatar fotoğrafları (ESPN kimliğiyle eşleşir, kurallar değişmez)
 const AV_LOCAL = {"3102532":"icons/players/micic-efes.webp"}, AV_EXTRA = [["3102532","Vasilije Mićić"]];
 const avHead = id => AV_LOCAL[id] || HEADSHOT(id);
-const avImg = av => { const m=/^([pw]):(\w+)$/.exec(av||""); return m ? `<img class="av-img${AV_LOCAL[m[2]]?" av-loc":""}" src="${m[1]==="w"?WHEADSHOT(m[2]):avHead(m[2])}" alt="" loading="lazy">` : ""; };
+const avImg = av => { if(/^e:/.test(av||"")){ const u=elAvUrl(av); return u?`<img class="av-img" src="${escA(u)}" alt="" loading="lazy">`:""; } const m=/^([pw]):(\w+)$/.exec(av||""); return m ? `<img class="av-img${AV_LOCAL[m[2]]?" av-loc":""}" src="${m[1]==="w"?WHEADSHOT(m[2]):avHead(m[2])}" alt="" loading="lazy">` : ""; };
 const wnbaAvs = (attr, cur) => WSTARS.map(([id,n])=>`<button class="pf-av" ${attr}="w:${id}" aria-pressed="${cur===`w:${id}`}" title="${esc(n)} (WNBA)"><img src="${WHEADSHOT(id)}" alt="" loading="lazy"><small>${esc(surname(n))}</small></button>`).join("");
 const avatar = (u, cls="") => { const p=S.players[u]||{}; const h=honors(); const img=avImg(p.av);
   const crown = h.week===u ? `<span class="av-crown" title="Geçen haftanın şampiyonu">👑</span>` : "";
@@ -1529,7 +1643,7 @@ function renderGames(){
   // açılış animasyonu bir kez oynasın
   let changed=false;
   for(const g of D.games) if(started(g) && !S.seen.has(g.id)){ S.seen.add(g.id); changed=true; }
-  if(changed) try{ localStorage.setItem("seenReveal", JSON.stringify([...S.seen].slice(-400))); }catch(e){}
+  if(changed) try{ localStorage.setItem(lsKey("seenReveal"), JSON.stringify([...S.seen].slice(-400))); }catch(e){}
 }
 $("#games").addEventListener("click", e => {
   const b = e.target.closest("[data-act]"); if(!b || b.disabled) return;
@@ -3438,7 +3552,7 @@ function maybeConfetti(){
   for(const d of [S.today, shiftDay(S.today,-1)]){
     if(!S.days[d]) continue;
     const w=dayWinner(d); if(w?.st!=="w" || w.u!==S.uid) continue;
-    const key="confetti_"+d; try{ if(localStorage.getItem(key)) continue; localStorage.setItem(key,"1"); }catch(e){ continue; }
+    const key=lsKey("confetti_"+d); try{ if(localStorage.getItem(key)) continue; localStorage.setItem(key,"1"); }catch(e){ continue; }
     confetti(); toast(pick([`🏆 ${dayNice(d,{day:"numeric",month:"long"})} gecesini kazandın!`,`🏆 Gece senin! ${dayNice(d,{day:"numeric",month:"long"})} gecesinin kazananı sensin.`,`🏆 Tebrikler, ${dayNice(d,{day:"numeric",month:"long"})} gecesini aldın!`]), 4000);
     return;
   }
@@ -3541,8 +3655,8 @@ function renderTicker(){
 }
 
 /* ====================================================== duyuru ve mail uyarısı */
-const lsGet = k => { try{ return localStorage.getItem(k); }catch(e){ return null; } };
-const lsSet = (k,v) => { try{ localStorage.setItem(k,v); }catch(e){} };
+const lsGet = k => { try{ return localStorage.getItem(lsKey(k)); }catch(e){ return null; } };
+const lsSet = (k,v) => { try{ localStorage.setItem(lsKey(k),v); }catch(e){} };
 function renderBanners(){
   const box=$("#banners"); if(!box) return;
   let html="";
@@ -3555,11 +3669,11 @@ function renderBanners(){
   // 1.51.0: duyurular süreli. Süresi yazılmamış eski duyurular 2 gün sonra kendiliğinden kalkar.
   if(n?.text && lsGet("noticeSeen")!==String(n.at) && Date.now()<(n.until || (n.at||0)+2*864e5)) html += `<div class="banner notice"><span class="bn-i">${ICON.megaphone}</span><span class="bn-t">${esc(n.text)}</span><button class="bn-x" data-bn="notice" aria-label="Kapat">✕</button></div>`;
   const later=+(lsGet("mailNudge")||0);
-  if(S.contactLoaded && !S.contact?.verified && Date.now()>later) html += `<div class="banner nudge"><span class="bn-i">${ICON.mail}</span><span class="bn-t"><b>${S.contact?.email?"Mail onay kodunu gir":"Mail adresini ekle"}</b> ${S.contact?.email?"Adresin kayıtlı ama onaylanmadı. Kodu girmezsen hiçbir mail gelmez; şifreni unutursan mail ile sıfırlayamazsın.":"Onaylı adres olmadan hatırlatma maili gelmez ve şifreni unutursan kodla sıfırlayamazsın."}</span>
+  if(!IS_EL && S.contactLoaded && !S.contact?.verified && Date.now()>later) html += `<div class="banner nudge"><span class="bn-i">${ICON.mail}</span><span class="bn-t"><b>${S.contact?.email?"Mail onay kodunu gir":"Mail adresini ekle"}</b> ${S.contact?.email?"Adresin kayıtlı ama onaylanmadı. Kodu girmezsen hiçbir mail gelmez; şifreni unutursan mail ile sıfırlayamazsın.":"Onaylı adres olmadan hatırlatma maili gelmez ve şifreni unutursan kodla sıfırlayamazsın."}</span>
     <span class="bn-acts"><button class="btn sm" data-bn="mail">${S.contact?.email?"Onayla":"Ekle"}</button><button class="linkish" data-bn="later">Sonra</button></span></div>`;
   // Profilini özelleştirmemiş olana (favori takım ya da avatar seçmemiş) hatırlatma
   const me=S.players[S.uid];
-  const missP = me ? [!me.favTeam && "favori takımını", !avImg(me.av) && "avatarını"].filter(Boolean) : [];
+  const missP = me && !IS_EL ? [!me.favTeam && "favori takımını", !avImg(me.av) && "avatarını"].filter(Boolean) : [];
   if(missP.length && Date.now()>+(lsGet("profileNudge")||0)) html += `<div class="banner nudge"><span class="bn-i">${ICON.palette}</span><span class="bn-t"><b>Profilini özelleştir</b> ${missP.length===2?"Favori takımını, avatarını ve rengini seç":missP[0][0].toLocaleUpperCase("tr")+missP[0].slice(1)+" da seç"}, puan tablosunda öyle görün.</span>
     <span class="bn-acts"><button class="btn sm" data-bn="profile">Seç</button><button class="linkish" data-bn="plater">Sonra</button></span></div>`;
   box.innerHTML=html;
@@ -3774,7 +3888,7 @@ function openHistory(u=S.uid, flt="all", team=""){
 }
 // 1.49.0: takım sezon istatistikleri ve lig sıraları (data/teamstats.json, günde bir güncellenir)
 let TSTATS=null;
-async function teamStatsAll(){ if(!TSTATS) TSTATS=await getJSON("data/teamstats.json").catch(()=>({t:{}})); return TSTATS; }
+async function teamStatsAll(){ if(!TSTATS) TSTATS=await getJSON(DATA+"teamstats.json").catch(()=>({t:{}})); return TSTATS; }
 const TS_ROWS=[["avgPoints","Sayı",1,1],["fieldGoalPct","İsabet",1,1,"%"],["threePointPct","Üçlük isabeti",1,1,"%"],["avgThreePointFieldGoalsMade","Maç başı üçlük",1,1],
   ["freeThrowPct","Serbest atış",1,1,"%"],["avgRebounds","Ribaund",1,1],["avgOffensiveRebounds","Hücum ribaundu",1,1],["avgAssists","Asist",1,1],
   ["avgSteals","Top çalma",1,1],["avgBlocks","Blok",1,1],["avgTurnovers","Top kaybı",0,1],["assistTurnoverRatio","Asist / top kaybı",1,2]];
@@ -3916,7 +4030,7 @@ S.nba = { sub:(()=>{ try{ return localStorage.getItem("nbaSub")||"puan"; }catch(
 S.nbaC = {};
 async function cached(key, url, ttl=10*60e3){
   const c=S.nbaC[key]; if(c && Date.now()-c.at<ttl) return c.data;
-  const data=await getJSON(url); S.nbaC[key]={at:Date.now(), data}; return data;
+  const data = IS_EL && /espn\.com/.test(url) ? await elWeb(url) : await elFetch(url); S.nbaC[key]={at:Date.now(), data}; return data;
 }
 const stOf = (e, n) => { const x=e.stats.find(s=>s.name===n || s.type===n || s.abbreviation===n); return x ? (x.displayValue ?? x.value) : ""; };
 const wlOf = e => `${stOf(e,"wins")||0}-${stOf(e,"losses")||0}`;
@@ -4425,7 +4539,7 @@ async function loadInj(force=false){
     try{ const d=await getJSON(`${WEB}/site/v2/sports/basketball/nba/injuries`); const out={};
       for(const t of d.injuries||[]) for(const i of t.injuries||[]){ const a=i.athlete||{}; const id=(a.links||[]).map(l=>(l.href||"").match(/\/id\/(\d+)/)?.[1]).find(Boolean); if(id) out[id]=injRec(i,a); }
       S.inj=out; S.injAt=Date.now();
-    }catch(e){ if(!S.inj){ try{ const j=await getJSON("data/injuries.json"); S.inj=Object.fromEntries(Object.entries(j).map(([id,x])=>[id,{...x, o:x.s==="Oynamıyor"||x.s==="Cezalı"}])); }catch(e2){ S.inj={}; } S.injAt=Date.now()-8*60e3; } }
+    }catch(e){ if(!S.inj){ try{ const j=await getJSON(DATA+"injuries.json"); S.inj=Object.fromEntries(Object.entries(j).map(([id,x])=>[id,{...x, o:x.s==="Oynamıyor"||x.s==="Cezalı"}])); }catch(e2){ S.inj={}; } S.injAt=Date.now()-8*60e3; } }
     loadInj.p=null; return S.inj; })();
   return loadInj.p;
 }
@@ -4518,7 +4632,7 @@ function checkNewBadges(){
   const list=badgesOf(S.uid), cur=list.filter(b=>b.n).map(b=>b.id);
   // 1.47.1: görülen rozetler yalnızca eklenir, hiç silinmez. Veri tam yüklenmeden yapılan bir kontrolde eksik görünen rozet
   // (ör. profil bilgisi gelmeden "Kimlik kartı") listeden düşüp her girişte yeniden "Yeni rozet!" diye çıkıyordu.
-  const key="badges2:"+S.uid; let old=null; try{ old=JSON.parse(localStorage.getItem(key)||"null"); }catch(e){}
+  const key=lsKey("badges2:"+S.uid); let old=null; try{ old=JSON.parse(localStorage.getItem(key)||"null"); }catch(e){}
   try{ localStorage.setItem(key, JSON.stringify([...new Set([...(old||[]), ...cur])])); }catch(e){}
   if(!lsGet("bIntro1") && !checkNewBadges.intro){ checkNewBadges.intro=true; autoPop(3.5, ()=>!lsGet("bIntro1"), showBadgeIntro); }
   if(!old) return;
@@ -4641,7 +4755,7 @@ $("#dayNext").onclick=()=>{ S.day=shiftDay(S.day,1); showDay(); };
 // 1.30.4: arşiv dosyalarını (games/scores/players.json) en fazla 5 dakikada bir yeniden indirir; Firebase okuması yok
 async function refreshArch(){
   if(Date.now()-(S.archAt||0) < 5*60e3) return false; S.archAt=Date.now();
-  const get = n => getJSON("data/"+n+"?t="+Date.now(), 6000).catch(()=>null);
+  const get = n => getJSON(DATA+n+"?t="+Date.now(), 6000).catch(()=>null);
   const [g,p,s] = await Promise.all([get("games.json"), get("players.json"), get("scores.json")]);
   if(g) S.arch.games=g; if(p) S.pstats=p.p||{};
   if(s){ S.archRaw={days:{},games:{},totals:{},weeks:{},...s}; S.arch.scores=S.archRaw; applyLeague(); }
@@ -4651,8 +4765,8 @@ async function loadArchive(){
   // Önce sitenin kendi kopyası (aynı sunucu, telefonda ek bağlantı kurulmaz); gelmezse GitHub'daki ham dosya
   const raw = (() => { const h=location.hostname; if(!h.endsWith(".github.io")) return "";
     const owner=h.split(".")[0], seg=location.pathname.split("/").filter(Boolean)[0];
-    return `https://raw.githubusercontent.com/${owner}/${seg && !seg.includes(".")?seg:h}/main/data/`; })();
-  const get = async n => { try{ return await getJSON("data/"+n+"?t="+Date.now(), 6000); }catch(e){ return raw ? getJSON(raw+n+"?t="+Date.now(), 6000).catch(()=>null) : null; } };
+    return `https://raw.githubusercontent.com/${owner}/${seg && !seg.includes(".")?seg:h}/main/${DATA}`; })();
+  const get = async n => { try{ return await getJSON(DATA+n+"?t="+Date.now(), 6000); }catch(e){ return raw ? getJSON(raw+n+"?t="+Date.now(), 6000).catch(()=>null) : null; } };
   const [g,p,s] = await Promise.all([get("games.json"), get("players.json"), get("scores.json")]);
   if(g) S.arch.games=g; if(p) S.pstats=p.p||{}; if(s) S.arch.scores={days:{},games:{},totals:{},weeks:{},...s};
   S.archRaw = S.arch.scores; S.archAt = Date.now();
@@ -4758,7 +4872,7 @@ function clubProblem(t){
 // Herkes bir takım ve bir basketbolcu seçer. Cevap tuzlu SHA-256 olarak saklanır (recovery/{uid});
 // "Şifremi unuttum" isteğini GitHub'daki görev birkaç dakikada bir işler.
 let ALLP=null;
-async function allPlayers(){ if(!ALLP) ALLP = await getJSON("data/allplayers.json"); return ALLP; }
+async function allPlayers(){ if(!ALLP) ALLP = await getJSON(DATA+"allplayers.json"); return ALLP; }
 const hex = buf => [...new Uint8Array(buf)].map(x=>x.toString(16).padStart(2,"0")).join("");
 const randHex = n => hex(crypto.getRandomValues(new Uint8Array(n)));
 const sha256hex = async s => hex(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s)));
@@ -5099,7 +5213,7 @@ function finishOnboard(){ const first=S.onboard; S.onboard=false; S.obStep=null;
 // Girişte: takım adı eksikse zorunlu adım açılır. Onaylı mail eksikse atlanabilir hatırlatma: en fazla 4 saatte bir.
 const MAIL_ASK_EVERY = 4*36e5;
 function maybeAskMail(){
-  if(S.onboard || !S.contact) return;
+  if(S.onboard || !S.contact || IS_EL) return;   // hesap adımları NBA tarafında; EuroLeague modunda sorulmaz
   if(!needClub() && !(needMail() && Date.now() - +(lsGet("mailAsk")||0) > MAIL_ASK_EVERY)) return;
   autoPop(1, ()=>needClub() || (needMail() && Date.now() - +(lsGet("mailAsk")||0) > MAIL_ASK_EVERY), ()=>{
     if(!needClub()) lsSet("mailAsk", String(Date.now()));
@@ -5976,6 +6090,7 @@ if("serviceWorker" in navigator){ navigator.serviceWorker.getRegistrations?.().t
   if("caches" in window) caches.keys().then(ks=>ks.forEach(k=>caches.delete(k))).catch(()=>{}); }).catch(()=>{}); }
 (async()=>{
   // Hız: bugünün maç listesi Firebase ve giriş beklenmeden hemen istenir
+  if(IS_EL){ document.body.classList.add("el-mode","lg-el"); await elBoot(); }
   { const d=espnToday(); S.preSB = {day:d, p:espn(`/scoreboard?dates=${d}&limit=50`).catch(()=>null)}; }
   let ok=false;
   try{ ok = await initFirebase(); }catch(e){ console.error(e); }
@@ -5990,6 +6105,7 @@ if("serviceWorker" in navigator){ navigator.serviceWorker.getRegistrations?.().t
     if(!user){ S.uid=null; $("#app").classList.add("hide"); $("#me").classList.add("hide"); $("#srch").classList.add("hide"); $("#invBtn").classList.add("hide"); stopChat(); closeChat(); $("#auth").classList.remove("hide"); paintLgPick(); showResetWait(); dispatchEvent(new Event("app-ready")); return; }
     S.uid=user.uid;
     if(S.joinP) await S.joinP.catch(()=>{});
+    if(IS_EL){ await loadPlayers().catch(()=>{}); if(S.players[S.uid] && !S.elp?.[S.uid]){ location.replace(location.pathname+"#bugece"); return; } }
     if(S.players?.[S.uid]) S.order=[S.uid, ...S.order.filter(u=>u!==S.uid)];
     else await loadPlayers().catch(()=>{});
     if(!S.players[S.uid]){ // kayıt yarıda kaldıysa ya da bağlantı yavaşsa
@@ -6016,11 +6132,11 @@ if("serviceWorker" in navigator){ navigator.serviceWorker.getRegistrations?.().t
     idleHome(true);
     route(); showDay(); Promise.resolve(refresh()).catch(()=>{}).finally(()=>dispatchEvent(new Event("app-ready")));
     if(S.onboard){ if(S.joinP) await S.joinP.catch(()=>{}); await loadPlayers().catch(()=>{}); allPlayers().catch(()=>{}).finally(()=>openOnboard(4)); }
-    else checkRecovery();
+    else if(!IS_EL) checkRecovery();
     loadLT(); setTimeout(installBanner, 6000); later(markSeen, 3000);
     // bilgilendirme pencereleri sıraya girer; açılıştan ~3 sn sonra en önemlisi (varsa) bir tane açılır
-    setTimeout(()=>{ maybeNews(); maybeCeremony(); markVisit(); maybePoll(); maybeLeaguePop(); maybeWeekPop(); maybeSelfPlay(); maybeScoringGuide(); maybeInvitePop(); maybeInstallPop(); maybeAskAuto(); maybeRealName(); }, 600);
-    later(()=>{ getDoc(doc(S.db,"config","admin")).then(()=>{ S.isAdmin=true; maybeArchiveTrial(); if(BETA.on) betaRender(); }).catch(e=>{ S.isAdmin=false; if(BETA.on && EL_TABS.includes(S.tab)) betaRender(); });
+    if(IS_EL) setTimeout(maybeNews, 600); else setTimeout(()=>{ maybeNews(); maybeCeremony(); markVisit(); maybePoll(); maybeLeaguePop(); maybeWeekPop(); maybeSelfPlay(); maybeScoringGuide(); maybeInvitePop(); maybeInstallPop(); maybeAskAuto(); maybeRealName(); }, 600);
+    later(()=>{ getDoc(doc(S.db,"config","admin")).then(()=>{ S.isAdmin=true; maybeArchiveTrial(); if(BETA.on) betaRender(); }).catch(e=>{ S.isAdmin=false; if(IS_EL && !EL_OPEN){ location.replace(location.pathname+"#bugece"); return; } if(BETA.on && EL_TABS.includes(S.tab)) betaRender(); });   // kapalı beta: EuroLeague modu yalnızca yöneticide
       loadElMe().then(m=>{ if(m && BETA.on) betaRender(); });
       getDoc(doc(S.db,"config","secret")).then(r=>{ S.invite=r.data()?.invite||""; }).catch(()=>{});
       allPlayers().catch(()=>{}); }, 2000);
@@ -6094,12 +6210,13 @@ function betaBoot(){
 function betaRevoke(){ if(BETA.on) switchUI(false); else betaSet(false); }
 function betaRender(){
   if(!BETA.on || !S.uid) return;
-  const isEL=EL_TABS.includes(S.tab); document.body.classList.toggle("el-mode", isEL);
-  if(isEL){ elEnsure(); $("#view-"+S.tab)?.classList.remove("hide");
-    if(!EL_OPEN && S.isAdmin===undefined){ const el=$("#"+S.tab); if(el && !el.innerHTML) el.innerHTML=skeletonCards(2); return; }   // yönetici kontrolü henüz bitmedi; bitince yeniden çizilir
-    if(!elVisible()){ document.body.classList.remove("el-mode"); location.hash="#bugece"; return; }
-    if(!S.elMe){ loadElMe().then(m=>{ if(m) betaRender(); else { location.hash="#bugece"; openEL(); } }); return; }
-    elRender(); betaHead(); betaNav(S.tab); return; }
+  document.body.classList.toggle("el-mode", IS_EL);
+  // EuroLeague sekmesi sayfaları (puan durumu, fikstür) yalnızca EuroLeague modunda; NBA'de bu adrese gelinirse EuroLeague moduna geçilir
+  // EuroLeague modunda Takas ve NBA'ye özgü sayfalar yok: NBA sekmesinin yerini EuroLeague puan durumu alır
+  if(IS_EL && ["takas","nba","takim"].includes(S.tab)){ location.replace("#"+(S.tab==="takas"?"bugece":"el-puan")); return; }
+  if(EL_TABS.includes(S.tab)){
+    if(!IS_EL){ location.replace(location.pathname+"?lg=el#"+S.tab); return; }
+    elEnsure(); $("#view-"+S.tab)?.classList.remove("hide"); elRender(); betaHead(); betaNav(S.tab); return; }
   const tab=BTABS[S.tab] ?? "";
   if(S.tab==="bugece") betaTonight();
   if(["profil","rozetler","ayarlar"].includes(S.tab)) betaPage();
@@ -6114,8 +6231,8 @@ function betaRender(){
   betaHead(); betaNav(tab); betaStrip(); betaLtStrip(); setTimeout(betaIntro, 0);
 }
 function betaHead(){
-  const isEL=EL_TABS.includes(S.tab);
-  const T={"el-tur":["Bu tur",BETA.elSub||""], "el-fik":["Fikstür","EuroLeague 2026-27 normal sezon"], "el-sira":["Lig","EuroLeague tahmin ligi"], "el-puan":["Puan durumu","EuroLeague 2026-27"], takas:["Takas","Takas makinesi · 2026-27 maaş kontrolü"], lb:["LetterBasket","Ligin maç günlüğü"], maclar:["Maçlar",""], gece:["Gece özeti",""], profil:["Profil",""], rozetler:["Rozetler",""], ayarlar:["Ayarlar","Profil bilgilerin Profil › Düzenle’de"], bugece:["Bu gece",""], tahmin:["Bu gece","Klasik maç kartları"], sonuclar:["Maçlar","Skorlar, box score ve öne çıkanlar"], ayrisma:["Tahminler","Kim ne tahmin etti"], canli:["Canlı",""], puan:["Sıralama",""], nba:["NBA",""], takim:["NBA","Takımım"], uzun:["Uzun vade",""]}[S.tab]||["NBA Tahmin",""];
+  const isEL=IS_EL;
+  const T={"el-tur":["Bu tur",BETA.elSub||""], "el-fik":["EuroLeague","Fikstür · normal sezon"], "el-sira":["Lig","EuroLeague tahmin ligi"], "el-puan":["EuroLeague","Puan durumu · 2026-27"], takas:["Takas","Takas makinesi · 2026-27 maaş kontrolü"], lb:["LetterBasket","Ligin maç günlüğü"], maclar:["Maçlar",""], gece:["Gece özeti",""], profil:["Profil",""], rozetler:["Rozetler",""], ayarlar:["Ayarlar","Profil bilgilerin Profil › Düzenle’de"], bugece:["Bu gece",""], tahmin:["Bu gece","Klasik maç kartları"], sonuclar:["Maçlar","Skorlar, box score ve öne çıkanlar"], ayrisma:["Tahminler","Kim ne tahmin etti"], canli:["Canlı",""], puan:["Sıralama",""], nba:["NBA",""], takim:["NBA","Takımım"], uzun:["Uzun vade",""]}[S.tab]||["NBA Tahmin",""];
   const seg = (opts) => `<div class="b-seg" style="grid-template-columns:repeat(${opts.length},1fr)">${opts.map(([h,l])=>`<a href="#${h}" aria-pressed="${S.tab===h}">${l}</a>`).join("")}</div>`;
   let sub=T[1], extra="";
   if(S.tab==="bugece") sub=BETA.sub||"";
@@ -6123,25 +6240,24 @@ function betaHead(){
   if(S.tab==="canli") sub=BETA.clSub||"";
   if(S.tab==="nba"||S.tab==="takim") extra=`<div class="b-chips b-nbachips"><a class="chip" href="#takim" aria-pressed="${S.tab==="takim"}">Takımım</a>${[["puan","Puan durumu"],["kupa","NBA Kupası"],["lider","Liderler"],["takim","Takımlar"],["oyuncu","Oyuncular"]].map(([k,l])=>`<a class="chip" href="#nba" data-bnsub="${k}" aria-pressed="${S.tab==="nba"&&S.nba?.sub===k}">${l}</a>`).join("")}</div>`;
   if(S.tab==="tahmin") extra=`<a class="b-back" href="#bugece">‹ Yeni Bu gece görünümüne dön</a>`;
+  if(IS_EL && EL_TABS.includes(S.tab)) extra=`<div class="b-chips b-nbachips"><a class="chip" href="#el-puan" aria-pressed="${S.tab==="el-puan"}">Puan durumu</a><a class="chip" href="#el-fik" aria-pressed="${S.tab==="el-fik"}">Fikstür</a></div>`;
   if(S.tab==="profil"){ const u=betaProfU(); sub = u===S.uid ? "Senin profilin" : esc(pname(u)); }
   if(S.tab==="rozetler"){ const u=betaProfU(); sub = u===S.uid ? "Senin rozetlerin" : esc(pname(u))+" · rozetler"; }
   const sub2 = ["profil","rozetler","ayarlar","gece","lb","takas"].includes(S.tab);
   $("#bHead").innerHTML = `<div class="b-h1">${sub2?`<button class="b-ib" data-b="back" type="button" aria-label="Geri">${bic("back",20,2.4)}</button>`:""}<span class="t"><b>${T[0]} ${isEL?'<span class="b-beta b-elb">EUROLEAGUE</span>':'<span class="b-beta">BETA</span>'}</b>${sub?`<small>${sub}</small>`:""}</span>
-    ${elVisible()?(isEL?`<button class="b-ib b-el b-tonba" data-b="el" type="button" aria-label="NBA'ye dön" title="NBA'ye dön">NBA</button>`:`<button class="b-ib b-el ${S.elMe?"on":""}" data-b="el" type="button" aria-label="EuroLeague moduna geç" title="EuroLeague moduna geç">EL</button>`):""}
-    ${isEL?"":`<button class="b-ib" data-b="search" type="button" aria-label="Ara">${bic("srch",19)}</button>`}
-    ${isEL?`<button class="b-ib b-me" data-b="elme" type="button" aria-label="EuroLeague profilim">${elAvatar(S.uid,"")}</button>`:`<button class="b-ib b-me" data-b="me" type="button" aria-label="Profilim">${avatar(S.uid,"")}</button>`}</div>${extra}`;
+    ${IS_EL||elVisible()?(isEL?`<button class="b-ib b-el b-tonba" data-b="el" type="button" aria-label="NBA'ye dön" title="NBA'ye dön">NBA</button>`:`<button class="b-ib b-el ${S.elMe?"on":""}" data-b="el" type="button" aria-label="EuroLeague moduna geç" title="EuroLeague moduna geç">EL</button>`):""}
+    <button class="b-ib" data-b="search" type="button" aria-label="Ara">${bic("srch",19)}</button>
+    <button class="b-ib b-me" data-b="me" type="button" aria-label="Profilim">${avatar(S.uid,"")}</button></div>${extra}`;
 }
 function betaNav(cur){
   const n=$("#chatN"), chatN = n && !n.classList.contains("hide") ? n.textContent : "";
   const it=(k,h,t,icn)=>`<a href="#${h}" ${cur===k?'aria-current="page"':""}>${bic(icn)}<span>${t}</span></a>`;
-  if(EL_TABS.includes(S.tab)){ $("#bNav").innerHTML = `<div class="in">${it("el-tur","el-tur","Bu tur","gece")}${it("el-fik","el-fik","Fikstür","mac")}
-    <button type="button" data-b="plus" aria-label="Daha fazla" aria-expanded="${!!BETA.plus}"><span class="pl">${bic("plus",24,2.6)}</span>${chatN?'<i class="b-dot"></i>':""}<span>Daha fazla</span></button>
-    ${it("el-sira","el-sira","Lig","sira")}${it("el-puan","el-puan","Puan durumu","nba")}</div>`; return; }
+  if(IS_EL && EL_TABS.includes(S.tab)) cur="nba";
   const nLive=[S.today, shiftDay(S.today,-1)].reduce((x,d)=>x+(S.days[d]?.games.filter(g=>g.state==="in").length||0),0);
   // 1.44.0: 6 sekme + ortada artı. Canlı maç sayısı Canlı sekmesinde görünür
   $("#bNav").innerHTML = `<div class="in in7">${it("bugece","bugece","Bu gece","gece")}${it("canli","canli","Canlı","live").replace("</a>", nLive?`<i class="b-live">${nLive}</i></a>`:"</a>")}${it("maclar","sonuclar","Maçlar","mac")}
     <button type="button" data-b="plus" aria-label="Daha fazla" aria-expanded="${!!BETA.plus}"><span class="pl">${bic("plus",24,2.6)}</span>${chatN?'<i class="b-dot"></i>':""}<span>Daha fazla</span></button>
-    ${it("tah","ayrisma","Tahminler","tah")}${it("sira","puan","Sıralama","sira")}${it("nba","nba","NBA","nba")}</div>`;
+    ${it("tah","ayrisma","Tahminler","tah")}${it("sira","puan","Sıralama","sira")}${IS_EL?it("nba","el-puan","EuroLeague","nba"):it("nba","nba","NBA","nba")}</div>`;
 }
 // eksik şeridi: bu gecenin açık maçlarında eksik tahmin ya da eksik banko / günün oyuncusu / soru varsa her sayfada görünür
 function betaMissing(){
@@ -6289,7 +6405,7 @@ function betaPlus(open, fromPop){
     el.innerHTML = `<div class="b-plus-in"><h3 class="cond">Daha fazla</h3>
       <div class="ptop">${tb("rules","Kurallar","rules")}${tb("score","Puanlama","calc")}${tb("news","Yenilikler","news")}${tb("req","İstek / sorun","req")}${tb("inv","Davet et","inv")}</div>
       <div class="balls">${ball("night","Gece özeti","moon","c1")}${ball("lt","Uzun vade","hour","c2")}${ball("badges","Rozetler","badge","c3")}
-        ${ball("chat","Sohbet","chat","c4", chatN?`<i class="tag">${esc(chatN)}</i>`:"")}${ball("lb","LetterBasket","book","c5",'<i class="tag new">YENİ</i>')}${ball("trade","Takas","trade","c7",'<i class="tag new">YENİ</i>')}${ball("set","Ayarlar","gear","c6")}</div>
+        ${ball("chat","Sohbet","chat","c4", chatN?`<i class="tag">${esc(chatN)}</i>`:"")}${ball("lb","LetterBasket","book","c5",'<i class="tag new">YENİ</i>')}${IS_EL?"":ball("trade","Takas","trade","c7",'<i class="tag new">YENİ</i>')}${ball("set","Ayarlar","gear","c6")}</div>
       <div class="pfoot"><button type="button" data-p="theme">${bic(isDark()?"sun":"moon",16)} ${isDark()?"Açık tema":"Koyu tema"}</button><button type="button" data-p="old">${bic("old",16)} Eski görünüm</button></div>
       <button class="closeplus" type="button" data-b="plus" aria-label="Kapat">${bic("x",24,2.8)}</button></div>`;
     el.classList.remove("hide"); document.body.classList.add("b-noscroll");
@@ -6775,7 +6891,7 @@ function betaUzun(){
 }
 // kilide 48 saatten az kalan ve eksik seçimi olan uzun vade turu varsa sarı şeridin üstünde ince gri şerit
 function betaLtDue(){
-  if(!S.lt?.loaded) return null;
+  if(IS_EL || !S.lt?.loaded) return null;   // EuroLeague uzun vadesi (haftanın MVP'si) sonraki aşamada
   const due=ltRounds().map(k=>({k, ms:ltLock(k)-Date.now()})).filter(x=>x.ms>0 && x.ms<48*36e5).map(x=>{ const d=S.lt.all[x.k]?.[S.uid], cats=LT_CATS[ltType(x.k)]; return {...x, n:cats.filter(([c])=>d?.picks?.[c]).length, of:cats.length}; }).filter(x=>x.n<x.of).sort((a,b)=>a.ms-b.ms);
   return due[0]||null;
 }

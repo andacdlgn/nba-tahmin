@@ -609,5 +609,286 @@ service cloud.firestore {
           && exists(pollPath(pid));
       }
     }
+    // ---- EuroLeague (otomatik üretildi: scripts/elrules.py; elle değiştirme) ----
+    function isElPlayer() { return signedIn() && exists(/databases/$(database)/documents/elPlayers/$(request.auth.uid)); }
+    function elDmPath(pid) { return /databases/$(database)/documents/el_dm/$(pid); }
+    function elPollPath(pid) { return /databases/$(database)/documents/el_polls/$(pid); }
+    match /el_picks/{pid} {
+      // Olmayan belgeyi okumak serbest (bilgi sızdırmaz); var olan belge sahibine
+      // ya da kilitlendikten sonra (gecenin ilk maçı başlayınca) herkese açık.
+      allow read: if resource == null
+        || (signedIn() && resource.data.uid == request.auth.uid)
+        || request.time >= lockAt(resource.data.start);
+
+      function validPick() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['uid', 'gameId', 'day', 'start', 'winner', 'margin', 'scorerId', 'scorerName', 'updatedAt'])
+          && d.uid == request.auth.uid
+          && pid == d.gameId + '_' + request.auth.uid
+          && numId(d.gameId) && str(d.day, 8)
+          && d.start is timestamp
+          && teamAbbr(d.winner)
+          // fark: eski baremler, 1.7.0 baremleri ya da 1.13.0'dan itibaren sayı (1-40; 40 = 40 ve üstü)
+          && (d.margin in ['1-5', '6-10', '11-15', '16+', '1-3', '4-7', '8-12', '13-19', '20+']
+              || (d.margin is string && d.margin.matches('^([1-9]|[1-3][0-9]|40)$')))
+          && numId(d.scorerId) && str(d.scorerName, 60)
+          && d.updatedAt == request.time
+          && request.time < lockAt(d.start);
+      }
+      allow create: if isElPlayer() && validPick();
+      allow update: if isElPlayer() && validPick()
+        && resource.data.uid == request.auth.uid
+        && request.resource.data.start == resource.data.start
+        && request.time < lockAt(resource.data.start);
+      allow delete: if false;
+    }
+    match /el_daily/{did} {
+      allow read: if resource == null
+        || (signedIn() && resource.data.uid == request.auth.uid)
+        || request.time >= lockAt(resource.data.firstStart);
+
+      function baseOk() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['uid', 'day', 'firstStart', 'confGame', 'confStart', 'confAt', 'dayPlayerId', 'dayPlayerName', 'dayAt', 'q', 'qAt'])
+          && d.uid == request.auth.uid
+          && did == d.day + '_' + request.auth.uid
+          && d.firstStart is timestamp;
+      }
+      function confOk(old) {
+        let d = request.resource.data;
+        return !('confGame' in d) || (
+          (old != null && 'confGame' in old && d.confGame == old.confGame && d.confAt == old.confAt && d.confStart == old.confStart)
+          || (numId(d.confGame) && d.confStart is timestamp && request.time < lockAt(d.confStart)
+              && d.confAt == request.time
+              && (old == null || !('confStart' in old) || request.time < lockAt(old.confStart)))
+        );
+      }
+      function dayOk(old) {
+        let d = request.resource.data;
+        return !('dayPlayerId' in d) || (
+          (old != null && 'dayPlayerId' in old && d.dayPlayerId == old.dayPlayerId && d.dayAt == old.dayAt)
+          || (numId(d.dayPlayerId) && str(d.dayPlayerName, 60)
+              && d.dayAt == request.time && request.time < lockAt(d.firstStart))
+        );
+      }
+      // gecenin sorusu: evet (y) / hayır (n), ilk maça kadar değiştirilebilir
+      function qOk(old) {
+        let d = request.resource.data;
+        return !('q' in d) || (
+          (old != null && 'q' in old && d.q == old.q && d.qAt == old.qAt)
+          || (d.q in ['y', 'n'] && d.qAt == request.time && request.time < lockAt(d.firstStart))
+        );
+      }
+      allow create: if isElPlayer() && baseOk() && confOk(null) && dayOk(null) && qOk(null);
+      allow update: if isElPlayer() && baseOk()
+        && resource.data.uid == request.auth.uid
+        && request.resource.data.firstStart == resource.data.firstStart
+        && confOk(resource.data) && dayOk(resource.data) && qOk(resource.data);
+      allow delete: if false;
+    }
+    match /el_progress/{did} {
+      allow read: if true;
+      allow write: if isElPlayer()
+        && request.resource.data.keys().hasOnly(['uid', 'day', 'gids', 'updatedAt'])
+        && request.resource.data.uid == request.auth.uid
+        && did == request.resource.data.day + '_' + request.auth.uid
+        && request.resource.data.gids is list && request.resource.data.gids.size() <= 30
+        && request.resource.data.updatedAt == request.time;
+    }
+    match /el_league/{doc} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /el_talk/{tid} {
+      allow read: if isElPlayer();
+      allow create, update: if isElPlayer()
+        && request.resource.data.keys().hasOnly(['uid', 'gid', 'day', 'e', 't', 'at'])
+        && request.resource.data.uid == request.auth.uid
+        && tid == request.resource.data.gid + '_' + request.auth.uid
+        && str(request.resource.data.gid, 20) && str(request.resource.data.day, 8)
+        && request.resource.data.e in ['', '😂', '🔥', '🤡', '😱', '👏', '💀', '🎯', '🙏']
+        && request.resource.data.t is string && request.resource.data.t.size() <= 80
+        && !request.resource.data.t.lower().matches('.*(orospu|siktir|sikerim|yarrak|am[iı]nak|amc[iı]k|ibne|pezevenk|fuck|nigg|faggot).*')
+        && request.resource.data.at == request.time;
+      allow delete: if signedIn() && resource.data.uid == request.auth.uid;
+    }
+    match /el_series/{sid} {
+      allow read: if resource == null
+        || (signedIn() && resource.data.uid == request.auth.uid)
+        || request.time >= resource.data.start;
+      function validSeries() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['uid', 'key', 'winner', 'games', 'start', 'updatedAt'])
+          && d.uid == request.auth.uid
+          && sid == d.key + '_' + request.auth.uid
+          && str(d.key, 40) && teamAbbr(d.winner)
+          && d.games in [4, 5, 6, 7]
+          && d.start is timestamp
+          && d.updatedAt == request.time
+          && request.time < d.start;
+      }
+      allow create: if isElPlayer() && validSeries();
+      allow update: if isElPlayer() && validSeries()
+        && resource.data.uid == request.auth.uid
+        && request.resource.data.start == resource.data.start
+        && request.time < resource.data.start;
+      allow delete: if false;
+    }
+    match /el_chat/{id} {
+      allow read: if isElPlayer();
+      // Güvenlik (1.30.3): mesaj kimliği yalnızca Firebase'in verdiği 20 harf-rakam biçiminde olabilir (kimliğe kod gizlenemez)
+      allow create: if isElPlayer() && id.matches('^[A-Za-z0-9]{20}$')
+        && request.resource.data.keys().hasOnly(['uid', 't', 'at', 're', 'rp', 'mn']) && request.resource.data.keys().hasAll(['uid', 't', 'at', 're'])
+        // rp: yanıtlanan mesaj (id, gönderen, kısa alıntı); mn: etiketlenen oyuncular
+        && (!('rp' in request.resource.data) || (request.resource.data.rp is map && request.resource.data.rp.keys().hasOnly(['id', 'uid', 't'])
+            && request.resource.data.rp.id is string && request.resource.data.rp.id.matches('^[A-Za-z0-9]{20}$') && str(request.resource.data.rp.uid, 128) && str(request.resource.data.rp.t, 120) && cleanChat(request.resource.data.rp.t)))
+        && (!('mn' in request.resource.data) || (request.resource.data.mn is list && request.resource.data.mn.size() <= 10))
+        && request.resource.data.uid == request.auth.uid
+        && str(request.resource.data.t, 500)
+        && request.resource.data.at == request.time
+        && request.resource.data.re == {}
+        && cleanChat(request.resource.data.t);
+      // tepki: herkes yalnızca kendi tepkisini koyar, değiştirir ya da kaldırır
+      // düzenleme: sahibi, gönderdikten sonraki 2 dakika içinde metni değiştirebilir (ed = düzenleme saati)
+      allow update: if isElPlayer() && (
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['re'])
+          && request.resource.data.re is map
+          && request.resource.data.re.diff(resource.data.re).affectedKeys().hasOnly([request.auth.uid])
+          && (!(request.auth.uid in request.resource.data.re) || request.resource.data.re[request.auth.uid] in ['👍', '😂', '🔥', '😮', '👏', '💀']))
+        || (resource.data.uid == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['t', 'mn', 'ed'])
+          && request.resource.data.ed == request.time
+          && request.time < resource.data.at + duration.value(2, 'm')
+          && str(request.resource.data.t, 500) && cleanChat(request.resource.data.t)
+          && (!('mn' in request.resource.data) || (request.resource.data.mn is list && request.resource.data.mn.size() <= 10))));
+      allow delete: if (signedIn() && resource.data.uid == request.auth.uid) || isAdmin();
+    }
+    match /el_chatpin/{d} {
+      allow read: if isElPlayer();
+      allow write: if isAdmin() && d == 'main'
+        && request.resource.data.keys().hasOnly(['id', 'uid', 't', 'by', 'at']) && request.resource.data.id is string
+        && (request.resource.data.id == '' || (str(request.resource.data.t, 140) && request.resource.data.at == request.time));
+    }
+    match /el_chatlim/{uid} {
+      allow write: if signedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['at']) && request.resource.data.at == request.time;
+    }
+    match /el_typing/{uid} {
+      allow read: if isElPlayer();
+      allow create, update: if isElPlayer() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['at']) && request.resource.data.at == request.time;
+      allow delete: if signedIn() && request.auth.uid == uid;
+    }
+    match /el_dm/{pid} {
+      allow read: if signedIn() && request.auth.uid in resource.data.u;
+      allow create: if isElPlayer()
+        && request.resource.data.keys().hasOnly(['u', 'at', 'last', 'rd', 'bl'])
+        && request.resource.data.u is list && request.resource.data.u.size() == 2
+        && request.auth.uid in request.resource.data.u
+        && request.resource.data.u[0] < request.resource.data.u[1]
+        && pid == request.resource.data.u[0] + '_' + request.resource.data.u[1]
+        && exists(/databases/$(database)/documents/elPlayers/$(request.resource.data.u[0]))
+        && exists(/databases/$(database)/documents/elPlayers/$(request.resource.data.u[1]))
+        && request.resource.data.at == request.time
+        && dmLastOk(request.resource.data)
+        && request.resource.data.rd is map && request.resource.data.rd.keys().hasOnly([request.auth.uid])
+        && request.resource.data.bl == {};
+      allow update: if isElPlayer() && request.auth.uid in resource.data.u
+        && request.resource.data.u == resource.data.u
+        && (
+          // yeni mesaj: son hareket, özet ve kendi okuma saati (engel varsa olmaz)
+          (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['at', 'last', 'rd'])
+            && request.resource.data.at == request.time && dmLastOk(request.resource.data)
+            && request.resource.data.rd.diff(resource.data.rd).affectedKeys().hasOnly([request.auth.uid])
+            && resource.data.bl.size() == 0)
+          // okundu
+          || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rd'])
+            && request.resource.data.rd.diff(resource.data.rd).affectedKeys().hasOnly([request.auth.uid]))
+          // engelle / engeli kaldır: herkes yalnızca kendi kaydını
+          || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['bl'])
+            && request.resource.data.bl.diff(resource.data.bl).affectedKeys().hasOnly([request.auth.uid])
+            && (!(request.auth.uid in request.resource.data.bl) || request.resource.data.bl[request.auth.uid] == true))
+        );
+      allow delete: if false;
+      match /m/{mid} {
+        allow read: if signedIn() && request.auth.uid in get(elDmPath(pid)).data.u;
+        allow create: if isElPlayer() && mid.matches('^[A-Za-z0-9]{20}$')
+          && request.auth.uid in getAfter(elDmPath(pid)).data.u
+          && getAfter(elDmPath(pid)).data.bl.size() == 0
+          && request.resource.data.keys().hasOnly(['uid', 't', 'at'])
+          && request.resource.data.uid == request.auth.uid
+          && str(request.resource.data.t, 500) && cleanChat(request.resource.data.t)
+          && request.resource.data.at == request.time;
+        allow delete: if signedIn() && resource.data.uid == request.auth.uid;
+      }
+    }
+    match /el_polls/{pid} {
+      allow read: if isElPlayer();
+      allow create: if isElPlayer() && pid in ['ligbasla1'] && request.resource.data.keys().hasOnly(['yes', 'no'])
+        && request.resource.data.yes == 0 && request.resource.data.no == 0;
+      allow update: if isElPlayer()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['yes', 'no'])
+        && !exists(/databases/$(database)/documents/el_polls/$(pid)/votes/$(request.auth.uid))
+        && existsAfter(/databases/$(database)/documents/el_polls/$(pid)/votes/$(request.auth.uid))
+        && ((request.resource.data.yes == resource.data.yes + 1 && request.resource.data.no == resource.data.no
+             && getAfter(/databases/$(database)/documents/el_polls/$(pid)/votes/$(request.auth.uid)).data.v == 'yes')
+          || (request.resource.data.no == resource.data.no + 1 && request.resource.data.yes == resource.data.yes
+             && getAfter(/databases/$(database)/documents/el_polls/$(pid)/votes/$(request.auth.uid)).data.v == 'no'));
+      match /votes/{uid} {
+        allow read: if signedIn() && request.auth.uid == uid;
+        allow create: if isElPlayer() && request.auth.uid == uid
+          && request.resource.data.keys().hasOnly(['v', 'at'])
+          && request.resource.data.v in ['yes', 'no'] && request.resource.data.at == request.time
+          && exists(elPollPath(pid));
+      }
+    }
+    match /el_lt/{id} {
+      allow read: if resource == null
+        || (signedIn() && resource.data.uid == request.auth.uid)
+        || request.time >= ltLock(resource.data.key);
+      allow create, update: if isElPlayer()
+        && id == request.resource.data.key + '_' + request.auth.uid
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.key.matches('^(w_[0-9]{8}|m_[0-9]{6}|c_2026|k_2027|s_2027)$')
+        && request.resource.data.keys().hasOnly(['uid', 'key', 'picks', 'names', 'swaps', 'updatedAt'])
+        && request.resource.data.picks is map && request.resource.data.picks.size() <= 12
+        && request.resource.data.updatedAt == request.time
+        && (request.time < ltLock(request.resource.data.key)
+          || (resource != null && request.resource.data.key == 's_2027'
+              && request.time < timestamp.date(2027, 3, 1)
+              && request.resource.data.picks == resource.data.picks
+              && request.resource.data.get('names', {}) == resource.data.get('names', {})
+              && ltSwapOk(request.resource.data.swaps, resource.data.get('swaps', {}), resource.data.picks)));
+    }
+    match /el_ltResults/{k} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /el_ft/{id} {
+      allow read: if isElPlayer();
+      allow create, update: if isElPlayer()
+        && request.resource.data.keys().hasOnly(['uid', 'day', 's', 'at'])
+        && request.resource.data.uid == request.auth.uid
+        && id == request.resource.data.day + '_' + request.auth.uid
+        && request.resource.data.day is string && request.resource.data.day.matches('^[0-9]{8}$')
+        && request.resource.data.s is int && request.resource.data.s >= 0 && request.resource.data.s <= 40
+        && request.resource.data.at == request.time;
+      allow delete: if false;
+    }
+    match /el_reports/{id} {
+      allow read, delete: if isAdmin();
+      allow create: if isElPlayer() && id.matches('^[0-9a-f]{10,40}$')
+        && request.resource.data.keys().hasOnly(['uid', 'kind', 'text', 'v', 'tab', 'ua', 'w', 'at'])
+        // Güvenlik (1.30.1): ek alanların türü ve boyu sınırlı
+        && (!('v' in request.resource.data) || (request.resource.data.v is string && request.resource.data.v.size() <= 20))
+        && (!('tab' in request.resource.data) || (request.resource.data.tab is string && request.resource.data.tab.size() <= 20))
+        && (!('ua' in request.resource.data) || (request.resource.data.ua is string && request.resource.data.ua.size() <= 200))
+        && (!('w' in request.resource.data) || request.resource.data.w is number)
+        && (!('kind' in request.resource.data) || request.resource.data.kind in ['sorun', 'istek', 'soru', 'diger'])
+        && request.resource.data.uid == request.auth.uid
+        && str(request.resource.data.text, 1000)
+        && request.resource.data.at == request.time;
+    }
+    // ---- EuroLeague sonu ----
   }
 }
