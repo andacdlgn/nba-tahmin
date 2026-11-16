@@ -38,8 +38,8 @@ def el_block(b):
     b = re.sub(r"^(\s*)match /(\w+)/", lambda m: f"{m.group(1)}match /el_{m.group(2)}/", b, count=1)
     b = b.replace("documents/players/", "documents/elPlayers/")
     b = b.replace("isPlayer()", "isElPlayer()").replace("dmPath(", "elDmPath(").replace("pollPath(", "elPollPath(")
-    if "match /el_lt/" in b:   # EuroLeague uzun vadesi yalnızca haftanın MVP'si: w_<pazartesi>, salı 15.00 UTC'de kilit
-        b = b.replace("ltLock(", "elLtLock(").replace("'^(w_[0-9]{8}|m_[0-9]{6}|c_2026|k_2027|s_2027)$'", "'^w_[0-9]{8}$'")
+    if "match /el_lt/" in b:   # EuroLeague uzun vadesi: turun MVP'si r_<ilk maç günü>_<tur> ve ayın MVP'si m_<yyyymm>
+        b = b.replace("ltLock(", "elLtLock(").replace("'^(w_[0-9]{8}|m_[0-9]{6}|c_2026|k_2027|s_2027)$'", "'^(r_[0-9]{8}_[0-9]{1,2}|m_[0-9]{6})$'")
     return b
 
 
@@ -49,7 +49,8 @@ def generate(text):
            "    function isElPlayer() { return signedIn() && exists(/databases/$(database)/documents/elPlayers/$(request.auth.uid)); }",
            "    function elDmPath(pid) { return /databases/$(database)/documents/el_dm/$(pid); }",
            "    function elPollPath(pid) { return /databases/$(database)/documents/el_polls/$(pid); }",
-           "    function elLtLock(k) { return timestamp.date(int(k[2:6]), int(k[6:8]), int(k[8:10])) + duration.value(39, 'h'); }"]
+           "    // kilit 15.50 UTC (18.50 TR): turun ilk maç günü ya da ayın ilk günü (EuroLeague maçları en erken 16.00 UTC)",
+           "    function elLtLock(k) { return timestamp.date(int(k[2:6]), int(k[6:8]), k[0] == 'r' ? int(k[8:10]) : 1) + duration.value(950, 'm'); }"]
     for n in EL_NS:
         m = re.search(rf"^    match /{n}/\{{", base, re.M)
         if not m:

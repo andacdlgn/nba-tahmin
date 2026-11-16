@@ -374,7 +374,7 @@ def el_box(event_id):
     bx = get(f"https://live.euroleague.net/api/Boxscore?gamecode={code}&seasoncode={el_season()}")
     hp = el_home_prob(g)
     comp = el_event(g)["competitions"][0]
-    el_box.last = {"header": {"competitions": [{"status": {"type": {"completed": bool(g.get("played")) and bx.get("Live") is False}},
+    el_box.last = {"round": g.get("round"), "header": {"competitions": [{"status": {"type": {"completed": bool(g.get("played")) and bx.get("Live") is False}},
                                                 "competitors": comp["competitors"]}]},
                    **({"predictor": {"homeTeam": {"gameProjection": round(hp * 100, 1)}}} if hp is not None else {})}
     clubs = [g["local"]["club"]["code"], g["road"]["club"]["code"]]
@@ -471,42 +471,62 @@ def lt_lock(k):
     return datetime(2027, 1, 15, 17, tzinfo=timezone.utc)
 
 
-EL_MVP_PTS = 3   # EuroLeague haftanın MVP'si: haftanın maçlarında en çok PIR toplayanı bilene (app.js EL_MVP_PTS)
+# EuroLeague uzun vadesi (1.56.0): resmî ödüllerle aynı iki seçim (app.js EL_MVP_*)
+#  - Turun MVP'si  r_<turun ilk maç günü>_<tur>: o turda kazanan takımdan en yüksek PIR'i alan oyuncu (EuroLeague'in kuralı;
+#    eşitlikte ödül paylaşılır). Kutu skorlarından otomatik hesaplanır. Bilene +3.
+#  - Ayın MVP'si   m_<yyyymm>: EuroLeague'in açıkladığı oyuncu; yönetici el_ltResults/m_<yyyymm> {mvp:[id]} olarak girer. Bilene +5.
+EL_MVP_PTS = {"r": 3, "m": 5}
 
 
-def el_mvp_week(games, wk):
-    """Haftanın (pazartesi wk) maçlarındaki PIR toplamları {oyuncu: toplam}; haftanın bütün maçları bitmediyse None."""
-    mon = datetime.strptime(wk, "%Y%m%d").date()
-    days = {(mon + timedelta(days=i)).strftime("%Y%m%d") for i in range(7)}
-    sched = [g for g in el_all_games() if el_et_day(g["utcDate"]) in days]
-    if not sched or not all(g.get("played") for g in sched):
-        return None
-    tot = {}
+def el_round_keys():
+    """{tur: (anahtar, bütün maçları bitti mi)} — anahtar turun ilk maçının gününden."""
+    rounds = {}
+    for g in el_all_games():
+        rounds.setdefault(g["round"], []).append(g)
+    out = {}
+    for n, G in rounds.items():
+        first = min(G, key=lambda x: x["utcDate"])["utcDate"][:10].replace("-", "")
+        out[n] = (f"r_{first}_{n}", all(x.get("played") for x in G))
+    return out
+
+
+def el_round_mvp(games, n):
+    """Turun MVP'si: kazanan takımlardan en yüksek PIR. {"mvp": [id...], "pir": değer} ya da None."""
+    best, win = None, []
     for g in games.values():
-        if g.get("day") in days and g.get("pir"):
-            for pid, v in g["pir"].items():
-                tot[pid] = tot.get(pid, 0) + v
-    return tot
+        if g.get("round") != n or not g.get("pir"):
+            continue
+        for pid, (v, w) in g["pir"].items():
+            if not w:
+                continue
+            if best is None or v > best:
+                best, win = v, [pid]
+            elif v == best:
+                win.append(pid)
+    return {"mvp": sorted(win), "pir": best} if win else None
 
 
 def el_lt_scores(players, games, league_start):
-    """EuroLeague uzun vadesi: her hafta (w_<pazartesi>) haftanın MVP'si. Kazanan(lar) = en çok PIR toplayan(lar)."""
+    """EuroLeague uzun vadesi puanları: {uid: {anahtar: puan}}, anahtarların günü ve sonuçlar."""
     out, days, res = {}, {}, {}
-    weeks = sorted({week_key(g["day"]) for g in games.values() if g.get("day", "") >= league_start})
-    for wk in weeks:
-        tot = el_mvp_week(games, wk)
-        if not tot:
+    for n, (k, done) in sorted(el_round_keys().items()):
+        if not done or k[2:10] < league_start:
             continue
-        best = max(tot.values())
-        win = sorted(p for p, v in tot.items() if v == best)
-        k = "w_" + wk
-        days[k] = max(g["day"] for g in games.values() if week_key(g["day"]) == wk)
-        res[k] = {"mvp": win, "pir": best}
+        r = el_round_mvp(games, n)
+        if not r:
+            continue
+        res[k] = r
+        days[k] = max((g["day"] for g in games.values() if g.get("round") == n), default=k[2:10])
+    for k, r in (fs_list("ltResults") or {}).items():   # ayın MVP'si (yönetici girer)
+        if re.match(r"^m_\d{6}$", k) and r.get("mvp") and f"{k[2:]}01" >= league_start[:6] + "01":
+            res[k] = {"mvp": list(r["mvp"]), "names": r.get("names") or {}}
+            days[k] = max((g["day"] for g in games.values() if g.get("day", "")[:6] == k[2:]), default=f"{k[2:]}28")
+    for k, r in res.items():
         for uid in players:
             d = fs_doc(f"lt/{k}_{uid}") or {}
             pick = (d.get("picks") or {}).get("mvp")
             if pick:
-                out.setdefault(uid, {})[k] = EL_MVP_PTS if pick in win else 0
+                out.setdefault(uid, {})[k] = EL_MVP_PTS[k[0]] if pick in r["mvp"] else 0
     return out, days, res
 
 
@@ -1107,7 +1127,7 @@ def save_teamstats(force=False):
 def main(full=False):
     games = load("games.json", {})
     pstats = load("players.json", {"counted": [], "p": {}})
-    PV = 4 if IS_EL else 3   # EuroLeague v4: maç kaydına maç kimliği, rakip, skor ve dakika da eklenir (oyuncu kartı için)
+    PV = 5 if IS_EL else 3   # EuroLeague v5 (PIR + tur), v4: maç kaydına maç kimliği, rakip, skor ve dakika da eklenir (oyuncu kartı için)
     if pstats.get("v") != PV:   # v3: maç maç kayıt + isabet yüzdeleri (uzun vade istatistikleri için); bir kere baştan kurulur
         pstats = {"v": PV, "counted": [], "p": {}}
         full = True
@@ -1165,7 +1185,8 @@ def main(full=False):
             g["day"] = day
             g["top"] = [{"id": p["id"], "name": p["name"], "team": p["team"], "pts": p["pts"]} for p in bx if p["pts"] == top]
             if IS_EL:   # haftanın MVP'si için oyuncuların verimlilik puanı (PIR)
-                g["pir"] = {p["id"]: p.get("val", 0) for p in bx}
+                g["pir"] = {p["id"]: [p.get("val", 0), 1 if p["team"] == winner else 0] for p in bx}
+                g["round"] = (getattr(box, "last", {}) or {}).get("round")
             games[g["id"]] = g
             if g["id"] not in counted:
                 for p in bx:

@@ -613,7 +613,8 @@ service cloud.firestore {
     function isElPlayer() { return signedIn() && exists(/databases/$(database)/documents/elPlayers/$(request.auth.uid)); }
     function elDmPath(pid) { return /databases/$(database)/documents/el_dm/$(pid); }
     function elPollPath(pid) { return /databases/$(database)/documents/el_polls/$(pid); }
-    function elLtLock(k) { return timestamp.date(int(k[2:6]), int(k[6:8]), int(k[8:10])) + duration.value(39, 'h'); }
+    // kilit 15.50 UTC (18.50 TR): turun ilk maç günü ya da ayın ilk günü (EuroLeague maçları en erken 16.00 UTC)
+    function elLtLock(k) { return timestamp.date(int(k[2:6]), int(k[6:8]), k[0] == 'r' ? int(k[8:10]) : 1) + duration.value(950, 'm'); }
     match /el_picks/{pid} {
       // Olmayan belgeyi okumak serbest (bilgi sızdırmaz); var olan belge sahibine
       // ya da kilitlendikten sonra (gecenin ilk maçı başlayınca) herkese açık.
@@ -850,7 +851,7 @@ service cloud.firestore {
       allow create, update: if isElPlayer()
         && id == request.resource.data.key + '_' + request.auth.uid
         && request.resource.data.uid == request.auth.uid
-        && request.resource.data.key.matches('^w_[0-9]{8}$')
+        && request.resource.data.key.matches('^(r_[0-9]{8}_[0-9]{1,2}|m_[0-9]{6})$')
         && request.resource.data.keys().hasOnly(['uid', 'key', 'picks', 'names', 'swaps', 'updatedAt'])
         && request.resource.data.picks is map && request.resource.data.picks.size() <= 12
         && request.resource.data.updatedAt == request.time

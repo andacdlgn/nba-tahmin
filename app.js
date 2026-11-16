@@ -76,7 +76,7 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.55.4";
+const VERSION = "1.56.0";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
@@ -685,63 +685,94 @@ async function loadElMe(){ if(!S.uid) return null; try{ const d=await getDoc(doc
 async function loadElPlayers(){ try{ const q=await getDocs(collection(S.db,"elPlayers")); S.elp=Object.fromEntries(q.docs.map(d=>[d.id,d.data()])); }catch(e){ S.elp={}; } return S.elp; }
 
 
-/* ---- EuroLeague uzun vadesi: haftanın MVP'si (1.55.2)
-   Her hafta (pazartesi–pazar) o haftanın EuroLeague maçlarında en çok PIR (verimlilik puanı) toplayacak oyuncuyu seçersin;
-   bilene +3. Seçim salı 18.00'de (TR) kilitlenir (firestore.rules elLtLock ve scripts/sync.py el_lt_scores ile aynı). */
-const EL_MVP_PTS = 3;
-const elMvpKey = day => "w_"+weekKey(day);
-const elMvpLock = k => Date.UTC(+k.slice(2,6), +k.slice(6,8)-1, +k.slice(8,10)) + 39*36e5;   // pazartesi 00.00 UTC + 39 saat
-const elMvpWeekDays = k => Array.from({length:7}, (_,i)=>shiftDay(k.slice(2),i));
-function elMvpKeys(){ const cur=elMvpKey(espnToday()); const nxt=elMvpKey(shiftDay(cur.slice(2),7)); return Date.now()<elMvpLock(cur) ? [cur] : [cur, nxt]; }
+/* ---- EuroLeague uzun vadesi (1.56.0): resmî ödüllerle aynı iki seçim
+   Haftanın MVP'si (EuroLeague'in "MVP of the Round"u): o haftada (turda) kazanan takımlardan en yüksek PIR'i alan oyuncu;
+     anahtar r_<turun ilk maç günü>_<tur>, kilit turun ilk günü 18.50 (TR), bilene +3. Kutu skorlarından otomatik hesaplanır.
+   Ayın MVP'si: EuroLeague'in açıkladığı oyuncu; anahtar m_<yyyymm>, kilit ayın ilk günü 18.50, bilene +5. Sonucu yönetici girer.
+   firestore.rules elLtLock ve scripts/sync.py el_lt_scores ile aynı. */
+const EL_MVP_PTS = {r:3, m:5};
+const elMvpLock = k => Date.UTC(+k.slice(2,6), +k.slice(6,8)-1, k[0]==="r" ? +k.slice(8,10) : 1) + 950*60e3;   // 15.50 UTC
+const elMonthKey = (d=new Date()) => `m_${d.getUTCFullYear()}${String(d.getUTCMonth()+1).padStart(2,"0")}`;
+const elMvpTitle = k => k[0]==="r" ? `Haftanın MVP'si · ${k.split("_")[2]}. hafta` : `Ayın MVP'si · ${new Date(Date.UTC(+k.slice(2,6), +k.slice(6,8)-1, 15)).toLocaleDateString(LOC,{month:"long", timeZone:"UTC"})}`;
+async function elRoundKey(n, skipDone){ const G=await elGames(n).catch(()=>[]); if(!G.length || (skipDone && G.every(g=>g.played))) return null;
+  const first=G.map(g=>g.utcDate).sort()[0]; return `r_${first.slice(0,10).replaceAll("-","")}_${n}`; }
+async function elMvpKeysLoad(){
+  const R=await elRounds().catch(()=>[]), cur=elCurRound(R)||1, keys=[];
+  for(const n of [cur-1, cur, cur+1]){ if(n<1) continue; const k=await elRoundKey(n, true); if(k) keys.push(k); }   // biten tur listelenmez
+  // sonuçlanmamış turlardan şu an oynanan (kilitli) ve sıradaki açık tur; ayda da süren ay ve sıradaki
+  const rk=keys.filter(k=>!(S.arch.scores?.mvp||{})[k]); const open=rk.find(k=>Date.now()<elMvpLock(k)), live=rk.filter(k=>Date.now()>=elMvpLock(k)).pop();
+  const now=new Date(), mCur=elMonthKey(now), mNext=elMonthKey(new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth()+1, 2)));
+  return [live, open, Date.now()<elMvpLock(mCur)?null:mCur, Date.now()<elMvpLock(mCur)?mCur:mNext].filter(Boolean);
+}
 async function elMvpLoad(){
-  const keys=elMvpKeys(), jobs=[];
+  const keys=await elMvpKeysLoad(), jobs=[]; S.lt.elKeys=keys;
   for(const k of keys) for(const u of S.order){ if(u!==S.uid && Date.now()<elMvpLock(k)) continue;
     jobs.push(getDoc(doc(S.db,"lt",`${k}_${u}`)).then(x=>{ (S.lt.all[k] ||= {})[u] = x.exists() ? x.data() : null; }).catch(()=>{})); }
+  jobs.push(...keys.filter(k=>k[0]==="m").map(k=>getDoc(doc(S.db,"ltResults",k)).then(x=>{ (S.lt.elRes ||= {})[k]=x.exists()?x.data():null; }).catch(()=>{})));
   await Promise.all(jobs); S.lt.loaded=true; if(S.tab==="uzun") betaUzun();
 }
-// sezon boyunca maç başına PIR (data/el/games.json) ve bir haftanın PIR toplamları
-function elPirStats(days){
-  const tot={}, gp={}, set=days?new Set(days):null;
-  for(const g of Object.values(S.arch.games||{})){ if(!g.pir || (set && !set.has(g.day))) continue;
-    for(const [id,v] of Object.entries(g.pir)){ tot[id]=(tot[id]||0)+v; gp[id]=(gp[id]||0)+1; } }
+// PIR: sezon boyu maç başına; bir turda kazanan takımlardaki en yüksek; bir aydaki ortalama (data/el/games.json)
+const elPirV = v => Array.isArray(v) ? v : [v, 0];
+function elPirStats(filter){
+  const tot={}, gp={};
+  for(const g of Object.values(S.arch.games||{})){ if(!g.pir || (filter && !filter(g))) continue;
+    for(const [id,v] of Object.entries(g.pir)){ tot[id]=(tot[id]||0)+elPirV(v)[0]; gp[id]=(gp[id]||0)+1; } }
   return {tot, gp};
+}
+function elRoundBoard(n){ const best={};
+  for(const g of Object.values(S.arch.games||{})){ if(g.round!==n || !g.pir) continue;
+    for(const [id,v] of Object.entries(g.pir)){ const [x,w]=elPirV(v); if(w && (best[id]==null || x>best[id])) best[id]=x; } }
+  return Object.entries(best).sort((a,b)=>b[1]-a[1]);
 }
 const elPName = id => S.pstats?.[id]?.n || (ALLP?.players||[]).find(x=>x.id===id)?.n || id;
 const elPTeam = id => S.pstats?.[id]?.t || (ALLP?.players||[]).find(x=>x.id===id)?.t || "";
 async function elMvpSave(k, id){
-  if(Date.now()>=elMvpLock(k)) return toast("Bu haftanın seçimi kilitlendi.");
+  if(Date.now()>=elMvpLock(k)) return toast("Bu seçim kilitlendi.");
   const data={uid:S.uid, key:k, picks:{mvp:id}, names:{mvp:elPName(id)}, updatedAt:serverTimestamp()};
-  try{ await setDoc(doc(S.db,"lt",`${k}_${S.uid}`), data); (S.lt.all[k] ||= {})[S.uid]=data; toast(`Haftanın MVP'si: ${elPName(id)}`); closeSheet(); betaUzun(); }
+  try{ await setDoc(doc(S.db,"lt",`${k}_${S.uid}`), data); (S.lt.all[k] ||= {})[S.uid]=data; toast(`${elMvpTitle(k).split(" · ")[0]}: ${elPName(id)}`); closeSheet(); betaUzun(); }
   catch(e){ toast("Kaydedilemedi."+(String(e?.code||"").includes("permission")?" Kilit geçmiş olabilir.":"")); }
 }
-function elMvpPick(k){
-  const {tot, gp}=elPirStats(), cur=S.lt.all[k]?.[S.uid]?.picks?.mvp;
+// yönetici: ayın MVP'sini EuroLeague açıklayınca girer (paylaşılan ödülde ikinci oyuncu da seçilir; seçili olana dokununca kalkar)
+async function elMvpResult(k, id){
+  const cur=S.lt.elRes?.[k]?.mvp||[], mvp=cur.includes(id)?cur.filter(x=>x!==id):[...cur, id];
+  try{ await setDoc(doc(S.db,"ltResults",k), {mvp, names:Object.fromEntries(mvp.map(x=>[x, elPName(x)])), at:serverTimestamp()});
+    (S.lt.elRes ||= {})[k]={mvp}; toast(`${elMvpTitle(k)}: ${mvp.map(elPName).join(", ")||"temizlendi"}`); closeSheet(); betaUzun(); }
+  catch(e){ toast("Kaydedilemedi."); }
+}
+function elMvpPick(k, admin){
+  const isM=k[0]==="m", {tot, gp}=elPirStats(), cur=admin ? (S.lt.elRes?.[k]?.mvp||[]) : [S.lt.all[k]?.[S.uid]?.picks?.mvp];
   const list=Object.keys(gp).filter(id=>gp[id]>=2).map(id=>({id, v:tot[id]/gp[id]})).sort((a,b)=>b.v-a.v);
-  openSheet(`<h3 id="shTitle">Haftanın MVP'si</h3><p class="muted" style="margin-top:-4px">${esc(dayNice(k.slice(2),{day:"numeric",month:"long"}))} haftası · Haftanın maçlarında en çok PIR toplayacak oyuncu. Bilirsen +${EL_MVP_PTS}.</p>
+  openSheet(`<h3 id="shTitle">${esc(elMvpTitle(k))}</h3><p class="muted" style="margin-top:-4px">${admin?"EuroLeague'in açıkladığı oyuncuyu seç (paylaşılan ödülde ikisini de seç; seçili olana yeniden dokununca kalkar).":isM?`EuroLeague'in bu ayın sonunda açıklayacağı Ayın MVP'sini tahmin et. Bilirsen +${EL_MVP_PTS.m}.`:`Bu haftanın maçlarında kazanan takımlardan en yüksek PIR'i alacak oyuncu (EuroLeague'in resmî Haftanın MVP'si kuralı). Bilirsen +${EL_MVP_PTS.r}.`} Listede sezonun maç başına PIR ortalaması var.</p>
     <input id="mvQ" class="adm-in" placeholder="Oyuncu ara" style="width:100%;margin:6px 0 10px"><div id="mvL" class="b-gr el-ld"></div>`);
   const paint=()=>{ const q=($("#mvQ")?.value||"").toLocaleLowerCase("tr");
-    $("#mvL").innerHTML=list.filter(x=>!q||elPName(x.id).toLocaleLowerCase("tr").includes(q)).slice(0,40).map((x,i)=>`<button type="button" class="b-row el-ldr ${x.id===cur?"on":""}" data-mvp="${escA(x.id)}"><span class="el-ln">${i+1}</span>${FACE(x.id)?`<img class="el-lp" src="${escA(FACE(x.id))}" alt="" loading="lazy">`:`<span class="el-lp"></span>`}<span class="el-lt"><b>${esc(elPName(x.id))}${x.id===cur?" ✓":""}</b><small><img src="${escA(EL_CREST[elPTeam(x.id)]||"")}" alt="" width="14" height="14"> ${esc(EL_NICK[elPTeam(x.id)]||"")} · ${gp[x.id]} maç</small></span><b class="el-lv">${x.v.toFixed(1).replace(".",",")}</b></button>`).join("") || `<div class="note">Oyuncu bulunamadı.</div>`; };
+    $("#mvL").innerHTML=list.filter(x=>!q||elPName(x.id).toLocaleLowerCase("tr").includes(q)).slice(0,40).map((x,i)=>{ const on=cur.includes(x.id);
+      return `<button type="button" class="b-row el-ldr ${on?"on":""}" data-mvp="${escA(x.id)}"><span class="el-ln">${i+1}</span>${FACE(x.id)?`<img class="el-lp" src="${escA(FACE(x.id))}" alt="" loading="lazy">`:`<span class="el-lp"></span>`}<span class="el-lt"><b>${esc(elPName(x.id))}${on?" ✓":""}</b><small><img src="${escA(EL_CREST[elPTeam(x.id)]||"")}" alt="" width="14" height="14"> ${esc(EL_NICK[elPTeam(x.id)]||"")} · ${gp[x.id]} maç</small></span><b class="el-lv">${x.v.toFixed(1).replace(".",",")}</b></button>`; }).join("") || `<div class="note">Oyuncu bulunamadı.</div>`; };
   allPlayers().catch(()=>{}).finally(paint);
   $("#mvQ").oninput=paint;
-  $("#mvL").onclick=e=>{ const b=e.target.closest("[data-mvp]"); if(b) elMvpSave(k, b.dataset.mvp); };
+  $("#mvL").onclick=e=>{ const b=e.target.closest("[data-mvp]"); if(b) (admin?elMvpResult:elMvpSave)(k, b.dataset.mvp); };
 }
 function elMvpRender(el){
   if(!S.lt.loaded){ el.innerHTML=`<div class="b-wrap"><div class="b-gr" style="padding:16px"><p class="b-note">Yükleniyor…</p></div></div>`; return; }
-  const keys=elMvpKeys(), res=S.arch.scores?.mvp||{}, ltS=S.arch.scores?.lt||{};
-  const card=k=>{ const lock=elMvpLock(k), open=Date.now()<lock, mine=S.lt.all[k]?.[S.uid], id=mine?.picks?.mvp;
-    const wk=elPirStats(elMvpWeekDays(k)).tot, top=Object.entries(wk).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  const keys=S.lt.elKeys||[], res=S.arch.scores?.mvp||{}, ltS=S.arch.scores?.lt||{};
+  const row=(pid,v,i)=>`<div class="el-mvr" data-ath="${escA(pid)}"><span>${i+1}</span><b>${esc(elPName(pid))}</b><small>${esc(EL_NICK[elPTeam(pid)]||"")}</small><b class="tnum">${v}</b></div>`;
+  const card=k=>{ const isM=k[0]==="m", lock=elMvpLock(k), open=Date.now()<lock, mine=S.lt.all[k]?.[S.uid], id=mine?.picks?.mvp;
+    const board = isM ? (()=>{ const {tot,gp}=elPirStats(g=>String(g.day||"").slice(0,6)===k.slice(2)); return Object.keys(gp).filter(x=>gp[x]>=2).map(x=>[x,tot[x]/gp[x]]).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([x,v])=>[x,v.toFixed(1).replace(".",",")]); })()
+      : elRoundBoard(+k.split("_")[2]).slice(0,5);
     const picks=open?[]:S.order.map(u=>({u, id:S.lt.all[k]?.[u]?.picks?.mvp})).filter(x=>x.id);
-    return `<div class="b-gr el-mv"><div class="el-mvh"><b>${esc(dayNice(k.slice(2),{day:"numeric",month:"long"}))} haftası</b><small>${open?`Kilit: ${new Date(lock).toLocaleString(LOC,{timeZone:TZ,weekday:"long",hour:"2-digit",minute:"2-digit"})}`:"Kilitlendi · hafta sürüyor"}</small></div>
-      <div class="el-mvp">${id?`${FACE(id)?`<img class="el-lp" src="${escA(FACE(id))}" alt="">`:""}<span class="el-lt"><b>${esc(mine.names?.mvp||elPName(id))}</b><small>Senin seçimin${wk[id]!=null?` · bu hafta ${wk[id]} PIR`:""}</small></span>`:`<span class="el-lt"><b>Henüz seçmedin</b><small>Haftanın maçlarında en çok PIR toplayacak oyuncuyu seç, bilirsen +${EL_MVP_PTS}</small></span>`}
-        ${open?`<button type="button" class="btn ${id?"":"primary-ish"}" data-mvpick="${k}">${id?"Değiştir":"Seç"}</button>`:""}</div>
-      ${top.length?`<div class="el-mvl"><small class="muted">Bu haftanın PIR sıralaması</small>${top.map(([pid,v],i)=>`<div class="el-mvr" data-ath="${escA(pid)}"><span>${i+1}</span><b>${esc(elPName(pid))}</b><small>${esc(EL_NICK[elPTeam(pid)]||"")}</small><b class="tnum">${v}</b></div>`).join("")}</div>`:""}
-      ${picks.length?`<div class="el-mvl"><small class="muted">Ligin seçimleri</small>${picks.map(x=>`<div class="el-mvr">${avatar(x.u,"sm")}<b>${esc(pname(x.u))}</b><small>${esc(elPName(x.id))}</small><b class="tnum">${wk[x.id]??0}</b></div>`).join("")}</div>`:""}</div>`; };
-  const past=Object.entries(res).sort((a,b)=>b[0].localeCompare(a[0]));
-  el.innerHTML=`<div class="b-wrap"><div class="b-gr el-mvi"><b>🏆 Haftanın MVP'si</b><span>EuroLeague'in uzun vadesi: her hafta, o haftanın maçlarında en çok PIR (verimlilik puanı) toplayacak oyuncuyu tahmin et. Bilirsen +${EL_MVP_PTS}. Seçim salı 18.00'de kilitlenir; haftanın bütün maçları bitince puan eklenir.</span></div>
-    ${keys.slice().reverse().map(card).join("")}
-    ${past.length?`<div class="b-lb"><span>GEÇMİŞ HAFTALAR</span></div><div class="b-gr">${past.map(([k,r])=>{ const my=ltS[S.uid]?.rounds?.[k];
-      return `<div class="el-mvr"><span>${esc(dayNice(k.slice(2),{day:"numeric",month:"short"}))}</span><b>${r.mvp.map(elPName).map(esc).join(", ")}</b><small>${r.pir} PIR</small><b class="tnum">${my==null?"–":my>0?"+"+my:"0"}</b></div>`; }).join("")}</div>`:""}</div>`;
+    const adminRes = isM && !open && S.isAdmin ? `<button type="button" class="btn" style="margin-top:10px;width:100%" data-mvres="${k}">${S.lt.elRes?.[k]?.mvp?.length?`Sonuç: ${esc(S.lt.elRes[k].mvp.map(elPName).join(", "))} · değiştir`:"Yönetici: EuroLeague açıklayınca sonucu gir"}</button>` : "";
+    return `<div class="b-gr el-mv"><div class="el-mvh"><b>${esc(elMvpTitle(k))}</b><small>${open?`Kilit: ${new Date(lock).toLocaleString(LOC,{timeZone:TZ,weekday:"short",day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}`:isM?"Kilitlendi · ay sürüyor":"Kilitlendi · hafta sürüyor"}</small></div>
+      <div class="el-mvp">${id?`${FACE(id)?`<img class="el-lp" src="${escA(FACE(id))}" alt="">`:""}<span class="el-lt"><b>${esc(mine.names?.mvp||elPName(id))}</b><small>Senin seçimin</small></span>`:`<span class="el-lt"><b>${open?"Henüz seçmedin":"Seçim yapmadın"}</b><small>${isM?`EuroLeague'in açıklayacağı Ayın MVP'si · bilirsen +${EL_MVP_PTS.m}`:`Kazanan takımlardan en yüksek PIR · bilirsen +${EL_MVP_PTS.r}`}</small></span>`}
+        ${open?`<button type="button" class="btn" data-mvpick="${k}">${id?"Değiştir":"Seç"}</button>`:""}</div>
+      ${board.length?`<div class="el-mvl"><small class="muted">${isM?"Bu ay PIR ortalaması (en az 2 maç)":"Bu hafta şu ana kadar (kazanan takımlarda en yüksek PIR)"}</small>${board.map(([p,v],i)=>row(p,v,i)).join("")}</div>`:""}
+      ${picks.length?`<div class="el-mvl"><small class="muted">Ligin seçimleri</small>${picks.map(x=>`<div class="el-mvr">${avatar(x.u,"sm")}<b>${esc(pname(x.u))}</b><small>${esc(S.lt.all[k]?.[x.u]?.names?.mvp||elPName(x.id))}</small><span></span></div>`).join("")}</div>`:""}${adminRes}</div>`; };
+  const sk=k=>k[0]==="m"?k.slice(2)+"32":k.slice(2,10);
+  const past=Object.entries(res).sort((a,b)=>sk(b[0]).localeCompare(sk(a[0])));
+  el.innerHTML=`<div class="b-wrap"><div class="b-gr el-mvi"><b>🏆 EuroLeague ödülleri</b><span>EuroLeague'in resmî ödüllerini önceden tahmin et. <b>Haftanın MVP'si</b>: o haftada kazanan takımlardan en yüksek PIR'i (verimlilik puanı) alan oyuncu, bilirsen +${EL_MVP_PTS.r}; sonuç kutu skorlarından otomatik hesaplanır. <b>Ayın MVP'si</b>: EuroLeague'in ay sonunda açıkladığı oyuncu, bilirsen +${EL_MVP_PTS.m}. Seçimler haftanın ya da ayın ilk günü 18.50'de kilitlenir.</span></div>
+    ${keys.map(card).join("")}
+    ${past.length?`<div class="b-lb"><span>SONUÇLANANLAR</span></div><div class="b-gr">${past.map(([k,r])=>{ const my=ltS[S.uid]?.rounds?.[k];
+      return `<div class="el-mvr"><span>${esc(k[0]==="m"?elMvpTitle(k).split(" · ")[1]:k.split("_")[2]+". hafta")}</span><b>${r.mvp.map(x=>r.names?.[x]||elPName(x)).map(esc).join(", ")}</b><small>${r.pir!=null?r.pir+" PIR":"Ayın MVP'si"}</small><b class="tnum">${my==null?"–":my>0?"+"+my:"0"}</b></div>`; }).join("")}</div>`:""}</div>`;
   el.querySelectorAll("[data-mvpick]").forEach(b=>b.onclick=()=>elMvpPick(b.dataset.mvpick));
+  el.querySelectorAll("[data-mvres]").forEach(b=>b.onclick=()=>elMvpPick(b.dataset.mvres, true));
 }
 async function elTeamExtras(code){
   const R=await elRounds().catch(()=>[]), cur=elCurRound(R);
@@ -4327,7 +4358,7 @@ async function calendarHTML(){
       const day=ymd(new Date(new Date(ev.date).getTime()-8*36e5)); sched[day]={op:op?.team?.abbreviation, home:me?.homeAway==="home", t:new Date(ev.date),
         res: c.status?.type?.completed ? `${me?.winner?"G":"M"} ${me?.score?.displayValue??me?.score??""}-${op?.score?.displayValue??op?.score??""}` : ""}; } }
   const locks={};
-  if(IS_EL){ for(let i=-8;i<=8;i++){ const k=elMvpKey(shiftDay(S.calM+"15", i*7)); const d=ymd(new Date(elMvpLock(k)+3*36e5-8*36e5)); (locks[d] ||= []).includes("Haftanın MVP'si") || locks[d].push("Haftanın MVP'si"); } }
+  if(IS_EL){ for(const k of S.lt?.elKeys||[]){ const d=ymd(new Date(elMvpLock(k)+3*36e5-8*36e5)); (locks[d] ||= []).push(elMvpTitle(k).split(" · ")[0]); } }
   else for(const k of ltRounds()){ const d=ymd(new Date(ltLock(k)+3*36e5-8*36e5)); (locks[d] ||= []).push(ltTitle(k).split(" · ")[0]); }
   const y=+S.calM.slice(0,4), m=+S.calM.slice(4,6), first=new Date(Date.UTC(y,m-1,1)), days=new Date(Date.UTC(y,m,0)).getUTCDate(), off=(first.getUTCDay()+6)%7;
   let cells=""; for(let i=0;i<off;i++) cells+=`<div class="cal-c empty"></div>`;
@@ -4590,7 +4621,7 @@ function ltLock(k){
   return Date.UTC(2027,0,15) + 17*36e5;
 }
 const MONTHS_TR=["Ocak","Şubat","Mart","Nisan","Mayıs","Haziran","Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"];
-function ltTitle(k){ if(IS_EL) return "Haftanın MVP'si";
+function ltTitle(k){ if(IS_EL) return elMvpTitle(k);
   if(k[0]==="w"){ const a=k.slice(2), b=shiftDay(a,6); return `Haftanın oyuncusu · ${dayNice(a,{day:"numeric",month:"short"})}–${dayNice(b,{day:"numeric",month:"short"})}`; }
   if(k[0]==="m"){ const m=+k.slice(6,8); return `Ayın ödülleri · ${m===11 && k.startsWith("m_2026")?"Ekim-Kasım":MONTHS_TR[m-1]}`; }
   if(k[0]==="c") return "NBA Kupası 2026";
@@ -7126,7 +7157,7 @@ function betaUzun(){
 }
 // kilide 48 saatten az kalan ve eksik seçimi olan uzun vade turu varsa sarı şeridin üstünde ince gri şerit
 function betaLtDue(){
-  if(IS_EL){ if(!S.lt?.loaded) return null; const k=elMvpKeys().find(k=>Date.now()<elMvpLock(k)); if(!k) return null; const ms=elMvpLock(k)-Date.now();
+  if(IS_EL){ if(!S.lt?.loaded) return null; const k=(S.lt.elKeys||[]).filter(k=>Date.now()<elMvpLock(k)).sort((a,b)=>elMvpLock(a)-elMvpLock(b))[0]; if(!k) return null; const ms=elMvpLock(k)-Date.now();
     return ms<48*36e5 && !S.lt.all[k]?.[S.uid]?.picks?.mvp ? {k, ms, n:0, of:1} : null; }
   if(!S.lt?.loaded) return null;
   const due=ltRounds().map(k=>({k, ms:ltLock(k)-Date.now()})).filter(x=>x.ms>0 && x.ms<48*36e5).map(x=>{ const d=S.lt.all[x.k]?.[S.uid], cats=LT_CATS[ltType(x.k)]; return {...x, n:cats.filter(([c])=>d?.picks?.[c]).length, of:cats.length}; }).filter(x=>x.n<x.of).sort((a,b)=>a.ms-b.ms);
