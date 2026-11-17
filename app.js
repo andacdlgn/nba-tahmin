@@ -76,7 +76,7 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.56.1";
+const VERSION = "1.56.2";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
@@ -950,14 +950,15 @@ async function elBoot(){ try{ for(const c of await elClubs()){ EL_CREST[c.code]=
 const elEtDay = utc => ymd(new Date(Date.parse(utc) - 5*36e5));                    // ESPN'in "gün"ü gibi: ABD doğu saati
 function elEvent(g){
   const st=elState(g), L=g.local, R=g.road;
-  const per = Object.values(L.partials||{}).filter(v=>typeof v==="number").length;
+  // periyot: sayı olan son çeyrek (servis başlamamış çeyreklere de 0 yazar; "4. Ç" hatası buradan)
+  const per = Math.max(1, ...[1,2,3,4].filter(k=>(L.partials?.["partials"+k]||0)+(R.partials?.["partials"+k]||0)>0));
   const side = (t,o,h) => ({ homeAway:h, winner: st==="post" && (t.score??0)>(o.score??0),
     team:{ abbreviation:t.club.code, id:t.club.code, shortDisplayName:elTeamName(t.club), displayName:t.club.name, logo:t.club.images?.crest||"" },
     score: st==="pre" ? "" : String(t.score??0), records:[{summary:""}],
     linescores: Object.entries(t.partials||{}).filter(([k,v])=>/^partials\d$/.test(k) && v!=null).map(([,v])=>({value:v, displayValue:String(v)})) });
   return { id:elGid(g), date:g.utcDate, season:{type:2, year:elYear()+1}, el:g,
     status:{ period: st==="post"?4:(g._per||per), displayClock:st==="in"?(g._clk||""):"", type:{ state:st, completed:st==="post", name: st==="post"?"STATUS_FINAL":st==="in"?"STATUS_IN_PROGRESS":"STATUS_SCHEDULED",
-      shortDetail: st==="post"?"Bitti":st==="in"?(g._per?`${g._per<=4?g._per+". Ç":"UZ"} ${g._clk||""}`.trim():"Canlı"):timeTR(new Date(g.utcDate)) } },
+      shortDetail: st==="post"?"Bitti":st==="in"?(g._per?(g._clk==="00:00"&&g._per<4?(g._per===2?"Devre arası":`${g._per}. Ç sonu`):`${g._per<=4?g._per+". Ç":"UZ"} ${g._clk||""}`.trim()):(L.score||R.score)?"Canlı":"Başlıyor"):timeTR(new Date(g.utcDate)) } },
     competitions:[{ competitors:[side(L,R,"home"), side(R,L,"away")], notes:[], venue:{fullName:g.venue?.name||""}, date:g.utcDate,
       status:{ period: st==="post"?4:per, type:{ state:st, completed:st==="post", shortDetail: st==="post"?"Bitti":"" } } }] };
 }
