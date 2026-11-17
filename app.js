@@ -76,7 +76,7 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.56.2";
+const VERSION = "1.56.3";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
@@ -7916,9 +7916,13 @@ async function fillInjMin(el){
     const evs=(st?.categories||[]).flatMap(c=>c.events||[]); if(!evs.length || im<0){ if(el.dataset.injfull) el.textContent="Bu sezon henüz oynamadı"; return; }
     const mins=evs.map(e=>+e.stats?.[im]||0), avg=mins.reduce((a,b)=>a+b,0)/mins.length, last=mins[0];
     const f1=v=>v.toFixed(1).replace(".",",");
+    // son maçın tarihi ve kaç gün önce olduğu (1.56.3)
+    const gd=gl.events?.[evs[0].eventId]?.gameDate, ld=gd?usDay(gd):null;
+    const ago = ld && S.today ? Math.max(0, Math.round((Date.UTC(+S.today.slice(0,4),+S.today.slice(4,6)-1,+S.today.slice(6,8)) - Date.UTC(+ld.slice(0,4),+ld.slice(4,6)-1,+ld.slice(6,8)))/864e5)) : null;
+    const lastTxt = ago==null ? `son maçında ${last} dk` : `son maçı <b class="inj-ago">${ago===0?"bugün":ago===1?"dün":ago+" gün önce"}</b> (${esc(dayNice(ld,{day:"numeric",month:"short"}))}, ${last} dk)`;
     if(el.dataset.injfull){ const pts=evs.map(e=>+e.stats?.[ip]||0), pa=pts.reduce((a,b)=>a+b,0)/pts.length;
-      el.innerHTML=`<b>${f1(pa)}</b> sayı · <b>${f1(avg)}</b> dk · son maçında ${last} dk <span class="muted">(${evs.length} maç)</span>`; }
-    else el.innerHTML=` · <b>${f1(avg)}</b> dk · son maçında ${last} dk`;
+      el.innerHTML=`<b>${f1(pa)}</b> sayı · <b>${f1(avg)}</b> dk · ${lastTxt} <span class="muted">(${evs.length} maç)</span>`; }
+    else el.innerHTML=` · <b>${f1(avg)}</b> dk · ${lastTxt}`;
   }catch(e){}
 }
 new MutationObserver(ms=>{ for(const m of ms) for(const a of m.addedNodes){ if(a.nodeType!==1) continue;

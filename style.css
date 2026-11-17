@@ -2429,3 +2429,4 @@ body.beta .new-ui-btn{display:none!important}
 .l5r[data-og]:hover,.ss-row[data-og]:hover,.agl-r[data-og]:hover,.hs[data-og]:hover,.injr[data-ath]:hover{background:color-mix(in srgb,var(--ink) 6%,transparent);border-radius:8px}
 .tf-bars>span[data-og]:hover i{filter:brightness(1.25)}
 .injr[data-ath]{cursor:pointer}
+.inj-ago{color:var(--amber-ink);font-weight:700}
