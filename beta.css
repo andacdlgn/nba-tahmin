@@ -1227,11 +1227,32 @@ body.el-mode .b-head,body.el-mode #bHead{box-shadow:inset 0 3px 0 #ff7a1a}
 .el-mvpk{grid-template-columns:auto 1fr auto}
 .el-mvpk .el-lt small{display:block}
 .inj-ago{color:var(--amber-ink,var(--amber));font-weight:700}
-/* Haftanın oyuncusu: takımın bu haftaki rakipleri */
-.lt-wk{display:block;font-size:11.5px;color:var(--muted);margin-top:3px;line-height:1.7}
+/* Haftanın oyuncusu: takımın bu haftaki rakipleri (1.57.0: savunma rengi) */
+.lt-wk{display:block;font-size:11.5px;color:var(--muted);margin-top:3px;line-height:1.75}
 .lt-wk b,.plr .pi .lt-wk b{display:inline;color:var(--ink);font-weight:700;font-size:inherit}
-.lt-wk .wk-g{display:inline-block;padding:0 6px;border-radius:6px;background:var(--track);color:var(--ink);font-weight:600;white-space:nowrap}
-.lt-wk .wk-g.done{opacity:.75}
-.lt-wk .wk-g.ok{color:var(--win)}.lt-wk .wk-g.no{color:var(--lose)}
-.lt-wk .wk-g.live{outline:1px solid var(--amber)}
+.wk-g{display:inline-block;padding:0 6px;border-radius:6px;background:var(--track);color:var(--ink);font-weight:600;white-space:nowrap;border:1px solid transparent;font-size:11.5px;line-height:1.55}
+.wk-g.done{opacity:.6}
+.wk-g i{font-style:normal;font-weight:800}.wk-g i.ok{color:var(--win)}.wk-g i.no{color:var(--lose)}
+.wk-g.easy{background:var(--win-soft);border-color:color-mix(in srgb,var(--win) 45%,transparent);color:var(--win)}
+.wk-g.hard{background:var(--lose-soft);border-color:color-mix(in srgb,var(--lose) 45%,transparent);color:var(--lose)}
+.wk-g.live{outline:1.5px solid var(--amber);outline-offset:1px}
+.lt-legend{font-size:11.5px;color:var(--muted);margin:6px 0 2px;line-height:1.7}
+.lt-sortsel{display:flex;gap:6px;margin:4px 0 8px}
+.lt-sortsel button{flex:1;padding:7px 8px;border-radius:9px;border:1px solid var(--line);background:var(--panel);color:var(--muted);font:inherit;font-size:12.5px;font-weight:600;cursor:pointer}
+.lt-sortsel button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+/* son 5 maç çizgisi */
+.lt-spark{display:inline-flex;align-items:center;gap:4px;margin-left:6px;vertical-align:middle}
+.lt-spark svg{display:block;overflow:visible}
+.lt-spark.up{color:var(--win)}.lt-spark.down{color:var(--lose)}
+.lt-spark em{font-style:normal;font-size:10.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.plr .pi small:has(.lt-spark){display:flex;align-items:center;flex-wrap:wrap}
+/* maç kartı: yorgunluk etiketleri */
+.ib-tags{display:flex;flex-wrap:wrap;gap:3px}
+.ib-side.r .ib-tags{justify-content:flex-end}
+.ib-tag{font-style:normal;font-size:10.5px;font-weight:700;padding:1px 6px;border-radius:6px;background:var(--track);color:var(--ink);white-space:nowrap}
+.ib-tag.b2b,.ib-tag.road{background:var(--lose-soft);color:var(--lose)}
+.ib-tag.rest,.ib-tag.homes{background:var(--win-soft);color:var(--win)}
+/* uzun vade şeridi: kilide 3 saatten az */
+.b-ltstrip.urgent{background:var(--amber-soft);border-color:var(--amber);color:var(--amber-ink)}
+.b-ltstrip.urgent .go{color:var(--amber-ink)}
 .lt-big.lt-zero span{opacity:.45}.lt-big.lt-zero .lt-lead{color:var(--muted)}
