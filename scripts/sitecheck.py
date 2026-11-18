@@ -46,12 +46,21 @@ def check_live():
         pg = b.new_page()
         pg.on("console", lambda m: errs.append(m.text) if m.type == "error" and "Content Security Policy" in m.text else None)
         pg.on("pageerror", lambda e: errs.append("Sayfa hatası: " + str(e)))
-        try:
-            pg.goto(f"{SITE}?check={int(time.time())}", wait_until="domcontentloaded", timeout=45000)
-            # sayfanın CSP'si eval'e izin vermez; bu yüzden betik değil seçici ile bekle (açılış ekranı kalkınca DOM'dan silinir)
-            pg.wait_for_selector("#splash", state="detached", timeout=25000)
-        except Exception as e:  # noqa: BLE001
-            problem = "Açılış ekranı 25 saniyede kalkmadı (" + type(e).__name__ + ")."
+        # GitHub Pages yeni yayını dağıtırken ya da veri kaynağı yavaşken ilk deneme takılabilir: bir dakika arayla
+        # üç kez denenir, ancak üçü de başarısızsa uyarı verilir (18 Kasım: tek seferlik takılma boşuna mail attırdı)
+        for attempt in range(3):
+            errs.clear()   # yalnızca son denemenin hataları sayılır
+            try:
+                pg.goto(f"{SITE}?check={int(time.time())}", wait_until="domcontentloaded", timeout=45000)
+                # sayfanın CSP'si eval'e izin vermez; bu yüzden betik değil seçici ile bekle (açılış ekranı kalkınca DOM'dan silinir)
+                pg.wait_for_selector("#splash", state="detached", timeout=30000)
+                problem = None
+                break
+            except Exception as e:  # noqa: BLE001
+                problem = f"Açılış ekranı 30 saniyede kalkmadı ({type(e).__name__}; {attempt + 1}. deneme)."
+                print(problem)
+                if attempt < 2:
+                    time.sleep(60)
         b.close()
     csp_errs = [e for e in errs if "Content Security Policy" in e]
     if csp_errs and not problem:
