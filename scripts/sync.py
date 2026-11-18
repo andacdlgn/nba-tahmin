@@ -185,6 +185,28 @@ def espn_fav(s):
     return side.get("home", "") if h >= 0.5 else side.get("away", "")
 
 
+def team_poss(summary):
+    """Takım başına hücum sayısı tahmini: isabetsiz dahil atış + 0,44 serbest atış - hücum ribaundu + top kaybı."""
+    out = {}
+    for t in (summary.get("boxscore", {}) or {}).get("teams", []) or []:
+        st = {x.get("name"): x.get("displayValue") for x in t.get("statistics", []) or []}
+        try:
+            fga = int(str(st.get("fieldGoalsMade-fieldGoalsAttempted", "0-0")).split("-")[1])
+            fta = int(str(st.get("freeThrowsMade-freeThrowsAttempted", "0-0")).split("-")[1])
+            orb = int(st.get("offensiveRebounds") or 0)
+            tov = int(st.get("totalTurnovers") or st.get("turnovers") or 0)
+        except (ValueError, IndexError):
+            continue
+        if fga:
+            out[t["team"]["abbreviation"]] = round(fga + 0.44 * fta - orb + tov, 1)
+    return out if len(out) == 2 else None
+
+def pm_int(v):
+    try:
+        return int(str(v or "0").replace("+", ""))
+    except ValueError:
+        return 0
+
 def box(event_id: str):
     if IS_EL:
         r = el_box(event_id)
@@ -217,6 +239,9 @@ def box(event_id: str):
                     "fg": made_att(row.get("fieldGoalsMade-fieldGoalsAttempted")),
                     "tp": made_att(row.get("threePointFieldGoalsMade-threePointFieldGoalsAttempted")),
                     "min": row.get("minutes", "0"),
+                    # 1.57.1: savunma kategorileri için savunma ribaundu, +/- ve faul
+                    "dreb": num("defensiveRebounds"), "pf": num("fouls"),
+                    "pm": pm_int(row.get("plusMinus")),
                 })
     return players
 
@@ -1127,7 +1152,7 @@ def save_teamstats(force=False):
 def main(full=False):
     games = load("games.json", {})
     pstats = load("players.json", {"counted": [], "p": {}})
-    PV = 5 if IS_EL else 3   # EuroLeague v5 (PIR + tur), v4: maç kaydına maç kimliği, rakip, skor ve dakika da eklenir (oyuncu kartı için)
+    PV = 5 if IS_EL else 4   # NBA v4 (1.57.1): maç kaydına kimlik, rakip, skor, dakika + savunma ribaundu, +/-, faul; EuroLeague v5 (PIR + tur), v4: maç kaydına maç kimliği, rakip, skor ve dakika da eklenir (oyuncu kartı için)
     if pstats.get("v") != PV:   # v3: maç maç kayıt + isabet yüzdeleri (uzun vade istatistikleri için); bir kere baştan kurulur
         pstats = {"v": PV, "counted": [], "p": {}}
         full = True
@@ -1183,6 +1208,10 @@ def main(full=False):
                 g["hp"] = round(hp, 4)
             winner = g.get("winner")
             g["day"] = day
+            if not IS_EL:   # 1.57.1: takımların hücum sayısı (savunma ratingi = rakibin sayısı / 100 hücum)
+                ps_ = team_poss(getattr(box, "last", {}) or {})
+                if ps_:
+                    g["poss"] = ps_
             g["top"] = [{"id": p["id"], "name": p["name"], "team": p["team"], "pts": p["pts"]} for p in bx if p["pts"] == top]
             if IS_EL:   # haftanın MVP'si için oyuncuların verimlilik puanı (PIR)
                 g["pir"] = {p["id"]: [p.get("val", 0), 1 if p["team"] == winner else 0] for p in bx}
@@ -1206,6 +1235,14 @@ def main(full=False):
                         mins = int(p["min"]) if str(p["min"]).isdigit() else 0
                         row += [g["id"], op["abbr"], "vs" if home else "@", f"{me['score']}-{op['score']}", mins]
                         s["min"] = s.get("min", 0) + mins
+                    else:   # NBA: [11 maç kimliği, 12 rakip, 13 vs/@, 14 skor, 15 dakika, 16 savunma ribaundu, 17 +/-, 18 faul]
+                        home = g["home"]["abbr"] == p["team"]
+                        me, op = (g["home"], g["away"]) if home else (g["away"], g["home"])
+                        mins = int(p["min"]) if str(p["min"]).isdigit() else 0
+                        row += [g["id"], op["abbr"], "vs" if home else "@", f"{me['score']}-{op['score']}", mins,
+                                p.get("dreb", 0), p.get("pm", 0), p.get("pf", 0)]
+                        for k2, v2 in (("min", mins), ("dreb", p.get("dreb", 0)), ("pm", p.get("pm", 0)), ("pf", p.get("pf", 0))):
+                            s[k2] = s.get(k2, 0) + v2
                     s["lg"] = (s.get("lg", []) + [row])[-16:]
                 counted.add(g["id"])
         d += timedelta(days=1)

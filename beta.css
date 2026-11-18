@@ -1256,3 +1256,11 @@ body.el-mode .b-head,body.el-mode #bHead{box-shadow:inset 0 3px 0 #ff7a1a}
 .b-ltstrip.urgent{background:var(--amber-soft);border-color:var(--amber);color:var(--amber-ink)}
 .b-ltstrip.urgent .go{color:var(--amber-ink)}
 .lt-big.lt-zero span{opacity:.45}.lt-big.lt-zero .lt-lead{color:var(--muted)}
+/* 1.57.1: savunma kategorisi ve aylık rakip özeti */
+.lt-sortsel{flex-wrap:wrap}.lt-sortsel button{min-width:30%}
+.lt-tdef{display:block;font-size:11.5px;color:var(--muted);margin-top:2px}
+.lt-tdef b{display:inline;font-size:inherit;color:var(--ink)}
+.plr .pi .lt-tdef b{display:inline}
+.lt-tdef.good b{color:var(--win)}.lt-tdef.bad b{color:var(--lose)}
+.wk-n{font-weight:700}.wk-n.easy{color:var(--win)}.wk-n.hard{color:var(--lose)}
+.pm-up{color:var(--win);font-weight:600}.pm-dn{color:var(--lose);font-weight:600}
