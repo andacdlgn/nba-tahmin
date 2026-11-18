@@ -76,7 +76,7 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.58.0";
+const VERSION = "1.58.1";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
@@ -4945,7 +4945,10 @@ function bindLTPicker(){
   if(cf[0]==="T"){ $("#ltBox").querySelector(".tm-grid").onclick=e=>{ const b=e.target.closest("[data-ltp]"); if(b) choose(b.dataset.ltp, b.dataset.ltn); }; return; }
   const def = /^d/.test(c) || c==="dpoy", rook = /^r/.test(c) || c==="roy", hasR = (ALLP?.players||[]).some(p=>p.r);
   const paint=()=>{ const q=slug($("#ltSearch").value||"");
-    let list=(ALLP?.players||[]).filter(p=>(!cf || confOf(p.t)===cf) && (!rook || !hasR || p.r)).map(p=>{ const st=ltPStat(p.id,k); const kf=x=>def ? x.stl+x.blk+(x.dreb!=null ? x.dreb/4 : x.reb/10) : x.pts; return {...p, st, key: st ? kf(st) : -1, sk: st?.ssn ? kf(st.ssn) : -1}; });
+    let list=(ALLP?.players||[]).filter(p=>(!cf || confOf(p.t)===cf) && (!rook || !hasR || p.r)).map(p=>{ const st=ltPStat(p.id,k); const kf=x=>def ? x.stl+x.blk+(x.dreb!=null ? x.dreb/4 : x.reb/10) : x.pts;
+      // sezon ödüllerinde az maçlı oyuncu (ör. 2 maç) ortalamasıyla öne geçmesin: 10 maça kadar orantılı küçülür
+      const wt = k[0]==="s" && st && !st.none ? Math.min(1, st.gp/10) : 1;
+      return {...p, st, key: st ? kf(st)*wt : -1, sk: st?.ssn ? kf(st.ssn) : -1}; });
     if(q) list=list.filter(p=>slug(p.n).includes(q)); const byLeft = S.ltSort==="left" && S.ltWk[k]?.m; if(byLeft) list.forEach(p=>{ p.left=ltLeft(p.t,k)??0; });
     const byDef = S.ltSort==="tdef" && def, tr=teamRanks(); if(byDef) list.forEach(p=>{ p.tdr=tr[p.t]?.d.rk ?? 99; });
     list.sort((a,b)=>(byLeft ? b.left-a.left : 0) || (byDef ? a.tdr-b.tdr : 0) || b.key-a.key || b.sk-a.sk); list=list.slice(0,40);
