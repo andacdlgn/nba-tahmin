@@ -76,7 +76,7 @@ const dayNice = (s, o={day:"numeric",month:"long",weekday:"long"}) => parseYmd(s
 // Takım logoları sitenin kendi logos/ klasöründen gelir (ESPN'e bağımlı değil).
 // Yerel dosya yüklenemezse ESPN'in adresi denenir, o da olmazsa takım kısaltması gösterilir.
 // Her güncellemede bir artır: sitenin en altında ve Kurallar'da görünür, yeni sürüm yüklendi mi diye bakmak için
-const VERSION = "1.56.6";
+const VERSION = "1.56.7";
 if(window.BUILD && window.BUILD!==VERSION){ try{ const k="mm:"+VERSION; if(!sessionStorage.getItem(k)){ sessionStorage.setItem(k,"1");
   fetch("./", {cache:"reload"}).catch(()=>{}).finally(()=>location.reload()); throw new Error("sürüm uyuşmazlığı, yenileniyor"); } }catch(e){ if(String(e.message).startsWith("sürüm")) throw e; } }
 // Sürüm: 1 = 2026-27 sezonu · ikinci sayı = yeni özellik paketi · üçüncü sayı = düzeltme.
@@ -4797,9 +4797,12 @@ function ltRange(k){
 function ltPStat(id, k){
   const ps=S.pstats?.[id]; if(!ps) return null;
   const [a,b,lab]=ltRange(k);
+  const ssn = ps.gp ? {pts:ps.pts/ps.gp, reb:ps.reb/ps.gp, ast:ps.ast/ps.gp, stl:(ps.stl||0)/ps.gp, blk:(ps.blk||0)/ps.gp} : null;
   if(k[0]!=="s" && k[0]!=="c" && ps.lg){ const g=ps.lg.filter(x=>x[0]>=a && x[0]<=b);
+    // haftalık/aylık turda bu aralıkta maçı yoksa sezon ortalaması değil 0 gösterilir (sezon ortalaması ssn'de, sıralamada eşitliği bozar)
+    if(!g.length) return {lab, gp:0, pts:0, reb:0, ast:0, stl:0, blk:0, w:0, l:0, fg:null, tp:null, none:true, ssn};
     if(g.length){ const sum=i=>g.reduce((t,x)=>t+(x[i]||0),0), n=g.length; return {lab, gp:n, pts:sum(1)/n, reb:sum(2)/n, ast:sum(3)/n, stl:sum(4)/n, blk:sum(5)/n, w:sum(6), l:n-sum(6),
-      fg:sum(8)?sum(7)/sum(8):null, tp:sum(10)?sum(9)/sum(10):null}; } }
+      fg:sum(8)?sum(7)/sum(8):null, tp:sum(10)?sum(9)/sum(10):null, ssn}; } }
   if(!ps.gp) return null;
   return {lab:"sezon", gp:ps.gp, pts:ps.pts/ps.gp, reb:ps.reb/ps.gp, ast:ps.ast/ps.gp, stl:(ps.stl||0)/ps.gp, blk:(ps.blk||0)/ps.gp, season:true,
     fg:ps.fga?ps.fgm/ps.fga:null, tp:ps.tpa?ps.tpm/ps.tpa:null};
@@ -4863,7 +4866,7 @@ async function loadInj(force=false){
 const injOfTeam = abbr => Object.entries(S.inj||{}).filter(([,x])=>x.t===abbr).map(([id,x])=>({id,...x})).sort((a,b)=>b.o-a.o || a.n.localeCompare(b.n));
 const injBadge = id => { const i=S.inj?.[id]; return !i ? "" : `<span class="inj ${i.o?"":"q"}">${i.s}</span>`; };
 function ltMini(id,k,def){ const st=ltPStat(id,k), p=(ALLP?.players||[]).find(x=>x.id===id), tw=p?ltTeamWL(p.t,k):{w:0,l:0};
-  return `<small class="lt-mini">${st?(def?`${f1(st.stl)} çalma · ${f1(st.blk)} blok`:`${f1(st.pts)} sayı · ${f1(st.reb)} rib. · ${f1(st.ast)} ast.`)+(st.season?"":` · ${st.w}G-${st.l}M`)+` (${st.lab})`:""}${tw.w+tw.l?` · takım ${tw.w}-${tw.l}`:""}</small>${p?ltWeekTxt(p.t,k):""}${injTxt(id)}${S.inj?.[id]?.s && lastGameAgo(id)?`<small class="lt-ago">${agoTxt(lastGameAgo(id))}</small>`:""}`; }
+  return `<small class="lt-mini">${st?.none?`${st.lab==="bu hafta"?"Bu hafta":"Bu ay"} henüz maçı yok${st.ssn?` (sezon ${def?`${f1(st.ssn.stl)} çalma · ${f1(st.ssn.blk)} blok`:`${f1(st.ssn.pts)} sayı`})`:""}`:st?(def?`${f1(st.stl)} çalma · ${f1(st.blk)} blok`:`${f1(st.pts)} sayı · ${f1(st.reb)} rib. · ${f1(st.ast)} ast.`)+(st.season?"":` · ${st.w}G-${st.l}M`)+` (${st.lab})`:""}${tw.w+tw.l?` · takım ${tw.w}-${tw.l}`:""}</small>${p?ltWeekTxt(p.t,k):""}${injTxt(id)}${S.inj?.[id]?.s && lastGameAgo(id)?`<small class="lt-ago">${agoTxt(lastGameAgo(id))}</small>`:""}`; }
 function ltPicker(k, c){
   const [ ,l, ,cf]=LT_CATS[ltType(k)].find(x=>x[0]===c);
   if(cf[0]==="T"){ const teams=(ALLP?.teams||[]).filter(t=>!cf[1] || confOf(t.a)===cf[1]).sort((a,b)=>a.n.localeCompare(b.n,"tr"));
@@ -4881,15 +4884,15 @@ function bindLTPicker(){
   if(cf[0]==="T"){ $("#ltBox").querySelector(".tm-grid").onclick=e=>{ const b=e.target.closest("[data-ltp]"); if(b) choose(b.dataset.ltp, b.dataset.ltn); }; return; }
   const def = /^d/.test(c) || c==="dpoy", rook = /^r/.test(c) || c==="roy", hasR = (ALLP?.players||[]).some(p=>p.r);
   const paint=()=>{ const q=slug($("#ltSearch").value||"");
-    let list=(ALLP?.players||[]).filter(p=>(!cf || confOf(p.t)===cf) && (!rook || !hasR || p.r)).map(p=>{ const st=ltPStat(p.id,k); return {...p, st, key: st ? (def ? st.stl+st.blk+st.reb/10 : st.pts) : -1}; });
-    if(q) list=list.filter(p=>slug(p.n).includes(q)); list.sort((a,b)=>b.key-a.key); list=list.slice(0,40);
+    let list=(ALLP?.players||[]).filter(p=>(!cf || confOf(p.t)===cf) && (!rook || !hasR || p.r)).map(p=>{ const st=ltPStat(p.id,k); const kf=x=>def ? x.stl+x.blk+x.reb/10 : x.pts; return {...p, st, key: st ? kf(st) : -1, sk: st?.ssn ? kf(st.ssn) : -1}; });
+    if(q) list=list.filter(p=>slug(p.n).includes(q)); list.sort((a,b)=>b.key-a.key || b.sk-a.sk); list=list.slice(0,40);
     $("#ltList").innerHTML=list.map(p=>{ const st=p.st, tw=ltTeamWL(p.t,k);
       const pct = v => v==null ? null : "%"+Math.round(v*100);
       const big = st ? (def ? [["RİB",st.reb],["TÇ",st.stl],["BLK",st.blk]] : [["SAY",st.pts],["RİB",st.reb],["AST",st.ast]]) : [];
-      const sm = st ? [def ? `${f1(st.pts)} sayı · ${f1(st.ast)} asist` : `${f1(st.stl)} top çalma · ${f1(st.blk)} blok`, pct(st.fg)&&`${pct(st.fg)} saha içi`, pct(st.tp)&&`${pct(st.tp)} üçlük`, (st.season ? `${st.gp} maç (${st.lab})` : `${st.gp} maç · ${st.w}G-${st.l}M (${st.lab})`)].filter(Boolean).join(" · ") : "Bu sezon maçı yok";
+      const sm = st?.none ? `${st.lab==="bu hafta"?"Bu hafta":"Bu ay"} henüz maçı yok${st.ssn?` · sezonda ${f1(st.ssn.pts)} sayı · ${f1(st.ssn.reb)} rib. · ${f1(st.ssn.ast)} ast.`:""}` : st ? [def ? `${f1(st.pts)} sayı · ${f1(st.ast)} asist` : `${f1(st.stl)} top çalma · ${f1(st.blk)} blok`, pct(st.fg)&&`${pct(st.fg)} saha içi`, pct(st.tp)&&`${pct(st.tp)} üçlük`, (st.season ? `${st.gp} maç (${st.lab})` : `${st.gp} maç · ${st.w}G-${st.l}M (${st.lab})`)].filter(Boolean).join(" · ") : "Bu sezon maçı yok";
       return `<button class="plr lt-pl" data-ltp="${p.id}" data-ltn="${esc(p.n)}"><img src="${FACE(p.id)}" alt="" loading="lazy">
         <span class="pi"><b>${esc(p.n)}</b><small>${escA(p.t)}${tw.w+tw.l?` · <span class="lt-wl">takım ${tw.w}-${tw.l}</span>`:""}</small><small class="lt-sm">${sm}</small>${ltWeekTxt(p.t,k)}${injTxt(p.id)}${S.inj?.[p.id]?.s?`<small class="lt-ago">${agoTxt(lastGameAgo(p.id))}</small>`:""}</span>
-        <span class="lt-big">${big.map(([l,v],x)=>`<span class="${x===0?"lt-lead":""}">${f1(v)}<small>${l}</small></span>`).join("") || "<span>–</span>"}</span></button>`; }).join("") || `<p class="muted">Oyuncu bulunamadı.</p>`; };
+        <span class="lt-big${st?.none?" lt-zero":""}">${big.map(([l,v],x)=>`<span class="${x===0?"lt-lead":""}">${f1(v)}<small>${l}</small></span>`).join("") || "<span>–</span>"}</span></button>`; }).join("") || `<p class="muted">Oyuncu bulunamadı.</p>`; };
   $("#ltSearch").oninput=paint; $("#ltList").onclick=e=>{ const b=e.target.closest("[data-ltp]"); if(b) choose(b.dataset.ltp, b.dataset.ltn); };
   paint(); $("#ltSearch").focus(); if(!S.inj) loadInj().then(()=>{ if($("#ltList")) paint(); });
   if(k[0]==="w" && !S.ltWk[k]?.m) ltWeekSched(k).then(()=>{ if($("#ltList")) paint(); });

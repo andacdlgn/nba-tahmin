@@ -1234,3 +1234,4 @@ body.el-mode .b-head,body.el-mode #bHead{box-shadow:inset 0 3px 0 #ff7a1a}
 .lt-wk .wk-g.done{opacity:.75}
 .lt-wk .wk-g.ok{color:var(--win)}.lt-wk .wk-g.no{color:var(--lose)}
 .lt-wk .wk-g.live{outline:1px solid var(--amber)}
+.lt-big.lt-zero span{opacity:.45}.lt-big.lt-zero .lt-lead{color:var(--muted)}
