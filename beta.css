@@ -1229,7 +1229,7 @@ body.el-mode .b-head,body.el-mode #bHead{box-shadow:inset 0 3px 0 #ff7a1a}
 .inj-ago{color:var(--amber-ink,var(--amber));font-weight:700}
 /* Haftanın oyuncusu: takımın bu haftaki rakipleri */
 .lt-wk{display:block;font-size:11.5px;color:var(--muted);margin-top:3px;line-height:1.7}
-.lt-wk b{display:inline;color:var(--ink);font-weight:700;font-size:inherit}
+.lt-wk b,.plr .pi .lt-wk b{display:inline;color:var(--ink);font-weight:700;font-size:inherit}
 .lt-wk .wk-g{display:inline-block;padding:0 6px;border-radius:6px;background:var(--track);color:var(--ink);font-weight:600;white-space:nowrap}
 .lt-wk .wk-g.done{opacity:.75}
 .lt-wk .wk-g.ok{color:var(--win)}.lt-wk .wk-g.no{color:var(--lose)}
