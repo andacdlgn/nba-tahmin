@@ -89,4 +89,31 @@ t("el week key no", ()=>assertFails(setDoc(doc(A,`el_lt/w_${elFut}_alice`),elmv(
 t("el mvp nba-only no", ()=>assertFails(setDoc(doc(B,`el_lt/r_${elFut}_14_bob`),elmv(`r_${elFut}_14`,{uid:"bob"}))));
 t("el mvp hidden before lock", ()=>assertFails(getDoc(doc(B,`el_lt/r_${elFut}_14_alice`))));
 let fail=0; for(const [n,p] of T){ try{ await p(); console.log("OK  ",n); }catch(e){ fail++; console.log("FAIL",n, String(e.message||e).slice(0,160)); } }
+// lockExt: yönetici kilidi uzatır, oyuncu adına tahmin girer
+await env.withSecurityRulesDisabled(async c=>{ const db=c.firestore();
+  await setDoc(doc(db,"config/admin"),{uids:["boss"]}); await setDoc(doc(db,"players/boss"),{name:"Boss", joined:Timestamp.now()});
+  await setDoc(doc(db,"picks/500000002_alice"),{...pick({gameId:"500000002",start:Timestamp.fromDate(new Date(Date.now()-3600e3))}),updatedAt:Timestamp.fromDate(new Date(Date.now()-7200e3))});
+});
+const BOSS=env.authenticatedContext("boss").firestore();
+const pastX=Timestamp.fromDate(new Date(Date.now()-600e3)), soonX=Timestamp.fromDate(new Date(Date.now()+300e3));
+const lpX=(o={})=>pick({gameId:"500000001",start:pastX,...o});
+await (async()=>{
+  const R=[];
+  R.push(["late pick blocked", await assertFails(setDoc(doc(A,"picks/500000001_alice"),lpX())).then(()=>1,()=>0)]);
+  R.push(["player cant ext", await assertFails(setDoc(doc(A,"lockExt/500000001"),{until:soonX,by:"alice",at:serverTimestamp()})).then(()=>1,()=>0)]);
+  R.push(["admin ext ok", await assertSucceeds(setDoc(doc(BOSS,"lockExt/500000001"),{until:soonX,by:"boss",at:serverTimestamp()})).then(()=>1,()=>0)]);
+  R.push(["admin ext too far", await assertFails(setDoc(doc(BOSS,"lockExt/500000009"),{until:Timestamp.fromDate(new Date(Date.now()+5*3600e3)),by:"boss",at:serverTimestamp()})).then(()=>1,()=>0)]);
+  R.push(["ext read unauth", await assertSucceeds(getDoc(doc(U,"lockExt/500000001"))).then(()=>1,()=>0)]);
+  R.push(["late pick ok with ext", await assertSucceeds(setDoc(doc(A,"picks/500000001_alice"),lpX())).then(()=>1,()=>0)]);
+  R.push(["late update ok with ext", await assertSucceeds(setDoc(doc(A,"picks/500000001_alice"),lpX({winner:"BOS"}))).then(()=>1,()=>0)]);
+  R.push(["other game still locked", await assertFails(setDoc(doc(A,"picks/500000003_alice"),lpX({gameId:"500000003"}))).then(()=>1,()=>0)]);
+  R.push(["player cant fake by", await assertFails(setDoc(doc(A,"picks/500000003_alice"),lpX({gameId:"500000003",by:"alice"}))).then(()=>1,()=>0)]);
+  R.push(["admin pick for other ok", await assertSucceeds(setDoc(doc(BOSS,"picks/500000002_alice"),{...pick({gameId:"500000002",start:pastX}),by:"boss"})).then(()=>1,()=>0)]);
+  R.push(["admin pick wrong by", await assertFails(setDoc(doc(BOSS,"picks/500000004_alice"),{...pick({gameId:"500000004",start:pastX}),by:"alice"})).then(()=>1,()=>0)]);
+  R.push(["admin pick bad pid", await assertFails(setDoc(doc(BOSS,"picks/500000005_bob"),{...pick({gameId:"500000005",start:pastX}),by:"boss"})).then(()=>1,()=>0)]);
+  R.push(["non-admin pick for other", await assertFails(setDoc(doc(A,"picks/500000006_bob"),{...pick({uid:"bob",gameId:"500000006"}),by:"alice"})).then(()=>1,()=>0)]);
+  R.push(["admin ext delete ok", await assertSucceeds(deleteDoc(doc(BOSS,"lockExt/500000001"))).then(()=>1,()=>0)]);
+  R.push(["after delete locked", await assertFails(setDoc(doc(A,"picks/500000001_alice"),lpX({winner:"NY"}))).then(()=>1,()=>0)]);
+  for(const [n,ok] of R){ console.log((ok?"ok   ":"FAIL ")+n); if(!ok) fail++; }
+})();
 await env.cleanup(); console.log(fail?fail+" failed":"all passed"); process.exit(fail?1:0);

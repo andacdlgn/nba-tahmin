@@ -31,7 +31,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 IS_EL = os.environ.get("LEAGUE", "nba") == "el"
 DATA = os.path.join(ROOT, "data", "el") if IS_EL else os.path.join(ROOT, "data")
 EL_NS = {"picks", "daily", "progress", "league", "talk", "series", "chat", "chatpin", "chatlim", "typing", "dm",
-         "polls", "lt", "ltResults", "ft", "reports"}   # app.js EL_NS ile aynı
+         "polls", "lt", "ltResults", "ft", "reports", "lockExt"}   # app.js EL_NS ile aynı
 EL_START = "20261117"   # EuroLeague tahmin liginin ilk gecesi (app.js EL_START)
 EL_SEASON_FIRST = "20260924"   # EuroLeague normal sezonunun ilk günü (istatistikler buradan)
 CONFIG = json.load(open(os.path.join(ROOT, "config.json"), encoding="utf-8"))
@@ -973,6 +973,32 @@ def question_answer(day, dgames):
 SERIES_WIN, SERIES_GAMES = 3, 2  # seri kazananı +3, maç sayısı da doğruysa +2
 
 
+LOCK_EXT = None   # yöneticinin uzattığı maç kilitleri: {maçId: until}
+
+
+def lock_ext():
+    global LOCK_EXT
+    if LOCK_EXT is None:
+        try:
+            LOCK_EXT = {k: v.get("until") for k, v in fs_list("lockExt").items() if v.get("until")}
+        except Exception as e:   # okunamazsa uzatma yok sayılır (normal kilit geçerli)
+            print("lockExt okunamadı:", e, file=sys.stderr)
+            LOCK_EXT = {}
+    return LOCK_EXT
+
+
+def pick_valid(pick, gid, start_iso, gap):
+    """Maç tahmini sayılır mı: normal kilitten önce, ya da yöneticinin uzattığı süre içinde, ya da yönetici girdiyse."""
+    if not pick:
+        return False
+    if pick.get("by"):   # kurallar "by" alanını yalnızca yöneticiye yazdırır (teknik sorun yaşayan oyuncu adına)
+        return True
+    if valid_before(pick, start_iso, gap):
+        return True
+    until = lock_ext().get(gid)
+    return bool(until and pick.get("updatedAt") and ts(pick["updatedAt"]) < ts(until))
+
+
 def valid_before(doc, start_iso, gap=LOCK):
     """Tahmin kilitten önce mi kaydedildi? (sunucu saatiyle; kilit = start - gap)"""
     if not doc or not doc.get("updatedAt"):
@@ -1335,7 +1361,7 @@ def main(full=False):
             for g in dgames:
                 pick = fs_doc(f"picks/{g['id']}_{uid}")
                 # kilit = ESPN'deki gerçek saat (sitenin yazdığı değere güvenilmez): 4 Kasım'dan itibaren maçın kendisi, öncesinde gecenin ilk maçı
-                if not valid_before(pick, g["start"] if day >= PERGAME_FROM else first_start, lock_gap(day)) or not (pick.get("winner") and pick.get("margin") and pick.get("scorerId")):
+                if not pick_valid(pick, g["id"], g["start"] if day >= PERGAME_FROM else first_start, lock_gap(day)) or not (pick.get("winner") and pick.get("margin") and pick.get("scorerId")):
                     pick = None
                 top_ids = {t["id"] for t in g["top"]}
                 r = score_game(g, pick, conf_game == g["id"], top_ids)

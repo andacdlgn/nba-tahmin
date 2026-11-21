@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parent.parent
 RULES = ROOT / "firestore.rules"
 # app.js'teki EL_NS ile aynı olmalı
 EL_NS = ["picks", "daily", "progress", "league", "talk", "series", "chat", "chatpin", "chatlim", "typing", "dm",
-         "polls", "lt", "ltResults", "ft", "reports"]
+         "polls", "lt", "ltResults", "ft", "reports", "lockExt"]
 BEGIN = "    // ---- EuroLeague (otomatik üretildi: scripts/elrules.py; elle değiştirme) ----"
 END = "    // ---- EuroLeague sonu ----"
 
@@ -37,7 +37,7 @@ def el_block(b):
         b = b.replace(f"documents/{n}/", f"documents/el_{n}/")
     b = re.sub(r"^(\s*)match /(\w+)/", lambda m: f"{m.group(1)}match /el_{m.group(2)}/", b, count=1)
     b = b.replace("documents/players/", "documents/elPlayers/")
-    b = b.replace("isPlayer()", "isElPlayer()").replace("dmPath(", "elDmPath(").replace("pollPath(", "elPollPath(")
+    b = b.replace("isPlayer()", "isElPlayer()").replace("dmPath(", "elDmPath(").replace("pollPath(", "elPollPath(").replace("extOpen(", "elExtOpen(")
     if "match /el_lt/" in b:   # EuroLeague uzun vadesi: turun MVP'si r_<ilk maç günü>_<tur> ve ayın MVP'si m_<yyyymm>
         b = b.replace("ltLock(", "elLtLock(").replace("'^(w_[0-9]{8}|m_[0-9]{6}|c_2026|k_2027|s_2027)$'", "'^(r_[0-9]{8}_[0-9]{1,2}|m_[0-9]{6})$'")
     return b
@@ -49,6 +49,7 @@ def generate(text):
            "    function isElPlayer() { return signedIn() && exists(/databases/$(database)/documents/elPlayers/$(request.auth.uid)); }",
            "    function elDmPath(pid) { return /databases/$(database)/documents/el_dm/$(pid); }",
            "    function elPollPath(pid) { return /databases/$(database)/documents/el_polls/$(pid); }",
+           "    function elExtOpen(gid) { return exists(/databases/$(database)/documents/el_lockExt/$(gid)) && request.time < get(/databases/$(database)/documents/el_lockExt/$(gid)).data.until; }",
            "    // kilit 15.50 UTC (18.50 TR): turun ilk maç günü ya da ayın ilk günü (EuroLeague maçları en erken 16.00 UTC)",
            "    function elLtLock(k) { return timestamp.date(int(k[2:6]), int(k[6:8]), k[0] == 'r' ? int(k[8:10]) : 1) + duration.value(950, 'm'); }"]
     for n in EL_NS:

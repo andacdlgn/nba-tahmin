@@ -17,6 +17,15 @@ service cloud.firestore {
     // Tahminler kilit saatinde (start'tan 10 dk önce) kapanır ve o an herkese açılır. Site "start" alanına
     // maçın kendi saatini (günlük seçimlerde gecenin ilk maçını) yazar; puanlama betiği bunu ESPN'den ayrıca doğrular.
     function lockAt(t) { return t - duration.value(10, 'm'); }
+    // Yönetici bir maçın kilidini uzatabilir: lockExt/{maçId}.until anına kadar tahmin açık
+    function extOpen(gid) {
+      return exists(/databases/$(database)/documents/lockExt/$(gid))
+        && request.time < get(/databases/$(database)/documents/lockExt/$(gid)).data.until;
+    }
+    function validMargin(m) {
+      return m in ['1-5', '6-10', '11-15', '16+', '1-3', '4-7', '8-12', '13-19', '20+']
+        || (m is string && m.matches('^([1-9]|[1-3][0-9]|40)$'));
+    }
     // Yönetici: config/admin belgesindeki uids listesinde olanlar (Firebase konsolundan eklenir)
     function isAdmin() {
       return signedIn() && exists(/databases/$(database)/documents/config/admin)
@@ -194,6 +203,17 @@ service cloud.firestore {
         && str(request.resource.data.name, 40) && request.resource.data.joined is timestamp;
     }
 
+    // lockExt/{maçId}: yöneticinin uzattığı maç kilidi (en fazla 3 saat ileri)
+    match /lockExt/{gid} {
+      allow read: if true;
+      allow create, update: if isAdmin() && numId(gid)
+        && request.resource.data.keys().hasOnly(['until', 'by', 'at'])
+        && request.resource.data.until is timestamp
+        && request.resource.data.until < request.time + duration.value(3, 'h')
+        && request.resource.data.by == request.auth.uid;
+      allow delete: if isAdmin();
+    }
+
     // picks/{maçId}_{uid}
     match /picks/{pid} {
       // Olmayan belgeyi okumak serbest (bilgi sızdırmaz); var olan belge sahibine
@@ -215,13 +235,25 @@ service cloud.firestore {
               || (d.margin is string && d.margin.matches('^([1-9]|[1-3][0-9]|40)$')))
           && numId(d.scorerId) && str(d.scorerName, 60)
           && d.updatedAt == request.time
-          && request.time < lockAt(d.start);
+          && (request.time < lockAt(d.start) || extOpen(d.gameId));
       }
-      allow create: if isPlayer() && validPick();
-      allow update: if isPlayer() && validPick()
+      // Yönetici, teknik sorun yaşayan oyuncu adına (kilitten sonra da) tahmin girebilir; belgeye "by" yazılır
+      function adminPick() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['uid', 'gameId', 'day', 'start', 'winner', 'margin', 'scorerId', 'scorerName', 'updatedAt', 'by'])
+          && d.by == request.auth.uid && d.uid is string && d.uid.size() > 0 && d.uid.size() <= 128
+          && pid == d.gameId + '_' + d.uid
+          && numId(d.gameId) && str(d.day, 8) && d.start is timestamp
+          && teamAbbr(d.winner) && validMargin(d.margin)
+          && numId(d.scorerId) && str(d.scorerName, 60)
+          && d.updatedAt == request.time;
+      }
+      allow create: if (isPlayer() && validPick()) || (isAdmin() && adminPick());
+      allow update: if (isPlayer() && validPick()
         && resource.data.uid == request.auth.uid
         && request.resource.data.start == resource.data.start
-        && request.time < lockAt(resource.data.start);
+        && (request.time < lockAt(resource.data.start) || extOpen(resource.data.gameId)))
+        || (isAdmin() && adminPick());
       allow delete: if false;
     }
 
@@ -613,6 +645,7 @@ service cloud.firestore {
     function isElPlayer() { return signedIn() && exists(/databases/$(database)/documents/elPlayers/$(request.auth.uid)); }
     function elDmPath(pid) { return /databases/$(database)/documents/el_dm/$(pid); }
     function elPollPath(pid) { return /databases/$(database)/documents/el_polls/$(pid); }
+    function elExtOpen(gid) { return exists(/databases/$(database)/documents/el_lockExt/$(gid)) && request.time < get(/databases/$(database)/documents/el_lockExt/$(gid)).data.until; }
     // kilit 15.50 UTC (18.50 TR): turun ilk maç günü ya da ayın ilk günü (EuroLeague maçları en erken 16.00 UTC)
     function elLtLock(k) { return timestamp.date(int(k[2:6]), int(k[6:8]), k[0] == 'r' ? int(k[8:10]) : 1) + duration.value(950, 'm'); }
     match /el_picks/{pid} {
@@ -635,13 +668,25 @@ service cloud.firestore {
               || (d.margin is string && d.margin.matches('^([1-9]|[1-3][0-9]|40)$')))
           && numId(d.scorerId) && str(d.scorerName, 60)
           && d.updatedAt == request.time
-          && request.time < lockAt(d.start);
+          && (request.time < lockAt(d.start) || elExtOpen(d.gameId));
       }
-      allow create: if isElPlayer() && validPick();
-      allow update: if isElPlayer() && validPick()
+      // Yönetici, teknik sorun yaşayan oyuncu adına (kilitten sonra da) tahmin girebilir; belgeye "by" yazılır
+      function adminPick() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['uid', 'gameId', 'day', 'start', 'winner', 'margin', 'scorerId', 'scorerName', 'updatedAt', 'by'])
+          && d.by == request.auth.uid && d.uid is string && d.uid.size() > 0 && d.uid.size() <= 128
+          && pid == d.gameId + '_' + d.uid
+          && numId(d.gameId) && str(d.day, 8) && d.start is timestamp
+          && teamAbbr(d.winner) && validMargin(d.margin)
+          && numId(d.scorerId) && str(d.scorerName, 60)
+          && d.updatedAt == request.time;
+      }
+      allow create: if (isElPlayer() && validPick()) || (isAdmin() && adminPick());
+      allow update: if (isElPlayer() && validPick()
         && resource.data.uid == request.auth.uid
         && request.resource.data.start == resource.data.start
-        && request.time < lockAt(resource.data.start);
+        && (request.time < lockAt(resource.data.start) || elExtOpen(resource.data.gameId)))
+        || (isAdmin() && adminPick());
       allow delete: if false;
     }
     match /el_daily/{did} {
@@ -890,6 +935,15 @@ service cloud.firestore {
         && request.resource.data.uid == request.auth.uid
         && str(request.resource.data.text, 1000)
         && request.resource.data.at == request.time;
+    }
+    match /el_lockExt/{gid} {
+      allow read: if true;
+      allow create, update: if isAdmin() && numId(gid)
+        && request.resource.data.keys().hasOnly(['until', 'by', 'at'])
+        && request.resource.data.until is timestamp
+        && request.resource.data.until < request.time + duration.value(3, 'h')
+        && request.resource.data.by == request.auth.uid;
+      allow delete: if isAdmin();
     }
     // ---- EuroLeague sonu ----
   }

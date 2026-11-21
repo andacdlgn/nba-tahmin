@@ -22,7 +22,7 @@ const Q = new URLSearchParams(location.search);
    - tarayıcıda saklanan ayarlar "el:" önekiyle ayrılır. */
 const IS_EL = Q.get("lg")==="el";
 const LG = IS_EL ? "el" : "nba";
-const EL_NS = new Set(["picks","daily","progress","league","talk","series","chat","chatpin","chatlim","typing","dm","polls","lt","ltResults","ft","reports"]);
+const EL_NS = new Set(["picks","daily","progress","league","talk","series","chat","chatpin","chatlim","typing","dm","polls","lt","ltResults","ft","reports","lockExt"]);
 const nsName = n => IS_EL && EL_NS.has(n) ? "el_"+n : n;
 const nsPath = p => { const [h,...t]=String(p).split("/"); return [nsName(h),...t].join("/"); };
 // Firestore yollarını lige göre çevir: doc(db,"picks",id) EuroLeague'de el_picks/id olur. İlk argüman bir koleksiyon/
@@ -347,7 +347,8 @@ const weekKey = s => { const d = parseYmd(s); const w = (d.getUTCDay()+6)%7; d.s
 // seçimi o an açılır). Banko, günün oyuncusu ve gecenin sorusu gecenin ilk maçından 10 dk önce kilitlenir.
 // g.lock = bu maçın kilidi, g.nightLock = gecenin kilidi, g.lockBase = Firestore'a yazılan "start" (kural 10 dk düşer).
 const LOCK_GAP = 10*6e4, PERGAME_FROM = Date.UTC(2026,10,4,12), GAP_FROM = Date.UTC(2026,10,3,12);
-const started = g => g.state !== "pre" || Date.now() >= g.lock.getTime();
+// Yönetici bir maçın kilidini uzatabilir (lockExt/{maçId}.until): o süre dolana kadar maç başlamış olsa da tahmin açık
+const started = g => (g.extUntil && Date.now() < g.extUntil) ? false : (g.state !== "pre" || Date.now() >= g.lock.getTime());
 // NBA Kupası maçları 4 Kasım gecesinden itibaren 2 kat puan (playoff da 2 kat)
 const CUP2X_FROM = "20261104";
 const multOf = g => g.seasonType===3 ? 2 : (g.cup && (g.day ? g.day>=CUP2X_FROM : g.start>=PERGAME_FROM)) ? 2 : 1;
@@ -517,7 +518,7 @@ function parseGames(raw){
   if(list.length){
     const first = Math.min(...list.map(g=>g.start.getTime())), gap = first>=GAP_FROM ? LOCK_GAP : 0, per = first>=PERGAME_FROM;
     list.forEach(g => { g.nightLock = new Date(first-gap); g.lock = per ? new Date(g.start.getTime()-gap) : g.nightLock;
-      g.lockBase = per ? g.start : new Date(first); g.nightBase = new Date(first); g.perGame = per; });
+      g.lockBase = per ? g.start : new Date(first); g.nightBase = new Date(first); g.perGame = per; g.extUntil = S.lockExt?.[g.id] || 0; });
   }
   return list;
 }
@@ -6317,6 +6318,63 @@ function confirmBtn(btn, label, fn){
   const old=btn.textContent; btn.dataset.armed="1"; btn.textContent=label; btn.classList.add("armed");
   btn._t=setTimeout(()=>{ delete btn.dataset.armed; btn.textContent=old; btn.classList.remove("armed"); }, 4000);
 }
+// ---- Maç kilidini uzatma ve oyuncu adına geç tahmin (yönetici) ----
+function watchLockExt(){
+  if(S.extUn || !S.db) return;
+  S.extUn = onSnapshot(collection(S.db,"lockExt"), snap=>{
+    S.lockExt={}; snap.forEach(d=>{ const u=d.data().until?.toMillis?.(); if(u) S.lockExt[d.id]=u; });
+    for(const D of Object.values(S.days||{})) for(const g of D?.games||[]) g.extUntil = S.lockExt[g.id] || 0;
+    try{ render(); if(BETA.on) betaRender(); }catch(e){}
+    clearTimeout(S.extT); const nx=Math.min(...Object.values(S.lockExt).filter(u=>u>Date.now()), Infinity);
+    if(nx<Infinity) S.extT=setTimeout(()=>{ try{ render(); if(BETA.on) betaRender(); }catch(e){} }, nx-Date.now()+500);
+  }, ()=>{});
+}
+function admLockGames(){ const out=[];
+  for(const d of [...new Set([S.today, S.day, shiftDay(S.today,-1)])]) for(const g of S.days[d]?.games||[]) out.push([d,g]);
+  return out; }
+async function paintAdmLock(){
+  const box=$("#admLock"); if(!box) return; const gs=admLockGames();
+  if(!gs.length){ box.innerHTML=`<h4>Maç kilidi ve geç tahmin</h4><p class="muted">Yüklü gecede maç yok.</p>`; return; }
+  const sel=S.admG && gs.find(([,g])=>g.id===S.admG) ? S.admG : (gs.find(([,g])=>!started(g)) || gs[gs.length-1])[1].id;
+  S.admG=sel; const [day,g]=gs.find(([,x])=>x.id===sel);
+  const ext=S.lockExt?.[g.id], extOn=ext && ext>Date.now();
+  box.innerHTML=`<h4>Maç kilidi ve geç tahmin</h4>
+    <p class="muted" style="margin:0 0 8px">Teknik sorun olursa bir maçın kilidini birkaç dakika açabilir ya da oyuncu adına tahmin girebilirsin. Sürüm değişmez, herkese duyuru gitmez.</p>
+    <select id="admG" class="adm-in">${gs.map(([d,x])=>`<option value="${x.id}"${x.id===sel?" selected":""}>${dayNice(d,{day:"numeric",month:"short"})} · ${esc(x.away.abbr)} @ ${esc(x.home.abbr)} · ${timeTR(x.start)}${S.lockExt?.[x.id]>Date.now()?" · açık":""}</option>`).join("")}</select>
+    <p class="muted" style="margin:6px 0">${extOn?`Kilit uzatıldı: <b>${timeTR(new Date(ext))}</b>'e kadar tahmin açık.`:`Normal kilit ${timeTR(g.lock)}.`}</p>
+    <div class="adm-row"><select id="admExtN" class="adm-in" style="width:auto">${[3,5,10,15,30].map(n=>`<option value="${n}"${n===5?" selected":""}>Şu andan ${n} dk</option>`).join("")}</select>
+      <button class="btn" id="admExtGo" type="button">Kilidi aç</button>${ext?`<button class="btn danger" id="admExtOff" type="button">Kapat</button>`:""}</div>
+    <small class="muted" id="admExtMsg">Açıkken oyuncular bu maça (başlamış olsa da) tahmin girebilir ve değiştirebilir; süre dolunca kendiliğinden kilitlenir.</small>
+    <h4 style="margin-top:14px">Oyuncu adına tahmin</h4>
+    <select id="admPU" class="adm-in">${S.order.map(u=>`<option value="${u}">${esc(pname(u))}</option>`).join("")}</select>
+    <div class="adm-row" style="margin-top:8px"><select id="admPW" class="adm-in"><option value="${esc(g.away.abbr)}">${esc(g.away.abbr)} kazanır</option><option value="${esc(g.home.abbr)}">${esc(g.home.abbr)} kazanır</option></select>
+      <input id="admPM" class="adm-in" type="number" min="1" max="40" inputmode="numeric" placeholder="Fark (1-40)" style="width:8em"></div>
+    <select id="admPS" class="adm-in" style="margin-top:8px"><option value="">Skorer yükleniyor…</option></select>
+    <button class="btn" id="admPGo" type="button" style="margin-top:8px;width:100%">Tahmini kaydet</button>
+    <small class="muted" id="admPMsg">Kilitten sonra girilse de sayılır; puan bir sonraki güncellemede (en geç 1 saat) hesaplanır. Oyuncunun eski tahmini varsa üstüne yazılır.</small>`;
+  $("#admG").onchange=e=>{ S.admG=e.target.value; paintAdmLock(); };
+  $("#admExtGo").onclick=async()=>{ const n=+$("#admExtN").value;
+    try{ await setDoc(doc(S.db,"lockExt",g.id), {until:Timestamp.fromMillis(Date.now()+n*6e4), by:S.uid, at:serverTimestamp()}); toast(`${g.away.abbr}-${g.home.abbr} ${n} dk açık.`); paintAdmLock(); }
+    catch(e){ $("#admExtMsg").textContent="Açılamadı: "+(e.code||e.message||"hata"); } };
+  $("#admExtOff")?.addEventListener("click", async()=>{ try{ await deleteDoc(doc(S.db,"lockExt",g.id)); toast("Uzatma kaldırıldı."); paintAdmLock(); }catch(e){ $("#admExtMsg").textContent="Kaldırılamadı."; } });
+  // skorer listesi: iki takımın kadrosu
+  Promise.all([loadRoster(g.away).catch(()=>[]), loadRoster(g.home).catch(()=>[])]).then(([a,h])=>{ const ps=$("#admPS"); if(!ps) return;
+    ps.innerHTML=`<option value="">Skorer seç</option>`+[...a,...h].map(p=>`<option value="${esc(p.id)}" data-n="${esc(p.name)}">${esc(p.team)} · ${esc(p.name)}</option>`).join(""); fillAdm(); });
+  const fillAdm=async()=>{ const u=$("#admPU")?.value; if(!u) return;
+    let p=null; try{ const r=await getDoc(doc(S.db,"picks",`${g.id}_${u}`)); p=r.exists()?r.data():null; }catch(e){}
+    if(!$("#admPW")) return; S.admPrev=p;
+    if(p){ $("#admPW").value=p.winner; $("#admPM").value=p.margin; if(p.scorerId) $("#admPS").value=p.scorerId; $("#admPMsg").textContent=`Mevcut tahmini: ${p.winner} ${p.margin} fark, ${p.scorerName||"skorer yok"}${p.by?" (yönetici girdi)":""}.`; }
+    else { $("#admPM").value=""; $("#admPMsg").textContent="Bu maça kayıtlı tahmini yok (ya da kilitlenmeden görünmüyor)."; } };
+  $("#admPU").onchange=fillAdm;
+  $("#admPGo").onclick=async()=>{ const u=$("#admPU").value, w=$("#admPW").value, m=parseInt($("#admPM").value,10), o=$("#admPS").selectedOptions[0];
+    if(!(m>=1 && m<=40)) return void($("#admPMsg").textContent="Farkı 1 ile 40 arasında yaz.");
+    if(!o?.value) return void($("#admPMsg").textContent="Skoreri seç.");
+    const prev=S.admPrev?.uid===u && S.admPrev?.gameId===g.id ? S.admPrev : null;
+    const data={uid:u, gameId:g.id, day, start:prev?.start || Timestamp.fromDate(g.lockBase), winner:w, margin:String(m), scorerId:o.value, scorerName:o.dataset.n.slice(0,60), updatedAt:serverTimestamp(), by:S.uid};
+    try{ await setDoc(doc(S.db,"picks",`${g.id}_${u}`), data); $("#admPMsg").textContent=`Kaydedildi: ${pname(u)} · ${w} ${m} fark · ${o.dataset.n}.`; toast("Tahmin kaydedildi.");
+      const D=S.days[day]; if(D?.picks){ (D.picks[g.id] ||= {})[u]={...data, updatedAt:Timestamp.now(), _locked:started(g)}; } }
+    catch(e){ $("#admPMsg").textContent="Kaydedilemedi: "+(e.code||e.message||"hata"); } };
+}
 async function openAdmin(){
   S.sheetLocked=false;
   openSheet(`<h3 id="shTitle">Yönetim paneli</h3><p class="muted">Bu bölümü yalnızca sen görüyorsun.</p><button class="btn" id="admBeta" type="button" style="width:100%;margin:4px 0 10px">Yeni görünüm (kapalı beta): <b>${betaAllowed()?"Açık":"Kapalı"}</b> · ${betaAllowed()?"kapat":"aç"}</button><div id="adm"><p class="muted">Yükleniyor…</p></div>`);
@@ -6366,6 +6424,7 @@ async function openAdmin(){
       <small class="muted" id="admInvMsg">Yeni oyuncular bu kodla katılır. Kodu değiştirince eski kod ve eski link çalışmaz.</small>
       <button class="btn" id="admLink" type="button" style="margin-top:8px">${ICON.link}Davet linkini paylaş</button></div>
     <div class="pf-sec"><h4>Uzun vade</h4><button class="btn" id="admLT" type="button">${ICON.medal}Sonuçları gir</button></div>
+    <div class="pf-sec" id="admLock"></div>
     <div class="pf-sec"><h4>Duyuru</h4><small class="muted" style="margin:0 0 8px">Sitenin üstünde herkese görünür. Kapatan bir daha görmez; yeni duyuru yine çıkar.</small>
       <textarea id="admNotice" class="adm-in" rows="2" maxlength="200" placeholder="Ör. Yeni oyuncu: Zeki 👋">${esc(S.notice?.text||"")}</textarea>
       <label class="adm-row" style="margin-top:8px;gap:8px;align-items:center"><small class="muted">Görünme süresi</small><select id="admNoticeDays" class="adm-in" style="width:auto">${[[1,"1 gün"],[2,"2 gün"],[3,"3 gün"],[7,"1 hafta"],[30,"1 ay"]].map(([v,l])=>`<option value="${v}" ${v===2?"selected":""}>${l}</option>`).join("")}</select></label>
@@ -6373,6 +6432,7 @@ async function openAdmin(){
       <div class="adm-row" style="margin-top:8px"><button class="btn" id="admNoticeSave" type="button">Yayınla</button>${S.notice?.text?'<button class="btn danger" id="admNoticeDel" type="button">Kaldır</button>':""}</div>
       <small class="muted" id="admNoticeMsg"></small></div>`;
   $("#admLT")?.addEventListener("click", ()=>allPlayers().catch(()=>{}).then(openLTAdmin));
+  paintAdmLock();
   $("#admStart").onchange=()=>$("#admDate").classList.toggle("hide", $("#admStart").value!=="custom");
   $("#admTrialOn").onchange=()=>$("#admTrialEnd").classList.toggle("hide", !$("#admTrialOn").checked);
   $("#admPurge").onclick=async()=>{
@@ -6528,7 +6588,7 @@ if("serviceWorker" in navigator){ navigator.serviceWorker.getRegistrations?.().t
     route(); showDay(); Promise.resolve(refresh()).catch(()=>{}).finally(()=>dispatchEvent(new Event("app-ready")));
     if(S.onboard){ if(S.joinP) await S.joinP.catch(()=>{}); await loadPlayers().catch(()=>{}); allPlayers().catch(()=>{}).finally(()=>openOnboard(4)); }
     else if(!IS_EL) checkRecovery();
-    loadLT(); setTimeout(installBanner, 6000); later(markSeen, 3000);
+    loadLT(); setTimeout(installBanner, 6000); later(markSeen, 3000); watchLockExt();
     // bilgilendirme pencereleri sıraya girer; açılıştan ~3 sn sonra en önemlisi (varsa) bir tane açılır
     if(IS_EL) setTimeout(maybeNews, 600); else setTimeout(()=>{ maybeNews(); maybeCeremony(); markVisit(); maybePoll(); maybeLeaguePop(); maybeWeekPop(); maybeSelfPlay(); maybeScoringGuide(); maybeInvitePop(); maybeInstallPop(); maybeAskAuto(); maybeRealName(); }, 600);
     later(()=>{ getDoc(doc(S.db,"config","admin")).then(()=>{ S.isAdmin=true; maybeArchiveTrial(); if(BETA.on) betaRender(); }).catch(e=>{ S.isAdmin=false; if(IS_EL && !EL_OPEN){ location.replace(location.pathname+"#bugece"); return; } if(BETA.on && EL_TABS.includes(S.tab)) betaRender(); });   // kapalı beta: EuroLeague modu yalnızca yöneticide
