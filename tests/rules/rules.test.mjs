@@ -114,6 +114,18 @@ await (async()=>{
   R.push(["non-admin pick for other", await assertFails(setDoc(doc(A,"picks/500000006_bob"),{...pick({uid:"bob",gameId:"500000006"}),by:"alice"})).then(()=>1,()=>0)]);
   R.push(["admin ext delete ok", await assertSucceeds(deleteDoc(doc(BOSS,"lockExt/500000001"))).then(()=>1,()=>0)]);
   R.push(["after delete locked", await assertFails(setDoc(doc(A,"picks/500000001_alice"),lpX({winner:"NY"}))).then(()=>1,()=>0)]);
+  // gecenin seçimleri: uzatma ve yönetici girişi
+  const fs0=Timestamp.fromDate(new Date(Date.now()-600e3)), dd=(o={})=>({uid:"alice",day:"20261122",firstStart:fs0,q:"y",qAt:serverTimestamp(),...o});
+  R.push(["daily late blocked", await assertFails(setDoc(doc(A,"daily/20261122_alice"),dd())).then(()=>1,()=>0)]);
+  R.push(["admin night ext ok", await assertSucceeds(setDoc(doc(BOSS,"lockExt/20261122"),{until:soonX,by:"boss",at:serverTimestamp()})).then(()=>1,()=>0)]);
+  R.push(["daily q ok with ext", await assertSucceeds(setDoc(doc(A,"daily/20261122_alice"),dd())).then(()=>1,()=>0)]);
+  R.push(["daily dp ok with ext", await assertSucceeds(setDoc(doc(A,"daily/20261122_alice"),{...dd(),q:"y",dayPlayerId:"3934672",dayPlayerName:"J",dayAt:serverTimestamp()})).then(()=>1,()=>0)]);
+  R.push(["daily banko ok with ext", await assertSucceeds(setDoc(doc(A,"daily/20261122_alice"),{...dd(),dayPlayerId:"3934672",dayPlayerName:"J",dayAt:serverTimestamp(),confGame:"500000001",confStart:fs0,confAt:serverTimestamp()})).then(()=>1,()=>0)]);
+  R.push(["other night still locked", await assertFails(setDoc(doc(A,"daily/20261121_alice"),dd({day:"20261121"}))).then(()=>1,()=>0)]);
+  R.push(["admin daily for other ok", await assertSucceeds(setDoc(doc(BOSS,"daily/20261121_alice"),{...dd({day:"20261121"}),by:"boss",confGame:"500000001",confStart:fs0,confAt:serverTimestamp()})).then(()=>1,()=>0)]);
+  R.push(["player cant fake daily by", await assertFails(setDoc(doc(A,"daily/20261120_alice"),{...dd({day:"20261120"}),by:"alice"})).then(()=>1,()=>0)]);
+  R.push(["non-admin daily for other", await assertFails(setDoc(doc(A,"daily/20261120_bob"),{...dd({day:"20261120",uid:"bob"}),by:"alice"})).then(()=>1,()=>0)]);
+  R.push(["admin daily bad q", await assertFails(setDoc(doc(BOSS,"daily/20261119_alice"),{...dd({day:"20261119",q:"x"}),by:"boss"})).then(()=>1,()=>0)]);
   for(const [n,ok] of R){ console.log((ok?"ok   ":"FAIL ")+n); if(!ok) fail++; }
 })();
 await env.cleanup(); console.log(fail?fail+" failed":"all passed"); process.exit(fail?1:0);

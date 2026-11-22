@@ -274,9 +274,9 @@ service cloud.firestore {
         let d = request.resource.data;
         return !('confGame' in d) || (
           (old != null && 'confGame' in old && d.confGame == old.confGame && d.confAt == old.confAt && d.confStart == old.confStart)
-          || (numId(d.confGame) && d.confStart is timestamp && request.time < lockAt(d.confStart)
+          || (numId(d.confGame) && d.confStart is timestamp && (request.time < lockAt(d.confStart) || extOpen(d.day))
               && d.confAt == request.time
-              && (old == null || !('confStart' in old) || request.time < lockAt(old.confStart)))
+              && (old == null || !('confStart' in old) || request.time < lockAt(old.confStart) || extOpen(d.day)))
         );
       }
       function dayOk(old) {
@@ -284,7 +284,7 @@ service cloud.firestore {
         return !('dayPlayerId' in d) || (
           (old != null && 'dayPlayerId' in old && d.dayPlayerId == old.dayPlayerId && d.dayAt == old.dayAt)
           || (numId(d.dayPlayerId) && str(d.dayPlayerName, 60)
-              && d.dayAt == request.time && request.time < lockAt(d.firstStart))
+              && d.dayAt == request.time && (request.time < lockAt(d.firstStart) || extOpen(d.day)))
         );
       }
       // gecenin sorusu: evet (y) / hayır (n), ilk maça kadar değiştirilebilir
@@ -292,14 +292,25 @@ service cloud.firestore {
         let d = request.resource.data;
         return !('q' in d) || (
           (old != null && 'q' in old && d.q == old.q && d.qAt == old.qAt)
-          || (d.q in ['y', 'n'] && d.qAt == request.time && request.time < lockAt(d.firstStart))
+          || (d.q in ['y', 'n'] && d.qAt == request.time && (request.time < lockAt(d.firstStart) || extOpen(d.day)))
         );
       }
-      allow create: if isPlayer() && baseOk() && confOk(null) && dayOk(null) && qOk(null);
-      allow update: if isPlayer() && baseOk()
+      // Yönetici, teknik sorun yaşayan oyuncu adına (kilitten sonra da) gecenin seçimlerini girebilir; belgeye "by" yazılır
+      function adminDaily() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['uid', 'day', 'firstStart', 'confGame', 'confStart', 'confAt', 'dayPlayerId', 'dayPlayerName', 'dayAt', 'q', 'qAt', 'by'])
+          && d.by == request.auth.uid && d.uid is string && d.uid.size() > 0 && d.uid.size() <= 128
+          && did == d.day + '_' + d.uid && str(d.day, 8) && d.firstStart is timestamp
+          && (!('confGame' in d) || (numId(d.confGame) && d.confStart is timestamp && d.confAt is timestamp))
+          && (!('dayPlayerId' in d) || (numId(d.dayPlayerId) && str(d.dayPlayerName, 60) && d.dayAt is timestamp))
+          && (!('q' in d) || (d.q in ['y', 'n'] && d.qAt is timestamp));
+      }
+      allow create: if (isPlayer() && baseOk() && confOk(null) && dayOk(null) && qOk(null)) || (isAdmin() && adminDaily());
+      allow update: if (isPlayer() && baseOk()
         && resource.data.uid == request.auth.uid
         && request.resource.data.firstStart == resource.data.firstStart
-        && confOk(resource.data) && dayOk(resource.data) && qOk(resource.data);
+        && confOk(resource.data) && dayOk(resource.data) && qOk(resource.data))
+        || (isAdmin() && adminDaily());
       allow delete: if false;
     }
 
@@ -705,9 +716,9 @@ service cloud.firestore {
         let d = request.resource.data;
         return !('confGame' in d) || (
           (old != null && 'confGame' in old && d.confGame == old.confGame && d.confAt == old.confAt && d.confStart == old.confStart)
-          || (numId(d.confGame) && d.confStart is timestamp && request.time < lockAt(d.confStart)
+          || (numId(d.confGame) && d.confStart is timestamp && (request.time < lockAt(d.confStart) || elExtOpen(d.day))
               && d.confAt == request.time
-              && (old == null || !('confStart' in old) || request.time < lockAt(old.confStart)))
+              && (old == null || !('confStart' in old) || request.time < lockAt(old.confStart) || elExtOpen(d.day)))
         );
       }
       function dayOk(old) {
@@ -715,7 +726,7 @@ service cloud.firestore {
         return !('dayPlayerId' in d) || (
           (old != null && 'dayPlayerId' in old && d.dayPlayerId == old.dayPlayerId && d.dayAt == old.dayAt)
           || (numId(d.dayPlayerId) && str(d.dayPlayerName, 60)
-              && d.dayAt == request.time && request.time < lockAt(d.firstStart))
+              && d.dayAt == request.time && (request.time < lockAt(d.firstStart) || elExtOpen(d.day)))
         );
       }
       // gecenin sorusu: evet (y) / hayır (n), ilk maça kadar değiştirilebilir
@@ -723,14 +734,25 @@ service cloud.firestore {
         let d = request.resource.data;
         return !('q' in d) || (
           (old != null && 'q' in old && d.q == old.q && d.qAt == old.qAt)
-          || (d.q in ['y', 'n'] && d.qAt == request.time && request.time < lockAt(d.firstStart))
+          || (d.q in ['y', 'n'] && d.qAt == request.time && (request.time < lockAt(d.firstStart) || elExtOpen(d.day)))
         );
       }
-      allow create: if isElPlayer() && baseOk() && confOk(null) && dayOk(null) && qOk(null);
-      allow update: if isElPlayer() && baseOk()
+      // Yönetici, teknik sorun yaşayan oyuncu adına (kilitten sonra da) gecenin seçimlerini girebilir; belgeye "by" yazılır
+      function adminDaily() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['uid', 'day', 'firstStart', 'confGame', 'confStart', 'confAt', 'dayPlayerId', 'dayPlayerName', 'dayAt', 'q', 'qAt', 'by'])
+          && d.by == request.auth.uid && d.uid is string && d.uid.size() > 0 && d.uid.size() <= 128
+          && did == d.day + '_' + d.uid && str(d.day, 8) && d.firstStart is timestamp
+          && (!('confGame' in d) || (numId(d.confGame) && d.confStart is timestamp && d.confAt is timestamp))
+          && (!('dayPlayerId' in d) || (numId(d.dayPlayerId) && str(d.dayPlayerName, 60) && d.dayAt is timestamp))
+          && (!('q' in d) || (d.q in ['y', 'n'] && d.qAt is timestamp));
+      }
+      allow create: if (isElPlayer() && baseOk() && confOk(null) && dayOk(null) && qOk(null)) || (isAdmin() && adminDaily());
+      allow update: if (isElPlayer() && baseOk()
         && resource.data.uid == request.auth.uid
         && request.resource.data.firstStart == resource.data.firstStart
-        && confOk(resource.data) && dayOk(resource.data) && qOk(resource.data);
+        && confOk(resource.data) && dayOk(resource.data) && qOk(resource.data))
+        || (isAdmin() && adminDaily());
       allow delete: if false;
     }
     match /el_progress/{did} {

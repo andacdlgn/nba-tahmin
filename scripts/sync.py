@@ -999,6 +999,20 @@ def pick_valid(pick, gid, start_iso, gap):
     return bool(until and pick.get("updatedAt") and ts(pick["updatedAt"]) < ts(until))
 
 
+def daily_ok(daily, at_key, first_start, gap, day):
+    """Gecenin seçimi (banko/günün oyuncusu/soru) sayılır mı: gecenin kilidinden önce, yöneticinin uzattığı
+    süre içinde (lockExt/{gün}) ya da yönetici girdiyse."""
+    if not daily or not daily.get(at_key):
+        return False
+    if daily.get("by"):
+        return True
+    at = ts(daily[at_key])
+    if at < ts(first_start) - gap:
+        return True
+    until = lock_ext().get(day)
+    return bool(until and at < ts(until))
+
+
 def valid_before(doc, start_iso, gap=LOCK):
     """Tahmin kilitten önce mi kaydedildi? (sunucu saatiyle; kilit = start - gap)"""
     if not doc or not doc.get("updatedAt"):
@@ -1342,17 +1356,17 @@ def main(full=False):
             conf_game = None
             if daily and daily.get("confGame") and daily.get("confAt"):
                 cg = next((g for g in dgames if g["id"] == daily["confGame"]), None)
-                if cg and ts(daily["confAt"]) < ts(first_start) - lock_gap(day):
+                if cg and daily_ok(daily, "confAt", first_start, lock_gap(day), day):
                     conf_game = cg["id"]
             dp = 0
             dp_name = None
-            if daily and daily.get("dayPlayerId") and daily.get("dayAt") and ts(daily["dayAt"]) < ts(first_start) - lock_gap(day):
+            if daily and daily.get("dayPlayerId") and daily_ok(daily, "dayAt", first_start, lock_gap(day), day):
                 dp_name = daily.get("dayPlayerName")
                 if daily["dayPlayerId"] in night_ids:
                     dp = 3 if day >= RULES2_FROM else 2
             # gecenin sorusu: gece tamamen bittiyse
             q, qp = None, 0
-            if daily and daily.get("q") in ("y", "n") and daily.get("qAt") and ts(daily["qAt"]) < ts(first_start) - lock_gap(day):
+            if daily and daily.get("q") in ("y", "n") and daily_ok(daily, "qAt", first_start, lock_gap(day), day):
                 q = daily["q"]
                 if nights.get(day, {}).get("done") and nights[day]["n"] == len(dgames):
                     qp = 1 if q == question_answer(day, dgames) else 0

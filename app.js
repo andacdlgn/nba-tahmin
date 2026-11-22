@@ -518,7 +518,8 @@ function parseGames(raw){
   if(list.length){
     const first = Math.min(...list.map(g=>g.start.getTime())), gap = first>=GAP_FROM ? LOCK_GAP : 0, per = first>=PERGAME_FROM;
     list.forEach(g => { g.nightLock = new Date(first-gap); g.lock = per ? new Date(g.start.getTime()-gap) : g.nightLock;
-      g.lockBase = per ? g.start : new Date(first); g.nightBase = new Date(first); g.perGame = per; g.extUntil = S.lockExt?.[g.id] || 0; });
+      g.lockBase = per ? g.start : new Date(first); g.nightBase = new Date(first); g.perGame = per; });
+    applyExt(list);
   }
   return list;
 }
@@ -6319,11 +6320,17 @@ function confirmBtn(btn, label, fn){
   btn._t=setTimeout(()=>{ delete btn.dataset.armed; btn.textContent=old; btn.classList.remove("armed"); }, 4000);
 }
 // ---- Maç kilidini uzatma ve oyuncu adına geç tahmin (yönetici) ----
+// Kilit uzatmalarını bir gecenin maçlarına uygula: lockExt/{maçId} o maçı, lockExt/{gün} gecenin kilidini (banko, günün oyuncusu, soru) uzatır
+function applyExt(list){
+  if(!list?.length) return; const day=usDay(list[0].nightBase), ne=S.lockExt?.[day]||0;
+  for(const g of list){ g.extUntil=S.lockExt?.[g.id]||0; if(!g.nightLock0) g.nightLock0=g.nightLock;
+    g.nightLock = ne>g.nightLock0.getTime() ? new Date(ne) : g.nightLock0; }
+}
 function watchLockExt(){
   if(S.extUn || !S.db) return;
   S.extUn = onSnapshot(collection(S.db,"lockExt"), snap=>{
     S.lockExt={}; snap.forEach(d=>{ const u=d.data().until?.toMillis?.(); if(u) S.lockExt[d.id]=u; });
-    for(const D of Object.values(S.days||{})) for(const g of D?.games||[]) g.extUntil = S.lockExt[g.id] || 0;
+    for(const D of Object.values(S.days||{})) applyExt(D?.games);
     try{ render(); if(BETA.on) betaRender(); }catch(e){}
     clearTimeout(S.extT); const nx=Math.min(...Object.values(S.lockExt).filter(u=>u>Date.now()), Infinity);
     if(nx<Infinity) S.extT=setTimeout(()=>{ try{ render(); if(BETA.on) betaRender(); }catch(e){} }, nx-Date.now()+500);
@@ -6351,7 +6358,23 @@ async function paintAdmLock(){
       <input id="admPM" class="adm-in" type="number" min="1" max="40" inputmode="numeric" placeholder="Fark (1-40)" style="width:8em"></div>
     <select id="admPS" class="adm-in" style="margin-top:8px"><option value="">Skorer yükleniyor…</option></select>
     <button class="btn" id="admPGo" type="button" style="margin-top:8px;width:100%">Tahmini kaydet</button>
-    <small class="muted" id="admPMsg">Kilitten sonra girilse de sayılır; puan bir sonraki güncellemede (en geç 1 saat) hesaplanır. Oyuncunun eski tahmini varsa üstüne yazılır.</small>`;
+    <small class="muted" id="admPMsg">Kilitten sonra girilse de sayılır; puan bir sonraki güncellemede (en geç 1 saat) hesaplanır. Oyuncunun eski tahmini varsa üstüne yazılır.</small>
+    <h4 style="margin-top:16px">Gecenin seçimleri (${dayNice(day,{day:"numeric",month:"short"})}): banko, günün oyuncusu, soru</h4>
+    ${(()=>{ const ne=S.lockExt?.[day], g0=S.days[day]?.games?.[0];
+      return `<p class="muted" style="margin:0 0 6px">${ne&&ne>Date.now()?`Gecenin kilidi uzatıldı: <b>${timeTR(new Date(ne))}</b>'e kadar açık.`:`Gecenin kilidi ${g0?timeTR(g0.nightLock0||g0.nightLock):"-"}.`}</p>`; })()}
+    <div class="adm-row"><select id="admNExtN" class="adm-in" style="width:auto">${[3,5,10,15,30].map(n=>`<option value="${n}"${n===5?" selected":""}>Şu andan ${n} dk</option>`).join("")}</select>
+      <button class="btn" id="admNExtGo" type="button">Gecenin kilidini aç</button>${S.lockExt?.[day]?`<button class="btn danger" id="admNExtOff" type="button">Kapat</button>`:""}</div>
+    <small class="muted" id="admNExtMsg">Açıkken herkes banko, günün oyuncusu ve gecenin sorusunu seçip değiştirebilir.</small>
+    <h4 style="margin-top:12px">Oyuncu adına gecenin seçimleri</h4>
+    <select id="admDU" class="adm-in">${S.order.map(u=>`<option value="${u}">${esc(pname(u))}</option>`).join("")}</select>
+    <label class="muted" style="display:block;margin:8px 0 2px">Banko</label>
+    <select id="admDB" class="adm-in"><option value="">Değiştirme</option>${(S.days[day]?.games||[]).map(x=>`<option value="${x.id}">${esc(x.away.abbr)} @ ${esc(x.home.abbr)} · ${timeTR(x.start)}</option>`).join("")}</select>
+    <label class="muted" style="display:block;margin:8px 0 2px">Günün oyuncusu</label>
+    <select id="admDP" class="adm-in"><option value="">Değiştirme</option></select>
+    <label class="muted" style="display:block;margin:8px 0 2px">Gecenin sorusu: ${esc(questionOf(day)?.t||"")}</label>
+    <select id="admDQ" class="adm-in"><option value="">Değiştirme</option><option value="y">Evet</option><option value="n">Hayır</option></select>
+    <button class="btn" id="admDGo" type="button" style="margin-top:8px;width:100%">Gecenin seçimlerini kaydet</button>
+    <small class="muted" id="admDMsg">Yalnızca seçtiğin alanlar değişir; "Değiştirme" bırakılanlar oyuncunun eski seçimi olarak kalır.</small>`;
   $("#admG").onchange=e=>{ S.admG=e.target.value; paintAdmLock(); };
   $("#admExtGo").onclick=async()=>{ const n=+$("#admExtN").value;
     try{ await setDoc(doc(S.db,"lockExt",g.id), {until:Timestamp.fromMillis(Date.now()+n*6e4), by:S.uid, at:serverTimestamp()}); toast(`${g.away.abbr}-${g.home.abbr} ${n} dk açık.`); paintAdmLock(); }
@@ -6374,6 +6397,34 @@ async function paintAdmLock(){
     try{ await setDoc(doc(S.db,"picks",`${g.id}_${u}`), data); $("#admPMsg").textContent=`Kaydedildi: ${pname(u)} · ${w} ${m} fark · ${o.dataset.n}.`; toast("Tahmin kaydedildi.");
       const D=S.days[day]; if(D?.picks){ (D.picks[g.id] ||= {})[u]={...data, updatedAt:Timestamp.now(), _locked:started(g)}; } }
     catch(e){ $("#admPMsg").textContent="Kaydedilemedi: "+(e.code||e.message||"hata"); } };
+  // ---- gecenin seçimleri
+  $("#admNExtGo").onclick=async()=>{ const n=+$("#admNExtN").value;
+    try{ await setDoc(doc(S.db,"lockExt",day), {until:Timestamp.fromMillis(Date.now()+n*6e4), by:S.uid, at:serverTimestamp()}); toast(`Gecenin kilidi ${n} dk açık.`); paintAdmLock(); }
+    catch(e){ $("#admNExtMsg").textContent="Açılamadı: "+(e.code||e.message||"hata"); } };
+  $("#admNExtOff")?.addEventListener("click", async()=>{ try{ await deleteDoc(doc(S.db,"lockExt",day)); toast("Uzatma kaldırıldı."); paintAdmLock(); }catch(e){ $("#admNExtMsg").textContent="Kaldırılamadı."; } });
+  const nightGames=S.days[day]?.games||[];
+  Promise.all(nightGames.flatMap(x=>[loadRoster(x.away).catch(()=>[]), loadRoster(x.home).catch(()=>[])])).then(rs=>{ const el=$("#admDP"); if(!el) return;
+    const all=rs.flat().sort((a,b)=>a.team.localeCompare(b.team)||a.name.localeCompare(b.name,"tr"));
+    el.innerHTML=`<option value="">Değiştirme</option>`+all.map(p=>`<option value="${esc(p.id)}" data-n="${esc(p.name)}">${esc(p.team)} · ${esc(p.name)}</option>`).join(""); fillDaily(); });
+  const fillDaily=async()=>{ const u=$("#admDU")?.value; if(!u) return; let d=null;
+    try{ const r=await getDoc(dailyRef(day,u)); d=r.exists()?r.data():null; }catch(e){}
+    S.admDaily={u, d}; if(!$("#admDMsg")) return;
+    const cg=nightGames.find(x=>x.id===d?.confGame);
+    $("#admDMsg").textContent = d ? `Mevcut: banko ${cg?cg.away.abbr+" @ "+cg.home.abbr:"yok"} · günün oyuncusu ${d.dayPlayerName||"yok"} · soru ${d.q==="y"?"Evet":d.q==="n"?"Hayır":"yok"}${d.by?" (yönetici girdi)":""}.` : "Bu geceye kayıtlı seçimi yok (ya da kilitlenmeden görünmüyor).";
+  };
+  $("#admDU").onchange=fillDaily;
+  $("#admDGo").onclick=async()=>{ const u=$("#admDU").value, bg=$("#admDB").value, po=$("#admDP").selectedOptions[0], q=$("#admDQ").value;
+    if(!bg && !po?.value && !q) return void($("#admDMsg").textContent="En az bir alan seç.");
+    const old=S.admDaily?.u===u ? (S.admDaily.d||{}) : {};
+    const first=Math.min(...nightGames.map(x=>x.start.getTime()));
+    const data={uid:u, day, firstStart:old.firstStart||Timestamp.fromMillis(first), by:S.uid};
+    for(const k of ["confGame","confStart","confAt","dayPlayerId","dayPlayerName","dayAt","q","qAt"]) if(old[k]!==undefined) data[k]=old[k];
+    if(bg){ const x=nightGames.find(y=>y.id===bg); data.confGame=bg; data.confStart=Timestamp.fromDate(x.nightBase); data.confAt=serverTimestamp(); }
+    if(po?.value){ data.dayPlayerId=po.value; data.dayPlayerName=po.dataset.n.slice(0,60); data.dayAt=serverTimestamp(); }
+    if(q){ data.q=q; data.qAt=serverTimestamp(); }
+    try{ await setDoc(dailyRef(day,u), data); toast("Gecenin seçimleri kaydedildi."); await fillDaily();
+      const D=S.days[day]; if(D?.daily) D.daily[u]={...data, confAt:data.confAt&&Timestamp.now(), dayAt:data.dayAt&&Timestamp.now(), qAt:data.qAt&&Timestamp.now()}; }
+    catch(e){ $("#admDMsg").textContent="Kaydedilemedi: "+(e.code||e.message||"hata"); } };
 }
 async function openAdmin(){
   S.sheetLocked=false;
